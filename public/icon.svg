@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Background -->
+  <rect width="512" height="512" fill="#0ea5e9" rx="64"/>
+  
+  <!-- Fish shape -->
+  <path d="M 150 256 Q 150 180, 220 180 L 380 180 Q 420 180, 420 220 L 420 292 Q 420 332, 380 332 L 220 332 Q 150 332, 150 256 Z" 
+        fill="#ffffff" opacity="0.95"/>
+  
+  <!-- Fish tail -->
+  <path d="M 380 180 L 450 140 L 420 220 L 450 220 L 380 180 Z" fill="#ffffff" opacity="0.95"/>
+  <path d="M 380 332 L 450 372 L 420 292 L 450 292 L 380 332 Z" fill="#ffffff" opacity="0.95"/>
+  
+  <!-- Fish eye -->
+  <circle cx="240" cy="220" r="18" fill="#0ea5e9"/>
+  <circle cx="240" cy="220" r="8" fill="#ffffff"/>
+  
+  <!-- Fishing hook -->
+  <path d="M 200 100 Q 200 50, 250 50 L 300 50" 
+        stroke="#fbbf24" stroke-width="8" fill="none" stroke-linecap="round"/>
+  <circle cx="300" cy="50" r="12" fill="#fbbf24"/>
+  <path d="M 250 50 L 250 150" 
+        stroke="#fbbf24" stroke-width="4" fill="none" stroke-dasharray="8,4"/>
+  
+  <!-- Text -->
+  <text x="256" y="440" font-family="Arial, sans-serif" font-size="48" font-weight="bold" 
+        text-anchor="middle" fill="#ffffff">RecFish ZA</text>
+</svg>

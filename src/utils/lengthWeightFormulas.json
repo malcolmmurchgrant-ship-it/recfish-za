@@ -1,0 +1,2284 @@
+{
+  "Angelshark African": {
+    "lengthType": "TL",
+    "f": -11.35134983,
+    "g": 2.933115959,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Barracuda Blackfin": {
+    "lengthType": "FL",
+    "f": -12.10168377,
+    "g": 2.999994039,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Barracuda Sawtooth": {
+    "lengthType": "FL",
+    "f": -11.7953777,
+    "g": 2.930708535,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Bass Brindle": {
+    "lengthType": "TL",
+    "f": -10.96440029,
+    "g": 2.999917984,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Bream Twobar": {
+    "lengthType": "FL",
+    "f": -10.15195066,
+    "g": 2.910000367,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Catshark Banded": {
+    "lengthType": "TL",
+    "f": -12.89350986,
+    "g": 3.048912048,
+    "formulaType": "exponential",
+    "reference": "TORRES, F.S.B., Jr."
+  },
+  "Catshark Tiger": {
+    "lengthType": "TL",
+    "f": -12.89350986,
+    "g": 3.048912048,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Chub Blue": {
+    "lengthType": "FL",
+    "f": -10.88860035,
+    "g": 3.044718981,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Chub Brassy": {
+    "lengthType": "FL",
+    "f": -10.81772995,
+    "g": 3.036582947,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Dane": {
+    "lengthType": "FL",
+    "f": -10.84992981,
+    "g": 2.984142065,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Dogfish Spotted Spiny": {
+    "lengthType": "TL",
+    "f": -13.43025495,
+    "g": 3.219990589,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Eel Blackedged Conger": {
+    "lengthType": "TL",
+    "f": -14.34276962,
+    "g": 3.271014929,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Eel Cape Conger": {
+    "lengthType": "TL",
+    "f": -14.34276962,
+    "g": 3.271014929,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Eel Crocodile Snake": {
+    "lengthType": "TL",
+    "f": -13.11616039,
+    "g": 2.998719931,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Eel Leopard Moray": {
+    "lengthType": "TL",
+    "f": -13.32042781,
+    "g": 2.999919707,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Eel Pike Conger": {
+    "lengthType": "TL",
+    "f": -12.85744953,
+    "g": 2.82366991,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Eel Slender Giant Moray": {
+    "lengthType": "TL",
+    "f": -11.43947983,
+    "g": 2.325802088,
+    "formulaType": "exponential",
+    "reference": "LETOURNEUR, Y. et al."
+  },
+  "Eel Yellowedged Moray": {
+    "lengthType": "TL",
+    "f": -14.75876045,
+    "g": 3.355549097,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Emperor Cutthroat": {
+    "lengthType": "FL",
+    "f": -11.04290266,
+    "g": 3.076994578,
+    "formulaType": "exponential",
+    "reference": "SAMBOO, C.R. et al."
+  },
+  "Flounder Largetooth": {
+    "lengthType": "TL",
+    "f": -11.90448041,
+    "g": 3.075998458,
+    "formulaType": "exponential",
+    "reference": "WILLING, R.S. et al."
+  },
+  "Flounder Measles": {
+    "lengthType": "TL",
+    "f": -11.63916969,
+    "g": 3.077567101,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Grunter Saddle": {
+    "lengthType": "FL",
+    "f": -10.75699043,
+    "g": 2.899035931,
+    "formulaType": "exponential",
+    "reference": "BRINCA, L. et al."
+  },
+  "Hogfish Goldsaddle": {
+    "lengthType": "FL",
+    "f": -11.34317988,
+    "g": 3.148749421,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Kingfish Bumpnose": {
+    "lengthType": "FL",
+    "f": -10.17663956,
+    "g": 2.864478111,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Kingfish Malabar": {
+    "lengthType": "FL",
+    "f": -10.48466698,
+    "g": 2.9200343,
+    "formulaType": "exponential",
+    "reference": "AHMAD, A.T.B. et al."
+  },
+  "Kingfish Tille": {
+    "lengthType": "FL",
+    "f": -11.64500046,
+    "g": 3.163870096,
+    "formulaType": "exponential",
+    "reference": "PAULY, D. et al."
+  },
+  "Kingfish White": {
+    "lengthType": "FL",
+    "f": -11.21354961,
+    "g": 3.064146996,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Klipvis Robust": {
+    "lengthType": "TL",
+    "f": -10.97628975,
+    "g": 3.035970926,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Mirrorfish Threadfin": {
+    "lengthType": "FL",
+    "f": -10.09704883,
+    "g": 2.849995135,
+    "formulaType": "exponential",
+    "reference": "MAGN\u00faSSON, J. et al."
+  },
+  "Mullet Bluetail": {
+    "lengthType": "FL",
+    "f": -11.50212002,
+    "g": 3.104231119,
+    "formulaType": "exponential",
+    "reference": "KULBICKI, M. et al."
+  },
+  "Mullet Diamond": {
+    "lengthType": "FL",
+    "f": -11.36104012,
+    "g": 3.065074921,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Needlefish Barred": {
+    "lengthType": "FL",
+    "f": -14.15301037,
+    "g": 3.126049995,
+    "formulaType": "exponential",
+    "reference": "TORRES, F.S.B., Jr."
+  },
+  "Needlefish Yellowfin": {
+    "lengthType": "FL",
+    "f": -11.53367043,
+    "g": 2.515065908,
+    "formulaType": "exponential",
+    "reference": "LETOURNEUR, Y. et al."
+  },
+  "Old Woman": {
+    "lengthType": "TL",
+    "f": -10.85877991,
+    "g": 2.970304012,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Pomfret Black": {
+    "lengthType": "FL",
+    "f": -10.76624012,
+    "g": 3.011996031,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Pompano Snubnose": {
+    "lengthType": "FL",
+    "f": -7.522987605,
+    "g": 2.252003003,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Porcupinefish": {
+    "lengthType": "TL",
+    "f": -8.161070824,
+    "g": 2.344594955,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Puffer Blackback": {
+    "lengthType": "TL",
+    "f": -10.82821893,
+    "g": 2.934397784,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Puffer Silverstripe": {
+    "lengthType": "FL",
+    "f": -10.91246898,
+    "g": 2.923995568,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Puffer Smooth": {
+    "lengthType": "TL",
+    "f": -10.74396888,
+    "g": 2.9448,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Puffer Star": {
+    "lengthType": "TL",
+    "f": -9.29916161,
+    "g": 2.67238793,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Puffer Whitespotted": {
+    "lengthType": "TL",
+    "f": -9.772453721,
+    "g": 2.800998837,
+    "formulaType": "exponential",
+    "reference": "LETOURNEUR, Y. et al."
+  },
+  "Rabbitfish Whitespotted": {
+    "lengthType": "FL",
+    "f": -9.730881691,
+    "g": 2.756633997,
+    "formulaType": "exponential",
+    "reference": "SAMBOO, C.R. et al."
+  },
+  "Ray Blackspotted Electric": {
+    "lengthType": "DW",
+    "f": -9.804895401,
+    "g": 2.807568073,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Ray Flapnose": {
+    "lengthType": "DW",
+    "f": -11.59589005,
+    "g": 3.138524055,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Ray Round Ribbontail": {
+    "lengthType": "DW",
+    "f": -9.153886795,
+    "g": 2.712804079,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Remora": {
+    "lengthType": "FL",
+    "f": -12.38527434,
+    "g": 3.000015677,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Rockcod Streakyspot": {
+    "lengthType": "TL",
+    "f": -11.11575031,
+    "g": 3.017632008,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Rubberlip Barred": {
+    "lengthType": "FL",
+    "f": -10.77190018,
+    "g": 2.946597099,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Rubberlip Blackspotted": {
+    "lengthType": "TL",
+    "f": -10.77190018,
+    "g": 2.946597099,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Rubberlip Redlip": {
+    "lengthType": "FL",
+    "f": -10.77190018,
+    "g": 2.946597099,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Scorpionfish Spineblotch": {
+    "lengthType": "TL",
+    "f": -10.87395,
+    "g": 3.010509968,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Shark Blackfin Reef": {
+    "lengthType": "PCL",
+    "f": -11.34669971,
+    "g": 3.049860954,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Shark Hammerhead Giant": {
+    "lengthType": "PCL",
+    "f": -10.97926044,
+    "g": 2.944046974,
+    "formulaType": "exponential",
+    "reference": "CLIFF, G."
+  },
+  "Shark Hammerhead Smooth (M)": {
+    "lengthType": "PCL",
+    "f": -11.21096346,
+    "g": 2.995366633,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Shark Java": {
+    "lengthType": "PCL",
+    "f": -10.43056965,
+    "g": 2.930546999,
+    "formulaType": "exponential",
+    "reference": "CLIFF, G. and S.F.J. DUDLEY"
+  },
+  "Shark Lemon": {
+    "lengthType": "PCL",
+    "f": -10.9772907,
+    "g": 3.003881802,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Shark Sandbar (F)": {
+    "lengthType": "PCL",
+    "f": -11.77966022,
+    "g": 3.170077085,
+    "formulaType": "exponential",
+    "reference": "CLIFF, G., S.F.J. DUDLEY, B. DAVIS"
+  },
+  "Shark Sandbar (M)": {
+    "lengthType": "PCL",
+    "f": -11.48738956,
+    "g": 3.090497971,
+    "formulaType": "exponential",
+    "reference": "CLIFF, G., S.F.J. DUDLEY, B. DAVIS"
+  },
+  "Shark Smoothhound Whitespotted": {
+    "lengthType": "TL",
+    "f": -14.8193903,
+    "g": 3.5015769,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Shark Thresher Bigeye": {
+    "lengthType": "PCL",
+    "f": -10.03355026,
+    "g": 2.856935024,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Sole Shallowwater": {
+    "lengthType": "TL",
+    "f": -11.82723045,
+    "g": 3.070030928,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Triggerfish Clown": {
+    "lengthType": "TL",
+    "f": -10.62203026,
+    "g": 3.018528938,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Triggerfish Patchy": {
+    "lengthType": "TL",
+    "f": -10.24499035,
+    "g": 2.874799967,
+    "formulaType": "exponential",
+    "reference": "SMITH, A. and P. DALZELL"
+  },
+  "Tuna Slender": {
+    "lengthType": "FL",
+    "f": -11.0926199,
+    "g": 2.999663115,
+    "formulaType": "exponential",
+    "reference": "IGFA"
+  },
+  "Wrasse Ladder": {
+    "lengthType": "FL",
+    "f": -11.165960309999999,
+    "g": 3.007407904,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Wrasse Rainbow": {
+    "lengthType": "FL",
+    "f": -11.165960309999999,
+    "g": 3.007407904,
+    "formulaType": "exponential",
+    "reference": "FishBase"
+  },
+  "Anchovy Cape": {
+    "lengthType": "TL",
+    "a": 5.6e-06,
+    "b": 3.05,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Baardman": {
+    "lengthType": "TL",
+    "a": 1.1480000000000001e-08,
+    "b": 3.02,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Barracuda Great": {
+    "lengthType": "FL",
+    "a": 9.81e-06,
+    "b": 2.875,
+    "formulaType": "power",
+    "reference": "nan"
+  },
+  "Barracuda Pickhandle": {
+    "lengthType": "FL",
+    "a": 8.3e-06,
+    "b": 2.94,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Bass Potato": {
+    "lengthType": "TL",
+    "a": 1e-08,
+    "b": 3.07,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Blacktail": {
+    "lengthType": "FL",
+    "a": 7.4e-09,
+    "b": 3.242,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Blueskin": {
+    "lengthType": "TL",
+    "a": 8.794000000000001e-09,
+    "b": 3.102,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Bonefish": {
+    "lengthType": "FL",
+    "a": 2.33e-05,
+    "b": 2.89,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Bonito Atlantic": {
+    "lengthType": "FL",
+    "a": 2.36e-05,
+    "b": 2.87,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Bonito Striped": {
+    "lengthType": "FL",
+    "a": 2.17e-05,
+    "b": 2.87,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Bream Bronze": {
+    "lengthType": "FL",
+    "a": 2.2e-08,
+    "b": 3.046,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Bream Kingsoldier": {
+    "lengthType": "FL",
+    "a": 0.0001047,
+    "b": 2.6,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Bream River": {
+    "lengthType": "TL",
+    "a": 1.2799999999999999e-08,
+    "b": 3.09,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Bream Stone": {
+    "lengthType": "FL",
+    "a": 1.4e-08,
+    "b": 3.08,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Carpenter": {
+    "lengthType": "FL",
+    "a": 4e-08,
+    "b": 2.8553,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Catfish Eel": {
+    "lengthType": "TL",
+    "a": 4.57e-06,
+    "b": 3.07,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Catshark Brown": {
+    "lengthType": "TL",
+    "a": 3.1600000000000002e-06,
+    "b": 3.12,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Catshark Dark": {
+    "lengthType": "TL",
+    "a": 3.1600000000000002e-06,
+    "b": 3.12,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Catshark Leopard": {
+    "lengthType": "TL",
+    "a": 8.02e-06,
+    "b": 2.92,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Catshark Puffadder": {
+    "lengthType": "TL",
+    "a": 3.31e-06,
+    "b": 3.14,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Catshark Striped": {
+    "lengthType": "TL",
+    "a": 6.740000000000001e-06,
+    "b": 2.958,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Cavebass": {
+    "lengthType": "TL",
+    "a": 2.49e-05,
+    "b": 2.96,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Chub Grey": {
+    "lengthType": "TL",
+    "a": 1.698e-05,
+    "b": 2.98,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Cobia": {
+    "lengthType": "FL",
+    "a": 4.2e-06,
+    "b": 3.1,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Concertinafish": {
+    "lengthType": "TL",
+    "a": 4.9500000000000004e-05,
+    "b": 2.895,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Cutlassfish": {
+    "lengthType": "TL",
+    "a": 5e-07,
+    "b": 3.14,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Dageraad": {
+    "lengthType": "FL",
+    "a": 1.2999999999999999e-08,
+    "b": 3.151,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Damsel Spot": {
+    "lengthType": "FL",
+    "a": 3.5799999999999996e-05,
+    "b": 3.18,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Dogfish Shortnose Spiny": {
+    "lengthType": "TL",
+    "a": 7.2e-06,
+    "b": 2.93,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Dorado": {
+    "lengthType": "FL",
+    "a": 2.4e-05,
+    "b": 2.75,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Dory John": {
+    "lengthType": "TL",
+    "a": 2.24e-05,
+    "b": 2.9,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Eel Honeycomb Moray": {
+    "lengthType": "TL",
+    "a": 9.5e-07,
+    "b": 3.09,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Elephantfish Cape": {
+    "lengthType": "TL",
+    "a": 7.97e-06,
+    "b": 3.0,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Elf": {
+    "lengthType": "FL",
+    "a": 1.5000000000000002e-08,
+    "b": 2.98,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Emperor Blue": {
+    "lengthType": "FL",
+    "a": 1.87e-05,
+    "b": 2.996,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Emperor Natal": {
+    "lengthType": "FL",
+    "a": 1.8710000000000002e-05,
+    "b": 2.996,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Emperor Rippled Barenose": {
+    "lengthType": "FL",
+    "a": 3.0200000000000002e-05,
+    "b": 2.72,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Emperor Yellowfin": {
+    "lengthType": "TL",
+    "a": 1.4449999999999999e-05,
+    "b": 2.99,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Englishman": {
+    "lengthType": "FL",
+    "a": 1.2699999999999999e-07,
+    "b": 2.74,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Fingerfin Natal": {
+    "lengthType": "TL",
+    "a": 1.202e-05,
+    "b": 3.02,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Fingerfin Twotone": {
+    "lengthType": "TL",
+    "a": 1.202e-05,
+    "b": 3.02,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Flagtail Barred": {
+    "lengthType": "TL",
+    "a": 1.058e-05,
+    "b": 3.0,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Flathead Bartailed": {
+    "lengthType": "TL",
+    "a": 3.019e-07,
+    "b": 2.383,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Fransmadam": {
+    "lengthType": "FL",
+    "a": 5.73e-08,
+    "b": 2.81,
+    "formulaType": "power",
+    "reference": "Student Thesis"
+  },
+  "Fusilier Yellowtail": {
+    "lengthType": "FL",
+    "a": 2.2700000000000003e-05,
+    "b": 2.9,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Galjoen": {
+    "lengthType": "TL",
+    "a": 9.03e-09,
+    "b": 3.12,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Galjoen Banded": {
+    "lengthType": "FL",
+    "a": 1.2e-08,
+    "b": 3.152,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Geelbek": {
+    "lengthType": "FL",
+    "a": 8.42e-09,
+    "b": 3.01,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "German": {
+    "lengthType": "TL",
+    "a": 1.3180000000000001e-05,
+    "b": 3.03,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Goatfish Blacksaddle": {
+    "lengthType": "TL",
+    "a": 1.1400000000000001e-05,
+    "b": 3.01,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Goatfish Indian": {
+    "lengthType": "FL",
+    "a": 1.415e-05,
+    "b": 3.114,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Goby Tank": {
+    "lengthType": "TL",
+    "a": 1.1e-05,
+    "b": 3.0,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Grunter Cock": {
+    "lengthType": "TL",
+    "a": 3.47e-05,
+    "b": 2.83,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Grunter Grey": {
+    "lengthType": "FL",
+    "a": 2.9999999999999997e-05,
+    "b": 2.84,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Grunter Javelin": {
+    "lengthType": "TL",
+    "a": 1.4449999999999999e-05,
+    "b": 2.98,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Grunter Olive": {
+    "lengthType": "FL",
+    "a": 4.5199999999999994e-05,
+    "b": 2.69,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Grunter Spotted": {
+    "lengthType": "FL",
+    "a": 3.0000000000000004e-08,
+    "b": 2.885,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Grunter Striped": {
+    "lengthType": "TL",
+    "a": 2.042e-05,
+    "b": 3.0,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Guitarfish Bluntnose": {
+    "lengthType": "TL",
+    "a": 3.1600000000000002e-06,
+    "b": 3.11,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Guitarfish Bowmouth": {
+    "lengthType": "TL",
+    "a": 3.89e-06,
+    "b": 3.12,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Guitarfish Giant": {
+    "lengthType": "TL",
+    "a": 5.22e-09,
+    "b": 3.0141,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Guitarfish Greyspot": {
+    "lengthType": "TL",
+    "a": 2.2100000000000002e-05,
+    "b": 2.56,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Guitarfish Lesser": {
+    "lengthType": "TL",
+    "a": 1.08e-09,
+    "b": 3.18,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Gurnard Cape": {
+    "lengthType": "TL",
+    "a": 9.33e-06,
+    "b": 3.05,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Hake Shallow-water": {
+    "lengthType": "TL",
+    "a": 5.7000000000000005e-06,
+    "b": 3.073,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Halfbeak Tropical": {
+    "lengthType": "FL",
+    "a": 6.800000000000001e-07,
+    "b": 3.575,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Herring Wolf": {
+    "lengthType": "FL",
+    "a": 5.2e-05,
+    "b": 2.391,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Hogfish Saddleback": {
+    "lengthType": "TL",
+    "a": 1.46e-05,
+    "b": 3.0,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Hottentot": {
+    "lengthType": "FL",
+    "a": 3.31e-08,
+    "b": 2.9467,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Hottentot Blue": {
+    "lengthType": "FL",
+    "a": 1e-08,
+    "b": 3.149,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Jobfish Green": {
+    "lengthType": "FL",
+    "a": 2.94e-05,
+    "b": 2.76,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Jobfish Rosy": {
+    "lengthType": "FL",
+    "a": 2.5e-05,
+    "b": 2.93,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "John Brown": {
+    "lengthType": "FL",
+    "a": 1e-08,
+    "b": 3.1843,
+    "formulaType": "power",
+    "reference": "Student Thesis"
+  },
+  "Jutjaw": {
+    "lengthType": "FL",
+    "a": 1.995e-05,
+    "b": 3.01,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Karanteen": {
+    "lengthType": "TL",
+    "a": 2.291e-05,
+    "b": 2.94,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Kingfish Bigeye": {
+    "lengthType": "FL",
+    "a": 5.01e-05,
+    "b": 2.71,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Kingfish Blackbanded": {
+    "lengthType": "TL",
+    "a": 1.203e-05,
+    "b": 3.0,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Kingfish Blacktip": {
+    "lengthType": "FL",
+    "a": 3.86e-08,
+    "b": 2.856,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Kingfish Bludger": {
+    "lengthType": "FL",
+    "a": 4.57e-05,
+    "b": 2.78,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Kingfish Blue": {
+    "lengthType": "FL",
+    "a": 3.09e-05,
+    "b": 2.88,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Kingfish Bluefin": {
+    "lengthType": "FL",
+    "a": 2.14e-05,
+    "b": 2.95,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Kingfish Brassy": {
+    "lengthType": "FL",
+    "a": 2.49e-05,
+    "b": 2.91,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Kingfish Giant": {
+    "lengthType": "FL",
+    "a": 2.34e-05,
+    "b": 2.96,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Kingfish Golden": {
+    "lengthType": "FL",
+    "a": 2.34e-05,
+    "b": 2.95,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Kingfish Longfin": {
+    "lengthType": "FL",
+    "a": 1.145e-05,
+    "b": 3.126,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Kingfish Yellowspotted": {
+    "lengthType": "FL",
+    "a": 3.285e-05,
+    "b": 2.808,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Kingklip": {
+    "lengthType": "TL",
+    "a": 1.25e-06,
+    "b": 3.33,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Klipvis Super": {
+    "lengthType": "TL",
+    "a": 6.92e-06,
+    "b": 3.07,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Knifejaw Cape": {
+    "lengthType": "FL",
+    "a": 1.3879999999999999e-06,
+    "b": 2.318,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Knifejaw Natal": {
+    "lengthType": "FL",
+    "a": 5.94e-07,
+    "b": 2.479,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Kob Dusky": {
+    "lengthType": "TL",
+    "a": 7.999999999999999e-09,
+    "b": 3.0397,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Kob Silver": {
+    "lengthType": "TL",
+    "a": 6e-09,
+    "b": 3.07,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Kob Small": {
+    "lengthType": "TL",
+    "a": 3.08e-09,
+    "b": 3.28,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Kob Snapper": {
+    "lengthType": "TL",
+    "a": 4.94e-09,
+    "b": 3.13,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Kob Squaretail": {
+    "lengthType": "TL",
+    "a": 2e-08,
+    "b": 2.89,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Koester": {
+    "lengthType": "TL",
+    "a": 9.55e-06,
+    "b": 2.97,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Leerfish": {
+    "lengthType": "FL",
+    "a": 1.124e-08,
+    "b": 3.015,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Lemonfish": {
+    "lengthType": "FL",
+    "a": 2e-08,
+    "b": 2.9515,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Mackerel Cape Horse": {
+    "lengthType": "FL",
+    "a": 7.8e-06,
+    "b": 3.011,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Mackerel Chub": {
+    "lengthType": "TL",
+    "a": 4.4e-06,
+    "b": 3.26,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Mackerel Indian": {
+    "lengthType": "TL",
+    "a": 5.7999999999999995e-06,
+    "b": 3.21,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Mackerel King": {
+    "lengthType": "FL",
+    "a": 9.100000000000001e-06,
+    "b": 2.96,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Mackerel Queen": {
+    "lengthType": "FL",
+    "a": 1.26e-08,
+    "b": 2.94,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Marlin Black": {
+    "lengthType": "LBFL",
+    "a": 8e-08,
+    "b": 2.668,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Marlin Blue Atlantic": {
+    "lengthType": "LBFL",
+    "a": 5.4e-06,
+    "b": 3.07,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Marlin Blue Pacific": {
+    "lengthType": "LBFL",
+    "a": 5.4e-06,
+    "b": 3.07,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Marlin Striped": {
+    "lengthType": "LBFL",
+    "a": 1.5169999999999999e-05,
+    "b": 2.88,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Milkfish": {
+    "lengthType": "TL",
+    "a": 1.2e-05,
+    "b": 3.01,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Mirrorfish Indian": {
+    "lengthType": "FL",
+    "a": 8.1e-05,
+    "b": 2.57,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Moony Cape": {
+    "lengthType": "TL",
+    "a": 3.09e-05,
+    "b": 2.99,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Moony Natal": {
+    "lengthType": "FL",
+    "a": 3.0339999999999998e-05,
+    "b": 2.964,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Mullet Flathead": {
+    "lengthType": "TL",
+    "a": 1.38e-05,
+    "b": 2.98,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Mullet Southern": {
+    "lengthType": "TL",
+    "a": 4e-08,
+    "b": 2.7478,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Mullet Striped": {
+    "lengthType": "TL",
+    "a": 2.51e-05,
+    "b": 2.83,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Musselcracker Black": {
+    "lengthType": "FL",
+    "a": 2.236e-08,
+    "b": 3.0355,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Musselcracker White": {
+    "lengthType": "FL",
+    "a": 1.8e-08,
+    "b": 3.037,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Needlefish Crocodile": {
+    "lengthType": "TL",
+    "a": 8.000000000000001e-07,
+    "b": 3.2,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Panga": {
+    "lengthType": "FL",
+    "a": 2e-08,
+    "b": 3.031,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Parrotfish Bluebarred": {
+    "lengthType": "FL",
+    "a": 1.65e-05,
+    "b": 3.041,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Pilchard": {
+    "lengthType": "TL",
+    "a": 9.299999999999999e-06,
+    "b": 3.06,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Pompano Largespot": {
+    "lengthType": "FL",
+    "a": 2e-08,
+    "b": 2.96,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Pompano Smallspot": {
+    "lengthType": "FL",
+    "a": 1.288e-05,
+    "b": 2.96,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Pompano Southern": {
+    "lengthType": "FL",
+    "a": 3.6399999999999995e-08,
+    "b": 2.887,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Puffer Evileye": {
+    "lengthType": "TL",
+    "a": 3.467e-05,
+    "b": 2.92,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Pursemouth Evenfin": {
+    "lengthType": "TL",
+    "a": 1.778e-05,
+    "b": 3.04,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Queenfish Doublespotted": {
+    "lengthType": "FL",
+    "a": 2.04e-05,
+    "b": 2.79,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Queenfish Needlescaled": {
+    "lengthType": "TL",
+    "a": 1.0500000000000001e-05,
+    "b": 2.86,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Queenfish Talang": {
+    "lengthType": "FL",
+    "a": 2.48e-05,
+    "b": 2.792,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Rainbow Runner": {
+    "lengthType": "FL",
+    "a": 1.35e-05,
+    "b": 2.92,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Ray Bluespotted Ribbontail": {
+    "lengthType": "DW",
+    "a": 2.3e-05,
+    "b": 3.16,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Ray Diamond": {
+    "lengthType": "DW",
+    "a": 7.500000000000001e-09,
+    "b": 3.04,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Ray Duckbill": {
+    "lengthType": "DW",
+    "a": 1.94e-05,
+    "b": 2.903,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Ray Eagle": {
+    "lengthType": "DW",
+    "a": 1.41e-08,
+    "b": 3.06,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Ray Marbled Electric": {
+    "lengthType": "TL",
+    "a": 1.62e-05,
+    "b": 3.04,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Ray Spotted Eagle": {
+    "lengthType": "DW",
+    "a": 5.86e-06,
+    "b": 3.13,
+    "formulaType": "power",
+    "reference": "TORRES, F.S.B., Jr."
+  },
+  "Rockcod Bigspot": {
+    "lengthType": "TL",
+    "a": 1.35e-05,
+    "b": 3.03,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Rockcod Catface": {
+    "lengthType": "TL",
+    "a": 2.26e-08,
+    "b": 2.905,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Rockcod Coral": {
+    "lengthType": "TL",
+    "a": 1.12e-05,
+    "b": 3.1,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Rockcod Halfmoon": {
+    "lengthType": "TL",
+    "a": 1.96e-08,
+    "b": 2.968,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Rockcod Honeycomb": {
+    "lengthType": "FL",
+    "a": 1.219e-05,
+    "b": 3.079,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Rockcod Humpback": {
+    "lengthType": "TL",
+    "a": 1.2800000000000001e-05,
+    "b": 3.034,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Rockcod Lyretail": {
+    "lengthType": "FL",
+    "a": 1.219e-05,
+    "b": 3.079,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Rockcod Malabar": {
+    "lengthType": "TL",
+    "a": 1.2800000000000001e-05,
+    "b": 3.034,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Rockcod Marbled Leopard": {
+    "lengthType": "TL",
+    "a": 1.1220000000000001e-05,
+    "b": 3.05,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Rockcod Tomato": {
+    "lengthType": "TL",
+    "a": 1.45e-05,
+    "b": 3.13,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Rockcod Whiteblotched": {
+    "lengthType": "TL",
+    "a": 1.67e-05,
+    "b": 2.964,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Rockcod Whiteedged": {
+    "lengthType": "TL",
+    "a": 8.76e-09,
+    "b": 3.085,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Rockcod Yellowbelly": {
+    "lengthType": "TL",
+    "a": 1.2500000000000001e-08,
+    "b": 3.055,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Rockcod Yellowtail": {
+    "lengthType": "TL",
+    "a": 1.67e-05,
+    "b": 2.964,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Roman": {
+    "lengthType": "FL",
+    "a": 1.2e-08,
+    "b": 3.154,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Roundherring Redeye": {
+    "lengthType": "TL",
+    "a": 4.68e-06,
+    "b": 3.11,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Rubberlip Black": {
+    "lengthType": "TL",
+    "a": 3.0200000000000002e-05,
+    "b": 2.86,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Rubberlip Dusky": {
+    "lengthType": "TL",
+    "a": 1.9050000000000002e-05,
+    "b": 2.96,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Rubberlip Minstrel": {
+    "lengthType": "TL",
+    "a": 1.3180000000000001e-05,
+    "b": 3.01,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Rubberlip Sailfin": {
+    "lengthType": "TL",
+    "a": 1.413e-05,
+    "b": 2.98,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Rubberlip Whitebarred": {
+    "lengthType": "TL",
+    "a": 1.349e-05,
+    "b": 3.01,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Sailfish Atlantic": {
+    "lengthType": "LBFL",
+    "a": 1.62e-05,
+    "b": 2.74,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Sailfish Pacific": {
+    "lengthType": "LBFL",
+    "a": 1.62e-05,
+    "b": 2.74,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Santer": {
+    "lengthType": "FL",
+    "a": 2.4000000000000003e-07,
+    "b": 2.571,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Scad Shrimp": {
+    "lengthType": "FL",
+    "a": 1.88e-05,
+    "b": 2.97,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Scad Torpedo": {
+    "lengthType": "FL",
+    "a": 4.74e-05,
+    "b": 2.58,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Scotsman": {
+    "lengthType": "FL",
+    "a": 5.8900000000000005e-08,
+    "b": 2.81,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Seacatfish Black": {
+    "lengthType": "FL",
+    "a": 1.38e-08,
+    "b": 3.04,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Seacatfish Natal": {
+    "lengthType": "FL",
+    "a": 4.270000000000001e-06,
+    "b": 3.07,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Seacatfish White": {
+    "lengthType": "FL",
+    "a": 9.55e-09,
+    "b": 3.08,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Seventy-four": {
+    "lengthType": "FL",
+    "a": 5.61e-08,
+    "b": 2.8147,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Shark Blackspot": {
+    "lengthType": "TL",
+    "a": 2.0699999999999997e-06,
+    "b": 3.21,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Shark Blacktip (F)": {
+    "lengthType": "PCL",
+    "a": 1.18e-08,
+    "b": 3.05,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Shark Blacktip (M)": {
+    "lengthType": "PCL",
+    "a": 1.08e-08,
+    "b": 3.08,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Shark Blue (F)": {
+    "lengthType": "FL",
+    "a": 1.94e-06,
+    "b": 3.485,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Shark Blue (M)": {
+    "lengthType": "FL",
+    "a": 3.01e-06,
+    "b": 3.282,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Shark Broadnose Sevengill": {
+    "lengthType": "PCL",
+    "a": 3.3e-09,
+    "b": 3.28,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Shark Bronze Whaler (F)": {
+    "lengthType": "PCL",
+    "a": 6.71e-09,
+    "b": 3.14,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Shark Bronze Whaler (M)": {
+    "lengthType": "PCL",
+    "a": 7.49e-09,
+    "b": 3.11,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Shark Bull (F)": {
+    "lengthType": "PCL",
+    "a": 2.1e-08,
+    "b": 2.98,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Shark Bull (M)": {
+    "lengthType": "PCL",
+    "a": 2.6299999999999997e-08,
+    "b": 2.93,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Shark Dusky": {
+    "lengthType": "PCL",
+    "a": 1.1899999999999999e-08,
+    "b": 3.04,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Shark Flapnosed Hound": {
+    "lengthType": "TL",
+    "a": 2.63e-06,
+    "b": 3.12,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Shark Great White": {
+    "lengthType": "PCL",
+    "a": 2.14e-08,
+    "b": 2.944,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Shark Grey Reef": {
+    "lengthType": "TL",
+    "a": 8.779999999999999e-06,
+    "b": 3.05,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Shark Hammerhead Scalloped (F)": {
+    "lengthType": "PCL",
+    "a": 7.999999999999999e-09,
+    "b": 3.1,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Shark Hammerhead Scalloped (M)": {
+    "lengthType": "PCL",
+    "a": 1e-08,
+    "b": 2.98,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Shark Hammerhead Smooth (F)": {
+    "lengthType": "PCL",
+    "a": 8.3e-06,
+    "b": 2.86,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Shark Mako Shortfin (F)": {
+    "lengthType": "FL",
+    "a": 3.0400000000000003e-09,
+    "b": 3.2512,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Shark Mako Shortfin (M)": {
+    "lengthType": "FL",
+    "a": 3.08e-09,
+    "b": 3.2096,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Shark Milk (F)": {
+    "lengthType": "TL",
+    "a": 4.499999999999999e-06,
+    "b": 3.02,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Shark Milk (M)": {
+    "lengthType": "TL",
+    "a": 4.499999999999999e-06,
+    "b": 3.02,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Shark Raggedtooth Spotted (F)": {
+    "lengthType": "PCL",
+    "a": 1.0886999999999998e-08,
+    "b": 3.082,
+    "formulaType": "power",
+    "reference": "KwaZulu-Natal Sharks Board"
+  },
+  "Shark Raggedtooth Spotted (M)": {
+    "lengthType": "PCL",
+    "a": 5.8769999999999995e-09,
+    "b": 3.2236,
+    "formulaType": "power",
+    "reference": "KwaZulu-Natal Sharks Board"
+  },
+  "Shark Remora": {
+    "lengthType": "TL",
+    "a": 9e-07,
+    "b": 3.32,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Shark Smoothhound Common (F)": {
+    "lengthType": "TL",
+    "a": 1.186e-09,
+    "b": 3.198,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Shark Smoothhound Common (M)": {
+    "lengthType": "TL",
+    "a": 9.87e-10,
+    "b": 3.19,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Shark Smoothhound Hardnosed": {
+    "lengthType": "TL",
+    "a": 2.4e-06,
+    "b": 3.13,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Shark Soupfin": {
+    "lengthType": "TL",
+    "a": 5.1e-06,
+    "b": 2.99,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Shark Spinner (F)": {
+    "lengthType": "PCL",
+    "a": 1.18e-05,
+    "b": 3.05,
+    "formulaType": "power",
+    "reference": "KwaZulu-Natal Sharks Board"
+  },
+  "Shark Spinner (M)": {
+    "lengthType": "PCL",
+    "a": 1.18e-05,
+    "b": 3.05,
+    "formulaType": "power",
+    "reference": "KwaZulu-Natal Sharks Board"
+  },
+  "Shark Spotted Gully": {
+    "lengthType": "TL",
+    "a": 2.2104e-10,
+    "b": 3.4307,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Shark Thresher Thintail": {
+    "lengthType": "PCL",
+    "a": 6.1e-08,
+    "b": 2.857,
+    "formulaType": "power",
+    "reference": "KwaZulu-Natal Sharks Board"
+  },
+  "Shark Tiger (F)": {
+    "lengthType": "PCL",
+    "a": 7e-09,
+    "b": 3.12,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Shark Tiger (M)": {
+    "lengthType": "PCL",
+    "a": 6e-09,
+    "b": 3.14,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Sillago Silver": {
+    "lengthType": "TL",
+    "a": 6e-06,
+    "b": 3.06,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Skate Spearnose": {
+    "lengthType": "DW",
+    "a": 4.2e-06,
+    "b": 3.1619,
+    "formulaType": "power",
+    "reference": "KwaZulu-Natal Sharks Board"
+  },
+  "Slimy": {
+    "lengthType": "FL",
+    "a": 2.7040000000000002e-05,
+    "b": 2.98,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Slinger": {
+    "lengthType": "FL",
+    "a": 7.2e-08,
+    "b": 2.82,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Snapper Blood": {
+    "lengthType": "FL",
+    "a": 1.84e-05,
+    "b": 2.92,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Snapper Emperor": {
+    "lengthType": "FL",
+    "a": 1.9e-05,
+    "b": 3.01,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Snapper Humpback": {
+    "lengthType": "FL",
+    "a": 1.91e-05,
+    "b": 3.06,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Snapper River": {
+    "lengthType": "FL",
+    "a": 2.8e-05,
+    "b": 2.844,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Snapper Ruby": {
+    "lengthType": "FL",
+    "a": 4.25e-05,
+    "b": 2.75,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Snapper Russell's": {
+    "lengthType": "FL",
+    "a": 1.658e-05,
+    "b": 2.978,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Snapper Speckled": {
+    "lengthType": "FL",
+    "a": 7.81e-08,
+    "b": 2.806,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Snapper Twinspot": {
+    "lengthType": "FL",
+    "a": 1.563e-05,
+    "b": 3.059,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Snoek Cape": {
+    "lengthType": "TL",
+    "a": 6e-09,
+    "b": 3.07,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Soapfish Goldribbon": {
+    "lengthType": "TL",
+    "a": 0.00011219999999999999,
+    "b": 3.06,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Soldier Sand": {
+    "lengthType": "FL",
+    "a": 6.740000000000001e-06,
+    "b": 3.38,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Sole East Coast": {
+    "lengthType": "TL",
+    "a": 1.9e-06,
+    "b": 3.32,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Spadefish": {
+    "lengthType": "TL",
+    "a": 2.455e-05,
+    "b": 2.95,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Spearfish Shortbill": {
+    "lengthType": "TL",
+    "a": 4.57e-06,
+    "b": 3.21,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Springer": {
+    "lengthType": "FL",
+    "a": 7.2e-06,
+    "b": 3.0527,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Steenbras Bank": {
+    "lengthType": "TL",
+    "a": 1.698e-05,
+    "b": 3.0,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Steenbras Red": {
+    "lengthType": "FL",
+    "a": 2.7e-08,
+    "b": 2.9519,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Steenbras Sand": {
+    "lengthType": "FL",
+    "a": 1.41e-05,
+    "b": 2.99,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Steenbras West Coast": {
+    "lengthType": "FL",
+    "a": 3.0000000000000004e-08,
+    "b": 2.944,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Steenbras White": {
+    "lengthType": "TL",
+    "a": 1.67e-08,
+    "b": 2.984,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Steentjie": {
+    "lengthType": "FL",
+    "a": 1.2999999999999999e-08,
+    "b": 3.105,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Stingray Blue (F)": {
+    "lengthType": "DW",
+    "a": 9e-09,
+    "b": 3.2512,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Stingray Blue (M)": {
+    "lengthType": "DW",
+    "a": 1e-08,
+    "b": 3.186,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Stingray Honeycomb": {
+    "lengthType": "DW",
+    "a": 1.057e-07,
+    "b": 2.713,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Stingray Leopard": {
+    "lengthType": "DW",
+    "a": 1.057e-07,
+    "b": 2.713,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Stingray Roundnose": {
+    "lengthType": "DW",
+    "a": 8.98e-08,
+    "b": 2.751,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Stingray Sharpnose": {
+    "lengthType": "DW",
+    "a": 8.98e-08,
+    "b": 2.751,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Stingray Shorttail": {
+    "lengthType": "DW",
+    "a": 6.419999999999999e-05,
+    "b": 2.87,
+    "formulaType": "power",
+    "reference": "Oceanographic Research Institute"
+  },
+  "Stingray Thorntail": {
+    "lengthType": "DW",
+    "a": 2.03e-05,
+    "b": 3.0,
+    "formulaType": "power",
+    "reference": "KwaZulu-Natal Sharks Board"
+  },
+  "Strepie": {
+    "lengthType": "FL",
+    "a": 8.03e-09,
+    "b": 3.18,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Stumpnose Bigeye": {
+    "lengthType": "FL",
+    "a": 2.5e-05,
+    "b": 3.03,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Stumpnose Cape": {
+    "lengthType": "FL",
+    "a": 4.24e-05,
+    "b": 2.9266,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Stumpnose Natal": {
+    "lengthType": "TL",
+    "a": 1.79e-08,
+    "b": 2.9729,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Stumpnose Red": {
+    "lengthType": "FL",
+    "a": 9.490000000000001e-08,
+    "b": 2.802,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Stumpnose White": {
+    "lengthType": "FL",
+    "a": 1.38e-08,
+    "b": 3.079,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Swallowtail Gorgeous": {
+    "lengthType": "TL",
+    "a": 9.55e-06,
+    "b": 2.97,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Swordfish": {
+    "lengthType": "LBFL",
+    "a": 4.2030000000000005e-09,
+    "b": 3.2134,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Tarpon Oxeye": {
+    "lengthType": "FL",
+    "a": 1.222e-05,
+    "b": 3.033,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Thornfish": {
+    "lengthType": "TL",
+    "a": 2.51e-05,
+    "b": 2.95,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Threadfin Striped": {
+    "lengthType": "TL",
+    "a": 1.022e-05,
+    "b": 3.0,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Triggerfish Bridle": {
+    "lengthType": "TL",
+    "a": 2.865e-05,
+    "b": 2.966,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Tripletail": {
+    "lengthType": "TL",
+    "a": 4.28e-05,
+    "b": 2.84,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Tuna Bigeye": {
+    "lengthType": "FL",
+    "a": 1.1900000000000001e-05,
+    "b": 3.09,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Tuna Eastern Little": {
+    "lengthType": "FL",
+    "a": 3.0000000000000004e-08,
+    "b": 2.908,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Tuna Longfin": {
+    "lengthType": "FL",
+    "a": 1.3717999999999999e-08,
+    "b": 3.0793,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Tuna Skipjack": {
+    "lengthType": "FL",
+    "a": 7.4e-06,
+    "b": 3.26,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Tuna Yellowfin": {
+    "lengthType": "FL",
+    "a": 1.8859999999999998e-08,
+    "b": 3.0195,
+    "formulaType": "power",
+    "reference": "Visboekie"
+  },
+  "Wahoo": {
+    "lengthType": "FL",
+    "a": 1.6000000000000001e-06,
+    "b": 3.275,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Wrasse Natal": {
+    "lengthType": "TL",
+    "a": 1e-05,
+    "b": 3.04,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Wrasse Surge": {
+    "lengthType": "TL",
+    "a": 2.593e-05,
+    "b": 2.8,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Wreckfish Atlantic": {
+    "lengthType": "TL",
+    "a": 1.95e-05,
+    "b": 2.96,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Yellowtail Cape": {
+    "lengthType": "FL",
+    "a": 3.31e-05,
+    "b": 2.7566,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Yellowtail Greater": {
+    "lengthType": "FL",
+    "a": 4.23e-05,
+    "b": 2.747,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Yellowtail Longfin": {
+    "lengthType": "FL",
+    "a": 1.46e-05,
+    "b": 3.055,
+    "formulaType": "power",
+    "reference": "FishBase"
+  },
+  "Zebra": {
+    "lengthType": "FL",
+    "a": 1.27e-08,
+    "b": 3.141,
+    "formulaType": "power",
+    "reference": "MANN B.Q. and C.D. BUXTON "
+  }
+}
