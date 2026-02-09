@@ -1,0 +1,49 @@
+==============================================================================
+RecFish ZA - React Application
+==============================================================================
+
+QUICK START:
+------------
+1. Read SETUP_GUIDE.md for step-by-step instructions
+2. Install dependencies: npm install
+3. Configure Supabase: Create .env.local from .env.example
+4. Run the app: npm run dev
+5. Open browser: http://localhost:3000
+
+FILES INCLUDED:
+--------------
+- SETUP_GUIDE.md - Step-by-step setup (READ THIS FIRST!)
+- README.md - Full documentation
+- package.json - Dependencies
+- .env.example - Configuration template
+- src/ - All application code
+- database/ - SQL files (if you need to re-run them)
+
+WHAT YOU NEED:
+-------------
+✅ Node.js installed (you have v24.13.0)
+✅ npm installed (you have v11.6.2)  
+✅ Supabase account (you have this)
+✅ Supabase database set up (497 species loaded)
+
+GET YOUR SUPABASE CREDENTIALS:
+-----------------------------
+1. Go to https://supabase.com/dashboard
+2. Open your "RecfishZA" project
+3. Settings → API
+4. Copy:
+   - Project URL
+   - anon public key
+5. Put them in .env.local file
+
+TIME TO SET UP: 10-15 minutes
+
+NEXT STEPS:
+----------
+1. Extract this folder to your computer
+2. Open SETUP_GUIDE.md and follow along
+3. You'll have the app running in 15 minutes!
+
+==============================================================================
+Need help? Check SETUP_GUIDE.md or ask Claude!
+==============================================================================
