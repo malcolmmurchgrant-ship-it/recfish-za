@@ -68,7 +68,7 @@ function AppContent() {
             <Route path="/my-catches" element={<MyCatches />} />
             <Route path="/sessions" element={<Sessions />} />
             <Route path="/species" element={<SpeciesLookup />} />
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/" element={<Navigate to="/login" replace />} />
           </Routes>
         </div>
       </div>
