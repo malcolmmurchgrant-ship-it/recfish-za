@@ -81,6 +81,7 @@ export default function Login() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              autoComplete="email"
               style={{
                 width: '100%',
                 padding: '0.75rem',
@@ -107,6 +108,7 @@ export default function Login() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              autoComplete="current-password"
               style={{
                 width: '100%',
                 padding: '0.75rem',
@@ -123,14 +125,15 @@ export default function Login() {
             disabled={loading}
             style={{
               width: '100%',
-              padding: '0.75rem',
+              padding: '0.875rem',
               background: loading ? '#9ca3af' : '#1e3a8a',
               color: 'white',
               border: 'none',
-              borderRadius: '4px',
+              borderRadius: '6px',
               fontSize: '1rem',
-              fontWeight: '500',
-              cursor: loading ? 'not-allowed' : 'pointer'
+              fontWeight: '600',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              marginBottom: '1rem'
             }}
           >
             {loading ? 'Signing in...' : 'Sign In'}
@@ -138,21 +141,36 @@ export default function Login() {
         </form>
 
         <div style={{
-          marginTop: '1.5rem',
-          textAlign: 'center',
-          fontSize: '0.875rem',
-          color: '#6b7280'
+          borderTop: '1px solid #e5e7eb',
+          paddingTop: '1.5rem',
+          marginTop: '0.5rem'
         }}>
-          Don't have an account?{' '}
+          <p style={{
+            textAlign: 'center',
+            fontSize: '0.875rem',
+            color: '#6b7280',
+            marginBottom: '1rem'
+          }}>
+            Don't have an account?
+          </p>
           <Link
-            to="/signup"
+            to="/register"
             style={{
+              display: 'block',
+              width: '100%',
+              padding: '0.875rem',
+              background: 'transparent',
               color: '#1e3a8a',
+              border: '2px solid #1e3a8a',
+              borderRadius: '6px',
+              fontSize: '1rem',
+              fontWeight: '600',
+              textAlign: 'center',
               textDecoration: 'none',
-              fontWeight: '500'
+              cursor: 'pointer'
             }}
           >
-            Sign up
+            Create Account
           </Link>
         </div>
       </div>
