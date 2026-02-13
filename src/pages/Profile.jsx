@@ -2,17 +2,135 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 
-const SA_PROVINCES = [
-  'Eastern Cape',
-  'Free State',
-  'Gauteng',
-  'KwaZulu-Natal',
-  'Limpopo',
-  'Mpumalanga',
-  'Northern Cape',
-  'North West',
-  'Western Cape'
-]
+const SADSAA_PROVINCES_AND_CLUBS = {
+  'Border Deep Sea Angling Association': [
+    'Christmasvale Ski-boat Club',
+    'East London Ski-boat Club',
+    'Gonubie Marine Club',
+    'Kwelera Ski-boat Club'
+  ],
+  'Eastern Province Deep Sea Angling Association': [
+    'Diaz Deep Sea Club',
+    'Noordhoek Skiboat Club',
+    'PE Deep Sea Angling Club',
+    'Port Alfred River and Skiboat Club',
+    'Port St Francis Ski-boat Yacht Club',
+    'St Francis Rod Reel and Boat Club',
+    'Vikings Fishing Club'
+  ],
+  'Free State Deep Sea Angling Association': [
+    '101 Ski-boat Club',
+    'Bloemfontein Diepsee Hengel Klub',
+    'Riemland Skiboot Klub'
+  ],
+  'Gauteng Deep Sea Angling Association': [
+    'Albatross Ski-boat Club',
+    'Dorado Ski-boat Club'
+  ],
+  'Limpopo Deep Sea Angling Association': [
+    'Letaba Skiboot Klub',
+    'Waterberg Ski-boot Klub'
+  ],
+  'Mpumalanga Deep Sea Angling Association': [
+    'Albatross Deep Sea Angling Club',
+    'B.O.L.S. Hengelklub',
+    'Dagga Boat Anglers',
+    'Hoedspruit Hengel Klub',
+    'Koning Makriel Seehengelklub',
+    'Lowveld Angling and Boat Association Skiboat',
+    'Nelspruit & Distrik Hengelklub',
+    'Piet Retief Heyshoop Dam Boat Club',
+    'Sea Pike Diepsee Hengelklub',
+    'Sodwana Angling Club',
+    'Standerton Hengel & Bootklub',
+    'Taratibo Skiboot Klub',
+    'Umhlanga Ski Boat Club'
+  ],
+  'Natal Deep Sea Angling Association': [
+    'Amanzimtoti Ski-Boat Club',
+    'Ballito Ski-boat Club',
+    'Bluff Yacht Club',
+    'Bobbies Angling Club',
+    'Durban Ski-Boat Club',
+    'Durban Undersea Club',
+    'Glenmore Beach Club',
+    'Hibberdene Ski-boat Club',
+    'Hibiscus Ski-boat Club',
+    'Injambili Ski-Boat Club',
+    'Isipingo Beach Ski-boat Club',
+    'Marlin Ski-boat and Angling Club',
+    'Midlands Ski-boat Club',
+    'Mtwalume Ski-Boat Club',
+    'Natal Deep Sea Rod and Reel Club',
+    'Newcastle Ski-Boat Club',
+    'Park Rynie Ski-boat Club',
+    'Pennington Ski-boat Club',
+    'Point Yacht Club',
+    'Pompano Ski-Boat Club',
+    'Scottburgh Ski-Boat Club',
+    'Shelly Beach Ski-boat Club',
+    'Tongaat Westbrook Ski-boat Club',
+    'Umdloti Ski-Boat Club',
+    'Umhlali Ski-Boat Club',
+    'Umhlanga Ski-boat Club',
+    'Umkomaas Ski-boat Club',
+    'Umzimkulu Deep Sea Angling Club',
+    'Vryheid Ski-boat Club',
+    'Warnadoon Ski-boat Club',
+    'Westbrook Ski-boat Club',
+    'Zinkwazi Deep Sea Angling and Boating Club'
+  ],
+  'North West Deep Sea Angling Association': [
+    'Klerksdorp Ski-boat Club',
+    'Potchefstroom Hengel Klub',
+    'Wesrand Hengel Klub'
+  ],
+  'Northern Cape Deep Sea Angling Association': [
+    'Northern Cape Griqua'
+  ],
+  'Northern Gauteng Deep Sea Angling Association': [
+    'Assembly Deep Sea Angling',
+    'Northerns Game Fish Club',
+    'Pretoria Deep Sea Angling Club'
+  ],
+  'Southern Cape Deep Sea Angling Association': [
+    'George Deep Sea Angling Club',
+    'Knysna Angling and Diving Association',
+    'Mossel Bay Yacht and Boat Club',
+    'Plettenberg Bay Angling Association',
+    'Plettenberg Bay Ski-boat Club'
+  ],
+  'Southern Gauteng Deep Sea Angling Association': [
+    'Albatros Deep Sea Angling Club',
+    'East Rand Boat Fishing Club',
+    'Guinjata Sports Fishing Club',
+    'Makaira Game Fishing Club',
+    'Nomads Ski-boat Game Fishing Club',
+    'Transvaal Ski-boat Club',
+    'Wahoo Ski-Boat Club'
+  ],
+  'Western Province Deep Sea Angling Association': [
+    'Atlantic Boat Club',
+    'Cape Boat and Ski-boat Club',
+    'False Bay Yacht Club',
+    'Gordons Bay Boat Club',
+    'Overberg Boat Club',
+    'Suidpunt Deep Sea Angling Club',
+    'Walker Bay Boat Ski-boat Club',
+    'Yzerfontein Boat Angling Club'
+  ],
+  'Zululand Deep Sea Angling Association': [
+    'Cape Vidal Skiboat Club',
+    'Mapalane Ski Boat Club',
+    'Meerensee Boat Club',
+    "Richard's Bay Ski Boat Club",
+    'Sodwana Ski Boat Club',
+    'St Lucia Ski Boat Club',
+    'Umlalazi Ski Boat Club'
+  ]
+}
+
+const SA_PROVINCES = Object.keys(SADSAA_PROVINCES_AND_CLUBS).sort()
 
 const inputStyle = {
   width: '100%',
@@ -343,10 +461,13 @@ export default function Profile() {
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
           <div style={fieldGroupStyle}>
-            <label style={labelStyle}>Province</label>
+            <label style={labelStyle}>Provincial Association</label>
             <select
               value={profile.province}
-              onChange={(e) => handleChange('province', e.target.value)}
+              onChange={(e) => {
+                handleChange('province', e.target.value)
+                handleChange('club_name', '') // reset club when province changes
+              }}
               style={inputStyle}
             >
               <option value="">Select province...</option>
@@ -357,14 +478,20 @@ export default function Profile() {
           </div>
 
           <div style={fieldGroupStyle}>
-            <label style={labelStyle}>Club Name</label>
-            <input
-              type="text"
+            <label style={labelStyle}>Club</label>
+            <select
               value={profile.club_name}
               onChange={(e) => handleChange('club_name', e.target.value)}
-              style={inputStyle}
-              placeholder="Your angling club"
-            />
+              style={{ ...inputStyle, background: profile.province ? 'white' : '#f9fafb' }}
+              disabled={!profile.province}
+            >
+              <option value="">
+                {profile.province ? 'Select club...' : 'Select province first'}
+              </option>
+              {profile.province && (SADSAA_PROVINCES_AND_CLUBS[profile.province] || []).map(club => (
+                <option key={club} value={club}>{club}</option>
+              ))}
+            </select>
           </div>
         </div>
       </div>
