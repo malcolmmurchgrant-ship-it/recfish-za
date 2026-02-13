@@ -8,6 +8,7 @@ import LogCatch from './pages/LogCatch'
 import MyCatches from './pages/MyCatches'
 import Sessions from './pages/Sessions'
 import SpeciesLookup from './pages/SpeciesLookup'
+import Profile from './pages/Profile'
 import SessionEndSummaryModal from './components/SessionEndSummaryModal'
 
 function Navigation() {
@@ -66,6 +67,9 @@ function Navigation() {
         >
           Fish ID ↗
         </a>
+        <Link to="/profile" style={{ color: 'white', textDecoration: 'none', fontWeight: '600', whiteSpace: 'nowrap' }}>
+          My Profile
+        </Link>
         
         {user && (
           <button
@@ -107,6 +111,7 @@ function AppContent() {
             <Route path="/my-catches" element={<MyCatches />} />
             <Route path="/sessions" element={<Sessions />} />
             <Route path="/species" element={<SpeciesLookup />} />
+            <Route path="/profile" element={<Profile />} />
             <Route path="/" element={<Navigate to="/login" replace />} />
           </Routes>
         </div>
