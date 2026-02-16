@@ -60,7 +60,6 @@ export default function SpeciesLookup() {
 
       let results = data || []
 
-      // Filter by favorites if enabled
       if (showFavoritesOnly && user) {
         results = results.filter(sp => favorites.has(sp.id))
       }
@@ -74,7 +73,7 @@ export default function SpeciesLookup() {
   }
 
   const toggleFavorite = async (speciesId, e) => {
-    e.stopPropagation() // Don't open modal when clicking star
+    e.stopPropagation()
 
     if (!user) {
       alert('Please log in to save favorites')
@@ -85,7 +84,6 @@ export default function SpeciesLookup() {
 
     try {
       if (isFavorite) {
-        // Remove from favorites
         const { error } = await supabase
           .from('user_favorite_species')
           .delete()
@@ -100,7 +98,6 @@ export default function SpeciesLookup() {
           return newSet
         })
       } else {
-        // Add to favorites
         const { error } = await supabase
           .from('user_favorite_species')
           .insert([{
@@ -117,6 +114,220 @@ export default function SpeciesLookup() {
       alert('Error updating favorites: ' + error.message)
     }
   }
+
+  // ── Regulations rendering ──────────────────────────────────────────────────
+
+  const RegulationsPanel = ({ sp }) => {
+    const hasZoneRegs = sp.zone_regulations && sp.zone_regulations.length > 0
+    const hasFlatRegs = sp.bag_limit || sp.minimum_size_cm || sp.closed_season || sp.protected
+
+    // Zone-based regulations (Kob and Elf-style zone rules)
+    if (hasZoneRegs) {
+      // Check whether zone regs are catch rules (Kob) or season-only (Elf)
+      const isCatchRules = sp.zone_regulations.some(z => z.minimum_size_cm || z.bag_limit)
+      const isSeasonOnly = sp.zone_regulations.every(z => z.closed_season && !z.minimum_size_cm && !z.bag_limit)
+
+      return (
+        <div style={{ marginTop: '1rem', padding: '1rem', background: '#f9fafb', borderRadius: '4px' }}>
+          <h3 style={{ fontWeight: '600', marginBottom: '0.75rem' }}>Regulations</h3>
+
+          {/* General flat regs still shown if present alongside zone regs (e.g. Elf has general regs + KZN closed season) */}
+          {hasFlatRegs && (
+            <div style={{ marginBottom: '1rem' }}>
+              {sp.bag_limit && <p><strong>Bag Limit:</strong> {sp.bag_limit}</p>}
+              {sp.minimum_size_cm && <p><strong>Minimum Size:</strong> {sp.minimum_size_cm} cm</p>}
+              {sp.closed_season && <p><strong>Closed Season:</strong> {sp.closed_season}</p>}
+              {sp.protected && (
+                <p style={{ color: '#dc2626', fontWeight: '600' }}>⚠️ Protected Species — No take</p>
+              )}
+            </div>
+          )}
+
+          {/* Zone-specific closed seasons (e.g. Elf KZN) */}
+          {isSeasonOnly && (
+            <div style={{
+              background: '#fef3c7',
+              border: '1px solid #fbbf24',
+              borderRadius: '4px',
+              padding: '0.75rem',
+              marginBottom: '0.5rem'
+            }}>
+              <p style={{ fontWeight: '600', color: '#92400e', marginBottom: '0.25rem' }}>
+                Zone-Specific Closed Season
+              </p>
+              {sp.zone_regulations.map((zone, i) => (
+                <p key={i} style={{ fontSize: '0.9rem', color: '#78350f' }}>
+                  <strong>{zone.zone}:</strong> Closed {zone.closed_season}
+                </p>
+              ))}
+            </div>
+          )}
+
+          {/* Zone-based catch regulations table (e.g. Kob) */}
+          {isCatchRules && (
+            <>
+              <p style={{
+                fontSize: '0.8rem',
+                color: '#6b7280',
+                fontStyle: 'italic',
+                marginBottom: '0.75rem'
+              }}>
+                Regulations vary by area and method of capture
+              </p>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  fontSize: '0.875rem'
+                }}>
+                  <thead>
+                    <tr style={{ background: '#1e3a8a', color: 'white' }}>
+                      <th style={{ padding: '0.6rem 0.75rem', textAlign: 'left', borderRadius: '4px 0 0 0' }}>
+                        Area / Method
+                      </th>
+                      <th style={{ padding: '0.6rem 0.75rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                        Min Size
+                      </th>
+                      <th style={{ padding: '0.6rem 0.75rem', textAlign: 'center', whiteSpace: 'nowrap', borderRadius: '0 4px 0 0' }}>
+                        Bag Limit
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sp.zone_regulations.map((zone, i) => (
+                      <tr
+                        key={i}
+                        style={{ background: i % 2 === 0 ? 'white' : '#f3f4f6' }}
+                      >
+                        <td style={{ padding: '0.6rem 0.75rem', borderBottom: '1px solid #e5e7eb' }}>
+                          {zone.zone}
+                        </td>
+                        <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center', borderBottom: '1px solid #e5e7eb', whiteSpace: 'nowrap' }}>
+                          {zone.minimum_size_cm ? `${zone.minimum_size_cm} cm` : '—'}
+                        </td>
+                        <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center', borderBottom: '1px solid #e5e7eb' }}>
+                          {zone.bag_limit ? (
+                            <span>
+                              {zone.bag_limit}
+                              {zone.slot_limit_size && (
+                                <span style={{
+                                  display: 'block',
+                                  fontSize: '0.75rem',
+                                  color: '#dc2626',
+                                  fontStyle: 'italic',
+                                  whiteSpace: 'nowrap'
+                                }}>
+                                  max {zone.slot_limit_max_above} &gt; {zone.slot_limit_size} cm/day
+                                </span>
+                              )}
+                            </span>
+                          ) : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {/* Slot limit callout note */}
+              {sp.zone_regulations.some(z => z.slot_limit_size) && (
+                <p style={{
+                  marginTop: '0.6rem',
+                  fontSize: '0.8rem',
+                  color: '#dc2626',
+                  fontStyle: 'italic'
+                }}>
+                  ⚠️ Where applicable: only {sp.zone_regulations.find(z => z.slot_limit_size)?.slot_limit_max_above} fish
+                  over {sp.zone_regulations.find(z => z.slot_limit_size)?.slot_limit_size} cm may be retained per day.
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      )
+    }
+
+    // Standard flat regulations display
+    return (
+      <div style={{ marginTop: '1rem', padding: '1rem', background: '#f9fafb', borderRadius: '4px' }}>
+        <h3 style={{ fontWeight: '600', marginBottom: '0.5rem' }}>Regulations</h3>
+        {sp.protected && (
+          <p style={{ color: '#dc2626', fontWeight: '600' }}>⚠️ Protected Species — No take</p>
+        )}
+        {sp.bag_limit && (
+          <p><strong>Bag Limit:</strong> {sp.bag_limit}</p>
+        )}
+        {sp.minimum_size_cm && (
+          <p><strong>Minimum Size:</strong> {sp.minimum_size_cm} cm
+            {sp.minimum_size_note && (
+              <span style={{ fontSize: '0.8rem', color: '#6b7280', marginLeft: '0.5rem' }}>
+                ({sp.minimum_size_note})
+              </span>
+            )}
+          </p>
+        )}
+        {sp.bag_limit_note && (
+          <p style={{ fontSize: '0.85rem', color: '#6b7280', fontStyle: 'italic' }}>
+            {sp.bag_limit_note}
+          </p>
+        )}
+        {sp.closed_season && (
+          <p><strong>Closed Season:</strong> {sp.closed_season}</p>
+        )}
+        {!sp.protected && !sp.bag_limit && !sp.minimum_size_cm && !sp.closed_season && (
+          <p style={{ color: '#6b7280', fontStyle: 'italic' }}>No specific regulations listed</p>
+        )}
+      </div>
+    )
+  }
+
+  // ── Species card badge (grid view) ────────────────────────────────────────
+
+  const RegulationBadges = ({ sp }) => {
+    // For zone-regulated species show a single indicator badge instead of misleading flat values
+    if (sp.zone_regulations && sp.zone_regulations.length > 0) {
+      const isCatchRules = sp.zone_regulations.some(z => z.minimum_size_cm || z.bag_limit)
+      return (
+        <span style={{
+          fontSize: '0.75rem',
+          padding: '0.25rem 0.5rem',
+          background: isCatchRules ? '#fce7f3' : '#fef3c7',
+          color: isCatchRules ? '#9d174d' : '#92400e',
+          borderRadius: '4px'
+        }}>
+          {isCatchRules ? 'Zone regulations apply' : 'KZN closed season'}
+        </span>
+      )
+    }
+
+    return (
+      <>
+        {sp.bag_limit && (
+          <span style={{
+            fontSize: '0.75rem',
+            padding: '0.25rem 0.5rem',
+            background: '#dbeafe',
+            color: '#1e40af',
+            borderRadius: '4px'
+          }}>
+            Bag: {sp.bag_limit}
+          </span>
+        )}
+        {sp.minimum_size_cm && (
+          <span style={{
+            fontSize: '0.75rem',
+            padding: '0.25rem 0.5rem',
+            background: '#fef3c7',
+            color: '#92400e',
+            borderRadius: '4px'
+          }}>
+            Min: {sp.minimum_size_cm} cm
+          </span>
+        )}
+      </>
+    )
+  }
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div>
@@ -165,7 +376,7 @@ export default function SpeciesLookup() {
             gap: '0.5rem'
           }}
         >
-          ⭐ Favorites ({favorites.size})
+          ★ Favorites ({favorites.size})
         </button>
       </div>
 
@@ -238,7 +449,7 @@ export default function SpeciesLookup() {
                     }}
                     title={favorites.has(sp.id) ? 'Remove from favorites' : 'Add to favorites'}
                   >
-                    {favorites.has(sp.id) ? '⭐' : '☆'}
+                    {favorites.has(sp.id) ? '★' : '☆'}
                   </button>
                 )}
 
@@ -255,8 +466,8 @@ export default function SpeciesLookup() {
                     alignItems: 'center',
                     justifyContent: 'center'
                   }}>
-                    <img 
-                      src={sp.lowres_image_url} 
+                    <img
+                      src={sp.lowres_image_url}
                       alt={sp.catalogue_name || sp.common_name}
                       style={{
                         width: '100%',
@@ -300,28 +511,7 @@ export default function SpeciesLookup() {
                     gap: '0.5rem',
                     flexWrap: 'wrap'
                   }}>
-                    {sp.bag_limit && (
-                      <span style={{
-                        fontSize: '0.75rem',
-                        padding: '0.25rem 0.5rem',
-                        background: '#dbeafe',
-                        color: '#1e40af',
-                        borderRadius: '4px'
-                      }}>
-                        Bag: {sp.bag_limit}
-                      </span>
-                    )}
-                    {sp.minimum_size_cm && (
-                      <span style={{
-                        fontSize: '0.75rem',
-                        padding: '0.25rem 0.5rem',
-                        background: '#fef3c7',
-                        color: '#92400e',
-                        borderRadius: '4px'
-                      }}>
-                        Min: {sp.minimum_size_cm}cm
-                      </span>
-                    )}
+                    <RegulationBadges sp={sp} />
                   </div>
                 </div>
               </div>
@@ -338,7 +528,7 @@ export default function SpeciesLookup() {
             }}>
               {showFavoritesOnly ? (
                 <>
-                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⭐</div>
+                  <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>★</div>
                   <h3 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>No favorites yet</h3>
                   <p>Click the ☆ star on any species to add it to your favorites!</p>
                 </>
@@ -353,7 +543,7 @@ export default function SpeciesLookup() {
         </div>
       )}
 
-      {/* Species Detail Modal - Same as before */}
+      {/* Species Detail Modal */}
       {selectedSpecies && (
         <div
           onClick={() => setSelectedSpecies(null)}
@@ -396,7 +586,7 @@ export default function SpeciesLookup() {
                 alignItems: 'center',
                 justifyContent: 'center'
               }}>
-                <img 
+                <img
                   src={selectedSpecies.lowres_image_url}
                   alt={selectedSpecies.common_name}
                   style={{
@@ -443,6 +633,15 @@ export default function SpeciesLookup() {
               </p>
             )}
 
+            {/* Regulations Panel — handles flat, zone-based, and slot limit */}
+            <RegulationsPanel sp={selectedSpecies} />
+
+            {selectedSpecies.iucn_status && (
+              <div style={{ marginTop: '1rem' }}>
+                <strong>Conservation Status:</strong> {selectedSpecies.iucn_status}
+              </div>
+            )}
+
             {/* High Resolution Image Gallery */}
             {selectedSpecies.highres_image_urls && selectedSpecies.highres_image_urls.length > 0 && (
               <div style={{ marginTop: '1.5rem' }}>
@@ -475,7 +674,7 @@ export default function SpeciesLookup() {
                       onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
                       title="Click to view full size"
                     >
-                      <img 
+                      <img
                         src={url}
                         alt={`${selectedSpecies.common_name} ${index + 1}`}
                         style={{
@@ -499,33 +698,6 @@ export default function SpeciesLookup() {
                 }}>
                   Click any image to view full size
                 </p>
-              </div>
-            )}
-
-            <div style={{
-              marginTop: '1rem',
-              padding: '1rem',
-              background: '#f9fafb',
-              borderRadius: '4px'
-            }}>
-              <h3 style={{ fontWeight: '600', marginBottom: '0.5rem' }}>Regulations</h3>
-              {selectedSpecies.bag_limit && (
-                <p><strong>Bag Limit:</strong> {selectedSpecies.bag_limit}</p>
-              )}
-              {selectedSpecies.minimum_size_cm && (
-                <p><strong>Minimum Size:</strong> {selectedSpecies.minimum_size_cm} cm</p>
-              )}
-              {selectedSpecies.closed_season && (
-                <p><strong>Closed Season:</strong> {selectedSpecies.closed_season}</p>
-              )}
-              {!selectedSpecies.bag_limit && !selectedSpecies.minimum_size_cm && !selectedSpecies.closed_season && (
-                <p style={{ color: '#6b7280', fontStyle: 'italic' }}>No specific regulations listed</p>
-              )}
-            </div>
-
-            {selectedSpecies.iucn_status && (
-              <div style={{ marginTop: '1rem' }}>
-                <strong>Conservation Status:</strong> {selectedSpecies.iucn_status}
               </div>
             )}
 
