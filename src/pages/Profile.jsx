@@ -257,7 +257,8 @@ export default function Profile() {
       if (error) throw error
 
       setSaved(true)
-      setTimeout(() => setSaved(false), 3000)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      setTimeout(() => setSaved(false), 5000)
     } catch (err) {
       setError('Failed to save profile: ' + err.message)
     } finally {
