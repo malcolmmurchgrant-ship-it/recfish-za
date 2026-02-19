@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useSession } from '../contexts/SessionContext'
@@ -10,6 +11,7 @@ import GridStats from '../components/GridStats'
 export default function Dashboard() {
   const { user } = useAuth()
   const { activeSession, lastEndedSession, clearLastEndedSession } = useSession()
+  const navigate = useNavigate()
   const [stats, setStats] = useState({
     totalCatches: 0,
     totalSpecies: 0,
@@ -84,16 +86,59 @@ export default function Dashboard() {
   if (!user) {
     return (
       <div style={{
-        background: 'white',
-        padding: '3rem',
-        borderRadius: '8px',
-        textAlign: 'center'
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: '60vh'
       }}>
-        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔒</div>
-        <h3 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>Please log in</h3>
-        <p style={{ color: '#6b7280' }}>
-          You need to be logged in to view your dashboard
-        </p>
+        <div style={{
+          background: 'white',
+          padding: '3rem',
+          borderRadius: '8px',
+          textAlign: 'center',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+          maxWidth: '400px',
+          width: '100%'
+        }}>
+          <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔒</div>
+          <h3 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>Please log in</h3>
+          <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>
+            You need to be logged in to view your dashboard
+          </p>
+          <button
+            onClick={() => navigate('/login')}
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              background: '#1e3a8a',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '1rem',
+              fontWeight: '600',
+              cursor: 'pointer',
+              marginBottom: '0.75rem'
+            }}
+          >
+            Log In
+          </button>
+          <button
+            onClick={() => navigate('/register')}
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              background: 'white',
+              color: '#1e3a8a',
+              border: '2px solid #1e3a8a',
+              borderRadius: '6px',
+              fontSize: '1rem',
+              fontWeight: '600',
+              cursor: 'pointer'
+            }}
+          >
+            Create Account
+          </button>
+        </div>
       </div>
     )
   }

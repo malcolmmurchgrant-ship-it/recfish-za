@@ -12,14 +12,10 @@ import {
   getFormulaByCatalogueName,
   formatWeight 
 } from '../utils/weightCalculations'
+import { checkRecord, buildRecordNotification } from '../utils/recordDetection'
+import RecordNotification from '../components/RecordNotification'
 
 export default function LogCatch() {
-  // Test if imports are working
-  console.log('LogCatch component loaded')
-  console.log('calculateWeight function:', typeof calculateWeight)
-  console.log('getFormulaByCatalogueName function:', typeof getFormulaByCatalogueName)
-  console.log('formatWeight function:', typeof formatWeight)
-  
   const { user } = useAuth()
   const { activeSession } = useSession()
   const navigate = useNavigate()
@@ -52,11 +48,15 @@ export default function LogCatch() {
   const [weightSource, setWeightSource] = useState('manual') // 'manual' or 'calculated'
   const [calculatingWeight, setCalculatingWeight] = useState(false)
 
+  // Record detection state
+  const [recordNotification, setRecordNotification] = useState(null)
+
   const [formData, setFormData] = useState({
     species_id: '',
     species_name: '',
     weight_kg: '',
     length_cm: '',
+    line_class_kg: '',
     caught_at: new Date().toISOString().slice(0, 16),
     released: false,
     location_description: '',
@@ -98,31 +98,15 @@ export default function LogCatch() {
 
   // Auto-calculate weight when length, species, length type, or sex variant changes
   useEffect(() => {
-    console.log('=== useEffect triggered ===')
-    console.log('formData.length_cm:', formData.length_cm)
-    console.log('selectedSpecies:', selectedSpecies)
-    console.log('lengthType:', lengthType)
-    console.log('sexVariant:', sexVariant)
-    
     if (formData.length_cm && selectedSpecies && lengthType) {
-      console.log('All conditions met, calling calculateWeightFromLength()')
       calculateWeightFromLength()
     } else {
-      console.log('Conditions not met, clearing autoWeight')
       setAutoWeight(null)
     }
-  }, [formData, selectedSpecies, lengthType, sexVariant]) // Added sexVariant to dependencies
+  }, [formData, selectedSpecies, lengthType, sexVariant])
 
   const calculateWeightFromLength = async () => {
-    console.log('=== Weight Calculation Debug ===')
-    console.log('Length:', formData.length_cm)
-    console.log('Selected Species:', selectedSpecies)
-    console.log('Length Type:', lengthType)
-    console.log('Sex Variant:', sexVariant)
-    console.log('Has Sex Variants:', hasSexVariants)
-    
     if (!formData.length_cm || !selectedSpecies) {
-      console.log('Missing length or species, skipping calculation')
       setAutoWeight(null)
       return
     }
@@ -130,34 +114,25 @@ export default function LogCatch() {
     setCalculatingWeight(true)
 
     try {
-      // Build species name with sex variant if applicable
       let speciesName = selectedSpecies.catalogue_name || selectedSpecies.common_name
       
       if (hasSexVariants) {
         speciesName = `${speciesName} (${sexVariant})`
       }
       
-      console.log('Searching for formula:', speciesName, lengthType)
-      
       const formula = await getFormulaByCatalogueName(supabase, speciesName, lengthType)
-      console.log('Formula found:', formula)
 
       if (!formula) {
-        console.log(`No formula available for ${speciesName} (${lengthType})`)
         setAutoWeight(null)
         setCalculatingWeight(false)
         return
       }
 
-      // Calculate weight
       const weightKg = calculateWeight(parseFloat(formData.length_cm), formula)
-      console.log('Calculated weight (kg):', weightKg)
 
       if (weightKg && weightKg > 0) {
         setAutoWeight(weightKg)
-        console.log('Auto-weight set to:', weightKg)
       } else {
-        console.log('Invalid weight calculated')
         setAutoWeight(null)
       }
     } catch (error) {
@@ -308,6 +283,43 @@ export default function LogCatch() {
     }
   }
 
+  const runRecordCheck = async (savedCatch) => {
+    try {
+      // Need the scientific name — get it from selectedSpecies
+      const scientificName = selectedSpecies?.scientific_name
+      const weightKg = savedCatch.weight_kg
+      if (!scientificName || !weightKg) return
+
+      // Fetch user profile for gender + DOB
+      const { data: profile } = await supabase
+        .from('users')
+        .select('gender, date_of_birth')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile?.gender || !profile?.date_of_birth) return
+
+      const result = await checkRecord(supabase, {
+        scientificName,
+        weightKg: parseFloat(weightKg),
+        lineClassKg: savedCatch.line_class_kg || null,
+        gender: profile.gender,
+        dateOfBirth: profile.date_of_birth,
+        catchDate: savedCatch.caught_at
+          ? savedCatch.caught_at.split('T')[0]
+          : new Date().toISOString().split('T')[0],
+      })
+
+      if (result) {
+        const notification = buildRecordNotification(result)
+        if (notification) setRecordNotification(notification)
+      }
+    } catch (err) {
+      // Record check failure should never block the catch being saved
+      console.error('Record check error:', err)
+    }
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
@@ -333,6 +345,7 @@ export default function LogCatch() {
             grid_reference: gridReference || null,
             gps_lat: gpsLat ? parseFloat(gpsLat) : null,
             gps_lon: gpsLon ? parseFloat(gpsLon) : null,
+            line_class_kg: formData.line_class_kg || null,
             photo_url: photo?.photoUrl || null,
             photo_thumbnail_url: photo?.thumbnailUrl || null,
             photo_uploaded_at: photo ? new Date().toISOString() : null,
@@ -343,6 +356,11 @@ export default function LogCatch() {
 
       if (error) throw error
 
+      // Run record check before resetting form (we still need selectedSpecies)
+      if (data && data[0]) {
+        await runRecordCheck(data[0])
+      }
+
       alert('Catch logged successfully!')
       
       // Reset form
@@ -351,6 +369,7 @@ export default function LogCatch() {
         species_name: '',
         weight_kg: '',
         length_cm: '',
+        line_class_kg: '',
         caught_at: new Date().toISOString().slice(0, 16),
         released: false,
         location_description: '',
@@ -449,6 +468,12 @@ export default function LogCatch() {
   return (
     <div style={{ minHeight: '100vh', background: '#f9fafb', paddingBottom: '2rem' }}>
       <ActiveSessionBanner />
+
+      {/* Record detection modal */}
+      <RecordNotification
+        result={recordNotification}
+        onClose={() => setRecordNotification(null)}
+      />
       
       <div style={{ maxWidth: '42rem', margin: '0 auto', padding: '1.5rem' }}>
         {/* Header */}
@@ -707,6 +732,41 @@ export default function LogCatch() {
               </div>
             </div>
           )}
+
+          {/* Line Class */}
+          <div style={{ marginBottom: '1.25rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+              Line Class
+            </label>
+            <select
+              value={formData.line_class_kg || ''}
+              onChange={(e) => setFormData({ ...formData, line_class_kg: e.target.value })}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '4px',
+                fontSize: '1rem',
+                background: 'white'
+              }}
+            >
+              <option value="">Not specified</option>
+              <option value="1">1 kg</option>
+              <option value="2">2 kg</option>
+              <option value="3">3 kg</option>
+              <option value="4">4 kg</option>
+              <option value="6">6 kg</option>
+              <option value="8">8 kg</option>
+              <option value="10">10 kg</option>
+              <option value="15">15 kg</option>
+              <option value="24">24 kg</option>
+              <option value="37">37 kg</option>
+              <option value="60">60 kg</option>
+            </select>
+            <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.3rem' }}>
+              Optional — required for SADSAA record consideration
+            </p>
+          </div>
 
           {/* Weight with Auto-calculation */}
           <div style={{ marginBottom: '1.25rem' }}>

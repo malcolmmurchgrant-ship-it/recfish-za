@@ -78,7 +78,7 @@ function AppContent() {
             <Route path="/species" element={<SpeciesLookup />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/competition-admin" element={<CompetitionAdmin />} />
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/" element={<Navigate to="/login" replace />} />
           </Routes>
         </div>
       </div>
