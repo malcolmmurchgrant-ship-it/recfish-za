@@ -16,8 +16,21 @@ export default function GPSButton({ onLocationCaptured }) {
       return
     }
 
-    navigator.geolocation.getCurrentPosition(
+    let watchId = null
+    
+    // Safety net — force stop after 20 seconds no matter what
+    const hardTimeout = setTimeout(() => {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId)
+      }
+      setError('Could not get location after 20 seconds. Try again outdoors.')
+      setLoading(false)
+    }, 20000)
+
+    watchId = navigator.geolocation.watchPosition(
       (position) => {
+        clearTimeout(hardTimeout)
+        navigator.geolocation.clearWatch(watchId)
         const lat = position.coords.latitude
         const lon = position.coords.longitude
         onLocationCaptured(lat, lon)
@@ -25,26 +38,15 @@ export default function GPSButton({ onLocationCaptured }) {
         setLoading(false)
       },
       (err) => {
-        console.error('GPS Error:', err)
-        switch(err.code) {
-          case err.PERMISSION_DENIED:
-            setError('Please allow location access in your browser settings')
-            break
-          case err.POSITION_UNAVAILABLE:
-            setError('Location unavailable. Check GPS is enabled on your device.')
-            break
-          case err.TIMEOUT:
-            setError('Location timed out. Move to an open area and try again.')
-            break
-          default:
-            setError('Unable to get location. Try again.')
-        }
+        clearTimeout(hardTimeout)
+        navigator.geolocation.clearWatch(watchId)
+        setError(`GPS Error ${err.code}: ${err.message}`)
         setLoading(false)
       },
       {
         enableHighAccuracy: false,
-        timeout: 30000,
-        maximumAge: 60000
+        timeout: 15000,
+        maximumAge: 300000
       }
     )
   }
