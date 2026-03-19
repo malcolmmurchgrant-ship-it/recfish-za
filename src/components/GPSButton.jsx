@@ -3,10 +3,12 @@ import { useState } from 'react'
 export default function GPSButton({ onLocationCaptured }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState(false)
 
   const captureLocation = () => {
     setLoading(true)
     setError('')
+    setSuccess(false)
 
     if (!navigator.geolocation) {
       setError('GPS not supported by your browser')
@@ -19,6 +21,7 @@ export default function GPSButton({ onLocationCaptured }) {
         const lat = position.coords.latitude
         const lon = position.coords.longitude
         onLocationCaptured(lat, lon)
+        setSuccess(true)
         setLoading(false)
       },
       (err) => {
@@ -28,20 +31,20 @@ export default function GPSButton({ onLocationCaptured }) {
             setError('Please allow location access in your browser settings')
             break
           case err.POSITION_UNAVAILABLE:
-            setError('Location unavailable. Check GPS is enabled.')
+            setError('Location unavailable. Check GPS is enabled on your device.')
             break
           case err.TIMEOUT:
-            setError('Location request timed out. Try again.')
+            setError('Location timed out. Move to an open area and try again.')
             break
           default:
-            setError('Unable to get location')
+            setError('Unable to get location. Try again.')
         }
         setLoading(false)
       },
       {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
+        enableHighAccuracy: false,
+        timeout: 30000,
+        maximumAge: 60000
       }
     )
   }
@@ -55,7 +58,7 @@ export default function GPSButton({ onLocationCaptured }) {
         style={{
           width: '100%',
           padding: '0.75rem',
-          background: loading ? '#9ca3af' : '#10b981',
+          background: loading ? '#9ca3af' : success ? '#1d4ed8' : '#10b981',
           color: 'white',
           border: 'none',
           borderRadius: '4px',
@@ -70,9 +73,8 @@ export default function GPSButton({ onLocationCaptured }) {
         }}
       >
         <span style={{ fontSize: '1.25rem' }}>📍</span>
-        {loading ? 'Getting GPS location...' : 'Get Current Location'}
+        {loading ? 'Getting GPS location...' : success ? 'Location Captured ✓' : 'Get Current Location'}
       </button>
-
       {error && (
         <div style={{
           background: '#fee2e2',
@@ -83,6 +85,18 @@ export default function GPSButton({ onLocationCaptured }) {
           marginBottom: '1rem'
         }}>
           {error}
+        </div>
+      )}
+      {success && (
+        <div style={{
+          background: '#d1fae5',
+          color: '#065f46',
+          padding: '0.75rem',
+          borderRadius: '4px',
+          fontSize: '0.875rem',
+          marginBottom: '1rem'
+        }}>
+          ✓ GPS coordinates captured successfully
         </div>
       )}
     </div>
