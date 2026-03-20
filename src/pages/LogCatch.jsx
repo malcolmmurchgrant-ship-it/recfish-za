@@ -894,10 +894,10 @@ export default function LogCatch() {
               GPS Location
             </label>
             <GPSButton 
-              onGPSCaptured={handleGPSCaptured}
-              currentLat={gpsLat}
-              currentLon={gpsLon}
-            />
+            onLocationCaptured={handleGPSCaptured}
+            currentLat={gpsLat}
+            currentLon={gpsLon}
+         />
             {gpsLat && gpsLon && (
               <div style={{ 
                 marginTop: '0.5rem', 
