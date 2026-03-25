@@ -8,8 +8,8 @@ import LogCatch from './pages/LogCatch'
 import MyCatches from './pages/MyCatches'
 import Sessions from './pages/Sessions'
 import SpeciesLookup from './pages/SpeciesLookup'
-import Profile from './pages/Profile'
 import CompetitionAdmin from './pages/CompetitionAdmin'
+import CompetitionCatchLogger from './pages/CompetitionCatchLogger'
 import SessionEndSummaryModal from './components/SessionEndSummaryModal'
 
 function Navigation() {
@@ -24,8 +24,7 @@ function Navigation() {
         margin: '0 auto',
         display: 'flex',
         gap: '2rem',
-        alignItems: 'center',
-        flexWrap: 'wrap'
+        alignItems: 'center'
       }}>
         <Link to="/dashboard" style={{ color: 'white', textDecoration: 'none', fontWeight: '600' }}>
           Dashboard
@@ -42,11 +41,8 @@ function Navigation() {
         <Link to="/species" style={{ color: 'white', textDecoration: 'none', fontWeight: '600' }}>
           Species Lookup
         </Link>
-        <Link to="/competition-admin" style={{ color: 'white', textDecoration: 'none', fontWeight: '600' }}>
+        <Link to="/competition" style={{ color: 'white', textDecoration: 'none', fontWeight: '600' }}>
           Competition
-        </Link>
-        <Link to="/profile" style={{ color: 'white', textDecoration: 'none', fontWeight: '600' }}>
-          Profile
         </Link>
         <a
           href="https://safishid.netlify.app"
@@ -76,9 +72,9 @@ function AppContent() {
             <Route path="/my-catches" element={<MyCatches />} />
             <Route path="/sessions" element={<Sessions />} />
             <Route path="/species" element={<SpeciesLookup />} />
-            <Route path="/profile" element={<Profile />} />
             <Route path="/competition-admin" element={<CompetitionAdmin />} />
-            <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route path="/competition" element={<CompetitionCatchLogger />} />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </div>
       </div>
