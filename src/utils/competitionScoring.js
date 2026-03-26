@@ -1,55 +1,147 @@
 // ============================================================
 // RecFish ZA — Competition Scoring Engine
 // Junior Gamefish Nationals 2026
+// Rules: SADSAA Points Scoring System + Tournament Rules
 // ============================================================
 
 const LINE_CLASS_KG = 10
 const SPECIES_FACTOR = 1
-const BAG_LIMIT = 10
+const BAG_LIMIT = 5 // 5 fish per angler per day (excluding baitfish)
 
-const BILLFISH_POINTS = {
-  Sailfish: 100,
-  Marlin: 220
-}
+const MIN_WEIGHT_TUNA_KG = 4    // All tuna species minimum
+const MIN_WEIGHT_OTHER_KG = 3   // All other gamefish minimum
+const MIN_LENGTH_GT_CM = 65     // Giant Kingfish fork length minimum
+const MIN_LENGTH_KINGFISH_CM = 40 // Other kingfish fork length minimum
 
-const BILLFISH_BONUS = {
-  2: 20,
-  3: 40
-}
+// Kingfish fixed scoring weights (in kg equivalent)
+const GT_SCORE_KG = 5           // Giant Kingfish scores as 5kg
+const KINGFISH_SCORE_KG = 4     // Other kingfish scores as 4kg
 
-// Maps entered species name to its scoring family group
+// Daily kingfish release limits per team
+const MAX_GT_RELEASES_PER_DAY = 1
+const MAX_KINGFISH_RELEASES_PER_DAY = 1
+
+// Tuna species for minimum weight check
+const TUNA_SPECIES = [
+  'Yellowfin Tuna', 'Skipjack Tuna', 'Eastern Little Tuna/Kawakawa', 'Striped Bonito'
+]
+
+// Billfish — release only, score ZERO points but count as species multiplier
+const BILLFISH_FAMILIES = ['Sailfish', 'Marlin']
+
+// Kingfish families
+const GT_FAMILY = 'Giant Kingfish'
+const KINGFISH_FAMILY = 'Other Kingfish'
+
+// Maps species name to scoring family group
 const FAMILY_GROUPS = {
+  // Queenfish
   'Double Spotted Queenfish': 'Queenfish',
   'Needlescaled Queenfish': 'Queenfish',
   'Talang Queenfish': 'Queenfish',
+  // Barracuda
   'Blackfin Barracuda': 'Barracuda',
   'Great Barracuda': 'Barracuda',
   'Pickhandle Barracuda': 'Barracuda',
   'Sawtooth Barracuda': 'Barracuda',
+  // Bonito
   'Striped Bonito': 'Bonito',
+  // King Mackerel
   'King Mackerel/Cuta': 'King Mackerel',
+  // Marlin (all count as one family for multiplier)
   'Black Marlin': 'Marlin',
   'Blue Marlin': 'Marlin',
   'Striped Marlin': 'Marlin',
   'White Marlin': 'Marlin',
+  // Kingfish
+  'Giant Kingfish/GT': 'Giant Kingfish',
+  'Bluefin Kingfish': 'Other Kingfish',
+  'Blacktip Kingfish': 'Other Kingfish',
+  'Yellowspot Kingfish': 'Other Kingfish',
+  // Amberjack and Tropical Yellowtail count as same species
+  'Greater Yellowtail/Amberjack': 'Amberjack',
+  'Tropical Yellowtail': 'Amberjack',
+  // Single species
   'Sailfish': 'Sailfish',
   'Dorado': 'Dorado',
   'Cobia': 'Cobia',
-  'Giant Kingfish/GT': 'GT',
-  'Greater Yellowtail/Amberjack': 'Amberjack',
   'Eastern Little Tuna/Kawakawa': 'Kawakawa',
   'Skipjack Tuna': 'Skipjack',
   'Yellowfin Tuna': 'Yellowfin Tuna',
   'Wahoo': 'Wahoo'
 }
 
-const BILLFISH_FAMILIES = ['Sailfish', 'Marlin']
-
 /**
  * Get the family group for a species name
  */
 export function getFamilyGroup(speciesName) {
   return FAMILY_GROUPS[speciesName] || speciesName
+}
+
+/**
+ * Check if a species is a billfish (release only, zero points, counts for multiplier)
+ */
+export function isBillfish(speciesName) {
+  return BILLFISH_FAMILIES.includes(getFamilyGroup(speciesName))
+}
+
+/**
+ * Check if a species is a kingfish
+ */
+export function isGT(speciesName) {
+  return getFamilyGroup(speciesName) === GT_FAMILY
+}
+
+export function isOtherKingfish(speciesName) {
+  return getFamilyGroup(speciesName) === KINGFISH_FAMILY
+}
+
+export function isKingfish(speciesName) {
+  return isGT(speciesName) || isOtherKingfish(speciesName)
+}
+
+/**
+ * Check minimum weight/length requirements
+ * Returns { valid: bool, reason: string }
+ */
+export function checkMinimumRequirements(speciesName, weightKg, lengthCm) {
+  const family = getFamilyGroup(speciesName)
+
+  // Billfish — no weight requirement, just release
+  if (BILLFISH_FAMILIES.includes(family)) {
+    return { valid: true, reason: '' }
+  }
+
+  // GT — minimum 65cm fork length
+  if (family === GT_FAMILY) {
+    if (!lengthCm || parseFloat(lengthCm) < MIN_LENGTH_GT_CM) {
+      return { valid: false, reason: `Giant Kingfish must be at least ${MIN_LENGTH_GT_CM}cm fork length` }
+    }
+    return { valid: true, reason: '' }
+  }
+
+  // Other kingfish — minimum 40cm
+  if (family === KINGFISH_FAMILY) {
+    if (!lengthCm || parseFloat(lengthCm) < MIN_LENGTH_KINGFISH_CM) {
+      return { valid: false, reason: `Kingfish must be at least ${MIN_LENGTH_KINGFISH_CM}cm fork length` }
+    }
+    return { valid: true, reason: '' }
+  }
+
+  // Tuna — minimum 4kg
+  if (TUNA_SPECIES.includes(speciesName)) {
+    if (!weightKg || parseFloat(weightKg) < MIN_WEIGHT_TUNA_KG) {
+      return { valid: false, reason: `Tuna must be at least ${MIN_WEIGHT_TUNA_KG}kg` }
+    }
+    return { valid: true, reason: '' }
+  }
+
+  // All other gamefish — minimum 3kg
+  if (!weightKg || parseFloat(weightKg) < MIN_WEIGHT_OTHER_KG) {
+    return { valid: false, reason: `Must be at least ${MIN_WEIGHT_OTHER_KG}kg` }
+  }
+
+  return { valid: true, reason: '' }
 }
 
 /**
@@ -61,19 +153,17 @@ export function calcKillWeighPoints(weightKg) {
 }
 
 /**
- * Calculate billfish release points for a single fish
- * releaseNumber = how many releases of this family this team has had today (1-based, including this fish)
+ * Calculate kingfish points (fixed weight scoring)
  */
-export function calcBillfishPoints(familyGroup, releaseNumber) {
-  const base = BILLFISH_POINTS[familyGroup] || 0
-  const bonus = BILLFISH_BONUS[releaseNumber] || 0
-  return base + bonus
+export function calcKingfishPoints(speciesName) {
+  if (isGT(speciesName)) return calcKillWeighPoints(GT_SCORE_KG)
+  if (isOtherKingfish(speciesName)) return calcKillWeighPoints(KINGFISH_SCORE_KG)
+  return 0
 }
 
 /**
  * Calculate species multiplier
- * distinctFamilies = number of distinct family groups caught by team that day
- * Rule: 1 species → ×1, 2 species → ×1, 3 species → ×2, 4 species → ×3, etc.
+ * 1-2 species → ×1, 3 species → ×2, 4 species → ×3 etc.
  */
 export function calcSpeciesMultiplier(distinctFamilies) {
   if (distinctFamilies <= 2) return 1
@@ -82,40 +172,37 @@ export function calcSpeciesMultiplier(distinctFamilies) {
 
 /**
  * Calculate full team daily score from an array of catches
- * catches = array of { species_name, weight_kg, released }
- * Returns { rawTotal, multiplier, finalScore, distinctFamilies, catchCount, details }
+ * Billfish count for multiplier but score zero points
  */
 export function calcTeamDayScore(catches) {
   if (!catches || catches.length === 0) {
     return { rawTotal: 0, multiplier: 1, finalScore: 0, distinctFamilies: 0, catchCount: 0, details: [] }
   }
 
-  // Track billfish release counts per family for bonus calculation
-  const billfishReleaseCounts = {}
   const familiesPresent = new Set()
   const details = []
-
   let rawTotal = 0
 
   catches.forEach(c => {
     const family = getFamilyGroup(c.species_name)
-    familiesPresent.add(family)
+    familiesPresent.add(family) // Billfish count toward multiplier
 
     let points = 0
-    let bonus = 0
     let pointsType = ''
 
     if (BILLFISH_FAMILIES.includes(family)) {
-      // Billfish release
-      billfishReleaseCounts[family] = (billfishReleaseCounts[family] || 0) + 1
-      const releaseNum = billfishReleaseCounts[family]
-      points = calcBillfishPoints(family, releaseNum)
-      bonus = BILLFISH_BONUS[releaseNum] || 0
-      pointsType = `Release (${releaseNum}${releaseNum === 1 ? 'st' : releaseNum === 2 ? 'nd' : 'rd'})`
+      // Billfish = zero points, counts for multiplier only
+      points = 0
+      pointsType = 'Release — counts for multiplier only'
+    } else if (family === GT_FAMILY) {
+      points = calcKingfishPoints(c.species_name)
+      pointsType = `GT scores as ${GT_SCORE_KG}kg`
+    } else if (family === KINGFISH_FAMILY) {
+      points = calcKingfishPoints(c.species_name)
+      pointsType = `Kingfish scores as ${KINGFISH_SCORE_KG}kg`
     } else {
-      // Kill & weigh
       points = calcKillWeighPoints(c.weight_kg || 0)
-      pointsType = `${c.weight_kg}kg ÷ ${LINE_CLASS_KG}kg²× 32`
+      pointsType = `${c.weight_kg}kg ÷ ${LINE_CLASS_KG}kg² × 32`
     }
 
     rawTotal += points
@@ -125,7 +212,6 @@ export function calcTeamDayScore(catches) {
       family,
       weight_kg: c.weight_kg,
       points: Math.round(points * 100) / 100,
-      bonus,
       pointsType
     })
   })
@@ -145,9 +231,8 @@ export function calcTeamDayScore(catches) {
 }
 
 /**
- * Calculate skipper grand prix points from daily boat scores
- * boatDayScores = [{ boat_id, boat_name, skipper_name, totalPoints }] sorted desc
- * Returns same array with grandPrixPoints added (1st = 1, 2nd = 2, etc.)
+ * Calculate skipper grand prix points
+ * Lowest total grand prix points wins
  */
 export function calcSkipperGrandPrix(boatDayScores) {
   return [...boatDayScores]
@@ -157,60 +242,48 @@ export function calcSkipperGrandPrix(boatDayScores) {
 
 /**
  * Build full leaderboard from all competition catches
- * catches = all catches for competition
- * teams = all teams
- * Returns { u19: [...], u16: [...] } each sorted by total score desc
+ * Tiebreaker: fewer qualifying fish wins
  */
 export function buildLeaderboard(catches, teams) {
   const teamScores = {}
 
-  // Group catches by team and day
   catches.forEach(c => {
     if (!teamScores[c.team_id]) {
-      teamScores[c.team_id] = { days: {}, totalScore: 0, totalFish: 0, totalReleases: 0 }
+      teamScores[c.team_id] = { days: {}, totalScore: 0, totalFish: 0 }
     }
-    if (!teamScores[c.team_id].days[c.competition_day]) {
-      teamScores[c.team_id].days[c.competition_day] = []
+    if (!teamScores[c.team_id].days[c.competition_day_id]) {
+      teamScores[c.team_id].days[c.competition_day_id] = []
     }
-    teamScores[c.team_id].days[c.competition_day].push(c)
-    if (c.released) teamScores[c.team_id].totalReleases++
+    teamScores[c.team_id].days[c.competition_day_id].push(c)
     teamScores[c.team_id].totalFish++
   })
 
-  // Calculate daily and total scores per team
   Object.keys(teamScores).forEach(teamId => {
     let total = 0
-    const dayScores = {}
-    Object.keys(teamScores[teamId].days).forEach(day => {
-      const dayCatches = teamScores[teamId].days[day]
-      const dayResult = calcTeamDayScore(dayCatches)
-      dayScores[day] = dayResult
-      total += dayResult.finalScore
+    Object.values(teamScores[teamId].days).forEach(dayCatches => {
+      total += calcTeamDayScore(dayCatches).finalScore
     })
     teamScores[teamId].totalScore = Math.round(total * 100) / 100
-    teamScores[teamId].dayScores = dayScores
   })
 
-  // Build leaderboard arrays per category
   const result = { U19: [], U16: [] }
 
   teams.forEach(team => {
-    const scores = teamScores[team.id] || { totalScore: 0, totalFish: 0, totalReleases: 0, dayScores: {} }
+    const scores = teamScores[team.id] || { totalScore: 0, totalFish: 0 }
     const entry = {
       ...team,
       totalScore: scores.totalScore,
       totalFish: scores.totalFish,
-      totalReleases: scores.totalReleases,
-      dayScores: scores.dayScores || {}
+      dayScores: scores.days || {}
     }
     if (team.team_type === 'U19') result.U19.push(entry)
     if (team.team_type === 'U16') result.U16.push(entry)
   })
 
-  // Sort by total score desc, tiebreak by fish count
+  // Sort by score desc, tiebreak: FEWER fish wins
   const sortTeams = arr => arr.sort((a, b) => {
     if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore
-    return b.totalFish - a.totalFish
+    return a.totalFish - b.totalFish // fewer fish wins tiebreak
   })
 
   result.U19 = sortTeams(result.U19)
@@ -220,8 +293,20 @@ export function buildLeaderboard(catches, teams) {
 }
 
 /**
- * Check if angler has reached daily bag limit
+ * Check if angler has reached daily bag limit (5 fish)
  */
 export function isAtBagLimit(anglerDayCatches) {
   return anglerDayCatches.length >= BAG_LIMIT
 }
+
+/**
+ * Check if team has reached daily kingfish release limit
+ */
+export function isAtKingfishLimit(teamDayCatches, kingfishType) {
+  const family = kingfishType === 'GT' ? GT_FAMILY : KINGFISH_FAMILY
+  const limit = kingfishType === 'GT' ? MAX_GT_RELEASES_PER_DAY : MAX_KINGFISH_RELEASES_PER_DAY
+  const count = teamDayCatches.filter(c => getFamilyGroup(c.species_name) === family).length
+  return count >= limit
+}
+
+export { BAG_LIMIT, MIN_WEIGHT_TUNA_KG, MIN_WEIGHT_OTHER_KG, MIN_LENGTH_GT_CM, MIN_LENGTH_KINGFISH_CM, GT_SCORE_KG, KINGFISH_SCORE_KG }

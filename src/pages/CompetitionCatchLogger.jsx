@@ -2,19 +2,36 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import {
   calcKillWeighPoints,
-  calcBillfishPoints,
+  calcKingfishPoints,
   calcTeamDayScore,
   calcSkipperGrandPrix,
   buildLeaderboard,
   getFamilyGroup,
-  isAtBagLimit
+  isAtBagLimit,
+  isAtKingfishLimit,
+  isBillfish,
+  isGT,
+  isOtherKingfish,
+  isKingfish,
+  checkMinimumRequirements,
+  BAG_LIMIT,
+  GT_SCORE_KG,
+  KINGFISH_SCORE_KG
 } from '../utils/competitionScoring'
 
 const COMPETITION_ID = 'ec9c5e41-a41a-4f2f-b8f6-75843b3b4f77'
-const BILLFISH_FAMILIES = ['Sailfish', 'Marlin']
+
+const fishingDates = {
+  1: '2026-03-30',
+  2: '2026-03-31',
+  3: '2026-04-01',
+  4: '2026-04-02',
+  5: '2026-04-03'
+}
 
 const SCORING_SPECIES = [
-  { name: 'Striped Bonito', release: false },
+  // Kill & Weigh
+  { name: 'Striped Bonito', release: false, tuna: true },
   { name: 'Blackfin Barracuda', release: false },
   { name: 'Great Barracuda', release: false },
   { name: 'Pickhandle Barracuda', release: false },
@@ -25,17 +42,22 @@ const SCORING_SPECIES = [
   { name: 'Double Spotted Queenfish', release: false },
   { name: 'Needlescaled Queenfish', release: false },
   { name: 'Talang Queenfish', release: false },
-  { name: 'Giant Kingfish/GT', release: false },
   { name: 'Greater Yellowtail/Amberjack', release: false },
-  { name: 'Eastern Little Tuna/Kawakawa', release: false },
-  { name: 'Skipjack Tuna', release: false },
-  { name: 'Yellowfin Tuna', release: false },
+  { name: 'Eastern Little Tuna/Kawakawa', release: false, tuna: true },
+  { name: 'Skipjack Tuna', release: false, tuna: true },
+  { name: 'Yellowfin Tuna', release: false, tuna: true },
   { name: 'Wahoo', release: false },
-  { name: 'Sailfish', release: true },
-  { name: 'Black Marlin', release: true },
-  { name: 'Blue Marlin', release: true },
-  { name: 'Striped Marlin', release: true },
-  { name: 'White Marlin', release: true },
+  // Kingfish — Release only, fixed scoring
+  { name: 'Giant Kingfish/GT', release: true, kingfish: true, gt: true },
+  { name: 'Bluefin Kingfish', release: true, kingfish: true },
+  { name: 'Blacktip Kingfish', release: true, kingfish: true },
+  { name: 'Yellowspot Kingfish', release: true, kingfish: true },
+  // Billfish — Release only, zero points, counts for multiplier
+  { name: 'Sailfish', release: true, billfish: true },
+  { name: 'Black Marlin', release: true, billfish: true },
+  { name: 'Blue Marlin', release: true, billfish: true },
+  { name: 'Striped Marlin', release: true, billfish: true },
+  { name: 'White Marlin', release: true, billfish: true },
 ]
 
 export default function CompetitionCatchLogger() {
@@ -56,6 +78,7 @@ export default function CompetitionCatchLogger() {
     boat_id: '',
     species_name: '',
     weight_kg: '',
+    length_cm: '',
     notes: ''
   })
 
@@ -105,22 +128,45 @@ export default function CompetitionCatchLogger() {
   }
 
   const activeDayRecord = days.find(d => d.day_number === activeDay)
-  const selectedSpecies = SCORING_SPECIES.find(s => s.name === form.species_name)
-  const isReleaseOnly = selectedSpecies?.release || false
+  const selectedSpeciesData = SCORING_SPECIES.find(s => s.name === form.species_name)
+  const isReleaseOnly = selectedSpeciesData?.release || false
+  const speciesIsBillfish = selectedSpeciesData?.billfish || false
+  const speciesIsKingfish = selectedSpeciesData?.kingfish || false
+  const speciesIsGT = selectedSpeciesData?.gt || false
   const teamParticipants = participants.filter(p => p.team_id === form.team_id)
   const anglerDayCatches = dayCatches.filter(c => c.angler_id === form.angler_id)
   const bagLimitReached = isAtBagLimit(anglerDayCatches)
 
+  // Kingfish team daily limits
+  const gtLimitReached = form.team_id && speciesIsGT &&
+    isAtKingfishLimit(dayCatches.filter(c => c.team_id === form.team_id), 'GT')
+  const kingfishLimitReached = form.team_id && speciesIsKingfish && !speciesIsGT &&
+    isAtKingfishLimit(dayCatches.filter(c => c.team_id === form.team_id), 'other')
+
+  // Validation check
+  const getValidationError = () => {
+    if (!form.team_id || !form.angler_id || !form.species_name) return null
+    if (bagLimitReached) return `Bag limit reached (${BAG_LIMIT} fish per angler per day)`
+    if (gtLimitReached) return 'Team GT limit reached (1 per day)'
+    if (kingfishLimitReached) return 'Team kingfish limit reached (1 per day)'
+    if (!isReleaseOnly && !speciesIsKingfish) {
+      const check = checkMinimumRequirements(form.species_name, form.weight_kg, null)
+      if (!check.valid) return check.reason
+    }
+    if (speciesIsKingfish && form.length_cm) {
+      const check = checkMinimumRequirements(form.species_name, null, form.length_cm)
+      if (!check.valid) return check.reason
+    }
+    return null
+  }
+
+  const validationError = getValidationError()
+
   const getPointsPreview = () => {
     if (!form.species_name) return null
-    const family = getFamilyGroup(form.species_name)
-    if (BILLFISH_FAMILIES.includes(family)) {
-      const releaseNum = dayCatches.filter(c =>
-        c.team_id === form.team_id && getFamilyGroup(c.species_name) === family
-      ).length + 1
-      const pts = calcBillfishPoints(family, releaseNum)
-      return { label: `Release #${releaseNum} — ${pts} pts` }
-    }
+    if (speciesIsBillfish) return { label: '0 pts (counts for species multiplier only)' }
+    if (speciesIsGT) return { label: `${Math.round(calcKingfishPoints(form.species_name) * 100) / 100} pts (scores as ${GT_SCORE_KG}kg)` }
+    if (speciesIsKingfish) return { label: `${Math.round(calcKingfishPoints(form.species_name) * 100) / 100} pts (scores as ${KINGFISH_SCORE_KG}kg)` }
     if (form.weight_kg && parseFloat(form.weight_kg) > 0) {
       const pts = Math.round(calcKillWeighPoints(parseFloat(form.weight_kg)) * 100) / 100
       return { label: `${pts} pts` }
@@ -135,12 +181,16 @@ export default function CompetitionCatchLogger() {
       alert('Please select a team, angler and species.')
       return
     }
-    if (!isReleaseOnly && !form.weight_kg) {
-      alert('Please enter a weight for this species.')
+    if (!isReleaseOnly && !speciesIsKingfish && !form.weight_kg) {
+      alert('Please enter a weight.')
       return
     }
-    if (bagLimitReached) {
-      alert('This angler has reached the daily bag limit of 10 fish.')
+    if (speciesIsKingfish && !form.length_cm) {
+      alert('Please enter a length for kingfish.')
+      return
+    }
+    if (validationError) {
+      alert(validationError)
       return
     }
     if (!activeDayRecord) {
@@ -149,14 +199,12 @@ export default function CompetitionCatchLogger() {
     }
 
     setSaving(true)
-    const family = getFamilyGroup(form.species_name)
-    let points = 0
 
-    if (BILLFISH_FAMILIES.includes(family)) {
-      const releaseNum = dayCatches.filter(c =>
-        c.team_id === form.team_id && getFamilyGroup(c.species_name) === family
-      ).length + 1
-      points = calcBillfishPoints(family, releaseNum)
+    let points = 0
+    if (speciesIsBillfish) {
+      points = 0
+    } else if (speciesIsKingfish) {
+      points = Math.round(calcKingfishPoints(form.species_name) * 100) / 100
     } else {
       points = Math.round(calcKillWeighPoints(parseFloat(form.weight_kg || 0)) * 100) / 100
     }
@@ -171,6 +219,7 @@ export default function CompetitionCatchLogger() {
       species_name: form.species_name,
       line_class_kg: 10,
       weight_kg: isReleaseOnly ? null : parseFloat(form.weight_kg),
+      length_cm: form.length_cm ? parseFloat(form.length_cm) : null,
       retained: !isReleaseOnly,
       points: points,
       entered_by: 'Shore Official',
@@ -180,7 +229,7 @@ export default function CompetitionCatchLogger() {
     if (error) {
       alert('Error saving catch: ' + error.message)
     } else {
-      setForm(f => ({ ...f, species_name: '', weight_kg: '', notes: '' }))
+      setForm(f => ({ ...f, species_name: '', weight_kg: '', length_cm: '', notes: '' }))
       loadCatches()
     }
     setSaving(false)
@@ -193,8 +242,7 @@ export default function CompetitionCatchLogger() {
   }
 
   const getTeamDayScore = (teamId) => {
-    const catches = dayCatches.filter(c => c.team_id === teamId)
-    return calcTeamDayScore(catches)
+    return calcTeamDayScore(dayCatches.filter(c => c.team_id === teamId))
   }
 
   const leaderboard = buildLeaderboard(allCatches, teams)
@@ -237,6 +285,8 @@ export default function CompetitionCatchLogger() {
 
   const medal = idx => idx === 0 ? '#f59e0b' : idx === 1 ? '#9ca3af' : idx === 2 ? '#b45309' : '#e5e7eb'
 
+  const canSubmit = !saving && !bagLimitReached && !gtLimitReached && !kingfishLimitReached && !validationError
+
   return (
     <div style={{ minHeight: '100vh', background: '#f3f4f6', paddingBottom: '3rem' }}>
 
@@ -244,21 +294,21 @@ export default function CompetitionCatchLogger() {
       <div style={{ background: '#1e3a8a', color: 'white', padding: '1rem 1.5rem' }}>
         <div style={{ fontSize: '0.7rem', opacity: 0.7, letterSpacing: '0.1em', textTransform: 'uppercase' }}>SADSAA</div>
         <div style={{ fontSize: '1.2rem', fontWeight: '800' }}>Junior Gamefish Nationals 2026</div>
-        <div style={{ fontSize: '0.8rem', opacity: 0.85 }}>Sodwana Bay • 30 Mar – 2 Apr • 10kg Line Class</div>
+        <div style={{ fontSize: '0.8rem', opacity: 0.85 }}>Sodwana Bay • 30 Mar – 3 Apr • 10kg Line Class</div>
       </div>
 
       {/* Day Tabs */}
-      <div style={{ background: '#1e40af', padding: '0.6rem 1rem', display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-        {[1,2,3,4].map(d => (
+      <div style={{ background: '#1e40af', padding: '0.6rem 1rem', display: 'flex', gap: '0.4rem', alignItems: 'center', overflowX: 'auto' }}>
+        {[1,2,3,4,5].map(d => (
           <button key={d} onClick={() => setActiveDay(d)} style={{
             padding: '0.35rem 0.9rem', borderRadius: '20px', border: 'none', cursor: 'pointer',
-            fontWeight: '700', fontSize: '0.8rem',
+            fontWeight: '700', fontSize: '0.8rem', flexShrink: 0,
             background: activeDay === d ? 'white' : 'rgba(255,255,255,0.2)',
             color: activeDay === d ? '#1e3a8a' : 'white'
           }}>Day {d}</button>
         ))}
         <div style={{ flex: 1 }} />
-        <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.75rem' }}>
+        <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.75rem', flexShrink: 0 }}>
           {activeDayRecord?.date || ''}
         </span>
       </div>
@@ -291,19 +341,15 @@ export default function CompetitionCatchLogger() {
                 <select value={form.team_id} onChange={e => setForm(f => ({ ...f, team_id: e.target.value, angler_id: '' }))}
                   style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '0.9rem' }}>
                   <option value="">— Select team —</option>
-                  <optgroup label="U/19">
-                    {teams.filter(t => t.team_type === 'U19').map(t => <option key={t.id} value={t.id}>{t.team_name}</option>)}
-                  </optgroup>
-                  <optgroup label="U/16">
-                    {teams.filter(t => t.team_type === 'U16').map(t => <option key={t.id} value={t.id}>{t.team_name}</option>)}
-                  </optgroup>
+                  <optgroup label="U/19">{teams.filter(t => t.team_type === 'U19').map(t => <option key={t.id} value={t.id}>{t.team_name}</option>)}</optgroup>
+                  <optgroup label="U/16">{teams.filter(t => t.team_type === 'U16').map(t => <option key={t.id} value={t.id}>{t.team_name}</option>)}</optgroup>
                 </select>
               </div>
 
               {/* Angler */}
               <div style={{ marginBottom: '0.875rem' }}>
                 <label style={{ display: 'block', fontWeight: '600', fontSize: '0.8rem', color: bagLimitReached ? '#ef4444' : '#374151', marginBottom: '0.3rem' }}>
-                  Angler * {bagLimitReached && '⚠ BAG LIMIT REACHED (10)'}
+                  Angler * {bagLimitReached && `⚠ BAG LIMIT (${BAG_LIMIT} fish/day)`}
                 </label>
                 <select value={form.angler_id} onChange={e => setForm(f => ({ ...f, angler_id: e.target.value }))}
                   disabled={!form.team_id}
@@ -311,7 +357,7 @@ export default function CompetitionCatchLogger() {
                   <option value="">— Select angler —</option>
                   {teamParticipants.map(p => {
                     const cnt = dayCatches.filter(c => c.angler_id === p.id).length
-                    return <option key={p.id} value={p.id}>{p.full_name} ({p.category}) — {cnt}/10</option>
+                    return <option key={p.id} value={p.id}>{p.full_name} ({p.category}) — {cnt}/{BAG_LIMIT}</option>
                   })}
                 </select>
               </div>
@@ -330,29 +376,53 @@ export default function CompetitionCatchLogger() {
               <div style={{ marginBottom: '0.875rem' }}>
                 <label style={{ display: 'block', fontWeight: '600', fontSize: '0.8rem', color: '#374151', marginBottom: '0.3rem' }}>Species *</label>
                 <select value={form.species_name}
-                  onChange={e => setForm(f => ({ ...f, species_name: e.target.value, weight_kg: '' }))}
+                  onChange={e => setForm(f => ({ ...f, species_name: e.target.value, weight_kg: '', length_cm: '' }))}
                   style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '0.9rem' }}>
                   <option value="">— Select species —</option>
-                  <optgroup label="Kill & Weigh">
-                    {SCORING_SPECIES.filter(s => !s.release).map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
-                  </optgroup>
-                  <optgroup label="🔵 Billfish — Release Only">
-                    {SCORING_SPECIES.filter(s => s.release).map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
-                  </optgroup>
+                  <optgroup label="Kill & Weigh">{SCORING_SPECIES.filter(s => !s.release).map(s => <option key={s.name} value={s.name}>{s.name}</option>)}</optgroup>
+                  <optgroup label="🟢 Kingfish — Release & Measure">{SCORING_SPECIES.filter(s => s.kingfish).map(s => <option key={s.name} value={s.name}>{s.name}</option>)}</optgroup>
+                  <optgroup label="🔵 Billfish — Release Only (multiplier)">{SCORING_SPECIES.filter(s => s.billfish).map(s => <option key={s.name} value={s.name}>{s.name}</option>)}</optgroup>
                 </select>
               </div>
 
-              {/* Billfish notice */}
-              {isReleaseOnly && (
+              {/* Species info notices */}
+              {speciesIsBillfish && (
                 <div style={{ background: '#dbeafe', border: '1px solid #93c5fd', borderRadius: '6px', padding: '0.65rem', marginBottom: '0.875rem', fontSize: '0.825rem', color: '#1e40af' }}>
-                  🔵 <strong>Billfish — Catch & Release only.</strong> No weight required.
+                  🔵 <strong>Billfish — Release only.</strong> Scores 0 points but counts toward species multiplier. Photo/video evidence required.
+                </div>
+              )}
+              {speciesIsGT && (
+                <div style={{ background: '#d1fae5', border: '1px solid #6ee7b7', borderRadius: '6px', padding: '0.65rem', marginBottom: '0.875rem', fontSize: '0.825rem', color: '#065f46' }}>
+                  🟢 <strong>Giant Kingfish — Release & Measure.</strong> Scores as {GT_SCORE_KG}kg. Min 65cm fork length. Max 1 per team per day.
+                  {gtLimitReached && <div style={{ marginTop: '0.4rem', color: '#ef4444', fontWeight: '700' }}>⚠ Team GT limit reached for today.</div>}
+                </div>
+              )}
+              {speciesIsKingfish && !speciesIsGT && (
+                <div style={{ background: '#d1fae5', border: '1px solid #6ee7b7', borderRadius: '6px', padding: '0.65rem', marginBottom: '0.875rem', fontSize: '0.825rem', color: '#065f46' }}>
+                  🟢 <strong>Kingfish — Release & Measure.</strong> Scores as {KINGFISH_SCORE_KG}kg. Min 40cm fork length. Max 1 per team per day.
+                  {kingfishLimitReached && <div style={{ marginTop: '0.4rem', color: '#ef4444', fontWeight: '700' }}>⚠ Team kingfish limit reached for today.</div>}
                 </div>
               )}
 
-              {/* Weight */}
+              {/* Length (kingfish only) */}
+              {speciesIsKingfish && (
+                <div style={{ marginBottom: '0.875rem' }}>
+                  <label style={{ display: 'block', fontWeight: '600', fontSize: '0.8rem', color: '#374151', marginBottom: '0.3rem' }}>
+                    Fork Length (cm) * {speciesIsGT ? '— min 65cm' : '— min 40cm'}
+                  </label>
+                  <input type="number" step="0.1" min="0" value={form.length_cm}
+                    onChange={e => setForm(f => ({ ...f, length_cm: e.target.value }))}
+                    placeholder={speciesIsGT ? 'e.g. 72.5' : 'e.g. 45.0'}
+                    style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '1rem' }} />
+                </div>
+              )}
+
+              {/* Weight (kill & weigh only) */}
               {!isReleaseOnly && form.species_name && (
                 <div style={{ marginBottom: '0.875rem' }}>
-                  <label style={{ display: 'block', fontWeight: '600', fontSize: '0.8rem', color: '#374151', marginBottom: '0.3rem' }}>Weight (kg) *</label>
+                  <label style={{ display: 'block', fontWeight: '600', fontSize: '0.8rem', color: '#374151', marginBottom: '0.3rem' }}>
+                    Weight (kg) * {selectedSpeciesData?.tuna ? '— min 4kg' : '— min 3kg'}
+                  </label>
                   <input type="number" step="0.01" min="0" value={form.weight_kg}
                     onChange={e => setForm(f => ({ ...f, weight_kg: e.target.value }))}
                     placeholder="e.g. 12.50"
@@ -363,7 +433,14 @@ export default function CompetitionCatchLogger() {
               {/* Points preview */}
               {pointsPreview && (
                 <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: '6px', padding: '0.6rem 0.875rem', marginBottom: '0.875rem', fontSize: '0.85rem', color: '#166534', fontWeight: '600' }}>
-                  📊 Estimated: {pointsPreview.label}
+                  📊 {pointsPreview.label}
+                </div>
+              )}
+
+              {/* Validation error */}
+              {validationError && (
+                <div style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '6px', padding: '0.6rem 0.875rem', marginBottom: '0.875rem', fontSize: '0.85rem', color: '#991b1b', fontWeight: '600' }}>
+                  ⚠ {validationError}
                 </div>
               )}
 
@@ -375,13 +452,13 @@ export default function CompetitionCatchLogger() {
                   style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '0.9rem' }} />
               </div>
 
-              <button onClick={handleSubmit} disabled={saving || bagLimitReached} style={{
+              <button onClick={handleSubmit} disabled={!canSubmit} style={{
                 width: '100%', padding: '0.85rem',
-                background: saving || bagLimitReached ? '#9ca3af' : '#1e3a8a',
+                background: canSubmit ? '#1e3a8a' : '#9ca3af',
                 color: 'white', border: 'none', borderRadius: '6px',
-                fontSize: '1rem', fontWeight: '800', cursor: saving || bagLimitReached ? 'not-allowed' : 'pointer'
+                fontSize: '1rem', fontWeight: '800', cursor: canSubmit ? 'pointer' : 'not-allowed'
               }}>
-                {saving ? 'Saving...' : bagLimitReached ? '⚠ Bag Limit Reached' : '✓ Save Catch'}
+                {saving ? 'Saving...' : validationError ? '⚠ Check Requirements' : '✓ Save Catch'}
               </button>
             </div>
 
@@ -413,7 +490,8 @@ export default function CompetitionCatchLogger() {
                     </div>
                     <div style={{ fontSize: '0.8rem', marginTop: '0.1rem', display: 'flex', gap: '0.75rem' }}>
                       {c.weight_kg && <span style={{ color: '#059669', fontWeight: '600' }}>{parseFloat(c.weight_kg).toFixed(2)} kg</span>}
-                      {c.points > 0 && <span style={{ color: '#7c3aed', fontWeight: '600' }}>{c.points} pts</span>}
+                      {c.length_cm && <span style={{ color: '#0891b2', fontWeight: '600' }}>{parseFloat(c.length_cm).toFixed(1)} cm</span>}
+                      <span style={{ color: '#7c3aed', fontWeight: '600' }}>{c.points} pts</span>
                     </div>
                   </div>
                   <button onClick={() => deleteCatch(c.id)}
@@ -443,9 +521,7 @@ export default function CompetitionCatchLogger() {
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: '700', fontSize: '0.9rem', color: '#111827' }}>{team.team_name}</div>
-                    <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                      {team.totalFish} fish{team.totalReleases > 0 ? ` • ${team.totalReleases} releases` : ''}
-                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>{team.totalFish} fish total</div>
                     {day.catchCount > 0 && (
                       <div style={{ fontSize: '0.75rem', color: '#7c3aed' }}>
                         Day {activeDay}: {day.finalScore} pts{day.multiplier > 1 ? ` (×${day.multiplier} species bonus)` : ''}
