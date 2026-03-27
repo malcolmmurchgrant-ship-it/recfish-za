@@ -222,7 +222,7 @@ export default function CompetitionCatchLogger() {
       length_cm: form.length_cm ? parseFloat(form.length_cm) : null,
       retained: !isReleaseOnly,
       points: points,
-      entered_by: 'Shore Official',
+      entered_by: null,
       notes: form.notes || null
     }])
 
