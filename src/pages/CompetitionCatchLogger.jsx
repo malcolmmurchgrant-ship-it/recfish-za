@@ -440,7 +440,7 @@ export default function CompetitionCatchLogger() {
             disabled={generating}
             style={{ padding: '0.35rem 0.8rem', background: generating ? '#9ca3af' : '#166534', color: 'white', border: 'none', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '700', cursor: generating ? 'not-allowed' : 'pointer', flexShrink: 0 }}
           >
-            {generating ? 'Generating...' : }
+            {generating ? 'Generating...' : `Day ${activeDay} Results`}
           </button>
           <button
             onClick={() => handleGeneratePDF(null)}
