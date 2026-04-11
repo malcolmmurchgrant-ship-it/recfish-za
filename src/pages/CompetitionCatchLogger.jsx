@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { generateResultsPDF } from '../utils/competitionPDF'
 import { supabase } from '../lib/supabase'
 import {
   calcKillWeighPoints, calcKingfishPoints, calcTeamDayScore,
@@ -149,6 +150,7 @@ export default function CompetitionCatchLogger() {
     weight_kg: '', length_cm: '', scoring: true, notes: ''
   })
 
+  const [generating, setGenerating] = useState(false)
   const isTuna = selectedComp?.type === 'tuna'
   const isGamefish = selectedComp?.type === 'gamefish'
 
@@ -368,6 +370,17 @@ export default function CompetitionCatchLogger() {
       })
   }
 
+  const handleGeneratePDF = async (dayNumber) => {
+    if (!selectedComp || selectedComp.type !== 'tuna') return
+    setGenerating(true)
+    try {
+      await generateResultsPDF(supabase, dayNumber)
+    } catch (err) {
+      alert('Error generating PDF: ' + err.message)
+    }
+    setGenerating(false)
+  }
+
   if (!selectedComp) return <CompetitionSelector onSelect={c => { setSelectedComp(c); setActiveDay(1); setView('log') }} />
 
   if (loading) return (
@@ -417,6 +430,27 @@ export default function CompetitionCatchLogger() {
           }}>{label}</button>
         ))}
       </div>
+
+      {/* PDF Generation — Tuna only */}
+      {isTuna && (
+        <div style={{ background: '#f0fdf4', borderBottom: '1px solid #86efac', padding: '0.6rem 1rem', display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '0.8rem', color: '#166534', fontWeight: '600', flexShrink: 0 }}>📄 Generate Official Results:</span>
+          <button
+            onClick={() => handleGeneratePDF(activeDay)}
+            disabled={generating}
+            style={{ padding: '0.35rem 0.8rem', background: generating ? '#9ca3af' : '#166534', color: 'white', border: 'none', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '700', cursor: generating ? 'not-allowed' : 'pointer', flexShrink: 0 }}
+          >
+            {generating ? 'Generating...' : }
+          </button>
+          <button
+            onClick={() => handleGeneratePDF(null)}
+            disabled={generating}
+            style={{ padding: '0.35rem 0.8rem', background: generating ? '#9ca3af' : '#1e3a8a', color: 'white', border: 'none', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '700', cursor: generating ? 'not-allowed' : 'pointer', flexShrink: 0 }}
+          >
+            {generating ? 'Generating...' : 'Final Results'}
+          </button>
+        </div>
+      )}
 
       <div style={{ maxWidth: '600px', margin: '0 auto', padding: '1rem' }}>
 
