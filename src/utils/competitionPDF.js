@@ -248,7 +248,7 @@ function addNationalsPage(doc, natStandings, intStandings, topCatches,
   doc.setFontSize(10)
   doc.setFont('helvetica', 'bold')
   doc.setTextColor(...NAVY)
-  doc.text('🏆  Nationals — Team Standings', 10, y)
+  doc.text('Nationals — Team Standings', 10, y)
   y += 3
 
   autoTable(doc, {
@@ -277,7 +277,7 @@ function addNationalsPage(doc, natStandings, intStandings, topCatches,
   doc.setFontSize(10)
   doc.setFont('helvetica', 'bold')
   doc.setTextColor(...NAVY)
-  doc.text(`🐟  ${topLabel}`, 10, y)
+  doc.text(`${topLabel}`, 10, y)
   y += 3
 
   autoTable(doc, {
@@ -308,8 +308,8 @@ function addNationalsPage(doc, natStandings, intStandings, topCatches,
   doc.setFontSize(10)
   doc.setFont('helvetica', 'bold')
   doc.setTextColor(...NAVY)
-  doc.text('⚓  Skipper Grand Prix', 10, y)
-  doc.text('🌍  International — Teams', midX + 2, y)
+  doc.text('Skipper Grand Prix', 10, y)
+  doc.text('International — Teams', midX + 2, y)
   y += 3
 
   autoTable(doc, {
@@ -356,7 +356,7 @@ function addNationalsPage(doc, natStandings, intStandings, topCatches,
   doc.setFontSize(10)
   doc.setFont('helvetica', 'bold')
   doc.setTextColor(...NAVY)
-  doc.text('🌍  International — Individual Angler Standings', 10, y)
+  doc.text('International — Individual Angler Standings', 10, y)
   y += 3
 
   autoTable(doc, {
@@ -535,11 +535,11 @@ export async function generateResultsPDF(supabase, dayNumber = null) {
                    intAngScores, dayLabel, dateStr, compName, venue, isFinal)
 
   // Page 2 — Nationals angler detail
-  addAnglerDetailPage(doc, natCatchDetail, '🎣  Nationals — Individual Angler Catches',
+  addAnglerDetailPage(doc, natCatchDetail, 'Nationals — Individual Angler Catches',
                       compName, venue, dayLabel, dateStr, isFinal)
 
   // Page 3+ — International angler detail
-  addAnglerDetailPage(doc, intCatchDetail, '🌍  International — Individual Angler Catches',
+  addAnglerDetailPage(doc, intCatchDetail, 'International — Individual Angler Catches',
                       compName, venue, dayLabel, dateStr, isFinal)
 
   // Save

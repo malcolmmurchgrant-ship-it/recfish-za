@@ -434,7 +434,7 @@ export default function CompetitionCatchLogger() {
       {/* PDF Generation — Tuna only */}
       {isTuna && (
         <div style={{ background: '#f0fdf4', borderBottom: '1px solid #86efac', padding: '0.6rem 1rem', display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '0.8rem', color: '#166534', fontWeight: '600', flexShrink: 0 }}>📄 Generate Official Results:</span>
+          <span style={{ fontSize: '0.8rem', color: '#166534', fontWeight: '600', flexShrink: 0 }}>Generate Official Results:</span>
           <button
             onClick={() => handleGeneratePDF(activeDay)}
             disabled={generating}
