@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 
 const AUTHORISED_ADMINS = [
+  'mpca99@telkomsa.net',
   'malcolmmurchgrant@gmail.com',
   'wpdsaa@mweb.co.za',
 ]
