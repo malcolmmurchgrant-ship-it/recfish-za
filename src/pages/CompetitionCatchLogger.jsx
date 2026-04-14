@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
+import { useAuth } from '../contexts/AuthContext'
 import { generateResultsPDF } from '../utils/competitionPDF'
+import CompetitionAdminPanel from './CompetitionAdmin'
 import { supabase } from '../lib/supabase'
 import {
   calcKillWeighPoints, calcKingfishPoints, calcTeamDayScore,
@@ -151,6 +153,11 @@ export default function CompetitionCatchLogger() {
   })
 
   const [generating, setGenerating] = useState(false)
+  const [showAdmin, setShowAdmin] = useState(false)
+  const { user } = useAuth()
+  const ADMIN_EMAILS = ['malcolmmurchgrant@gmail.com','mpca99@telkomsa.net','wpdsaa@mweb.co.za']
+  const userEmail = (user?.email || user?.user_metadata?.email || '').toLowerCase()
+  const isAdmin = ADMIN_EMAILS.includes(userEmail)
   const isTuna = selectedComp?.type === 'tuna'
   const isGamefish = selectedComp?.type === 'gamefish'
 
@@ -381,6 +388,8 @@ export default function CompetitionCatchLogger() {
     setGenerating(false)
   }
 
+  if (showAdmin) return <CompetitionAdminPanel onClose={() => { setShowAdmin(false); }} />
+
   if (!selectedComp) return <CompetitionSelector onSelect={c => { setSelectedComp(c); setActiveDay(1); setView('log') }} />
 
   if (loading) return (
@@ -394,10 +403,20 @@ export default function CompetitionCatchLogger() {
 
       {/* Header */}
       <div style={{ background: NAVY, color: 'white', padding: '1rem 1.5rem' }}>
-        <button onClick={() => { setSelectedComp(null); setTeams([]); setParticipants([]); setBoats([]); setDays([]); setAllCatches([]); setDayCatches([]) }}
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          {isAdmin ? (
+            <button onClick={() => setShowAdmin(true)}
+              style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', borderRadius: '20px', padding: '0.25rem 0.75rem', fontSize: '0.75rem', cursor: 'pointer' }}>
+              Admin
+            </button>
+          ) : (
+            <span style={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.5)' }}>{userEmail || 'not logged in'}</span>
+          )}
+          <button onClick={() => { setSelectedComp(null); setTeams([]); setParticipants([]); setBoats([]); setDays([]); setAllCatches([]); setDayCatches([]) }}
           style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', borderRadius: '20px', padding: '0.25rem 0.75rem', fontSize: '0.75rem', cursor: 'pointer', marginBottom: '0.5rem' }}>
           ← All Competitions
         </button>
+        </div>
         <div style={{ fontSize: '0.7rem', opacity: 0.7, letterSpacing: '0.1em', textTransform: 'uppercase' }}>SADSAA</div>
         <div style={{ fontSize: '1.1rem', fontWeight: '800' }}>{selectedComp.name}</div>
         <div style={{ fontSize: '0.8rem', opacity: 0.85 }}>{selectedComp.venue} • {selectedComp.dates}</div>

@@ -33,7 +33,8 @@ export default function CompetitionAdminPanel({ onClose }) {
   const [editingCatch, setEditingCatch] = useState(null)
   const [selectedComp, setSelectedComp] = useState(NAT_COMP_ID)
 
-  const isAuthorised = user && AUTHORISED_ADMINS.includes(user.email?.toLowerCase())
+  const userEmail = (user?.email || user?.user_metadata?.email || '').toLowerCase()
+  const isAuthorised = AUTHORISED_ADMINS.includes(userEmail)
 
   useEffect(() => { if (isAuthorised) loadData() }, [selectedComp])
 
