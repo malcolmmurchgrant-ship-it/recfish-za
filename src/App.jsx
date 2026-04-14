@@ -10,6 +10,7 @@ import Sessions from './pages/Sessions'
 import SpeciesLookup from './pages/SpeciesLookup'
 import CompetitionAdmin from './pages/CompetitionAdmin'
 import CompetitionCatchLogger from './pages/CompetitionCatchLogger'
+import Profile from './pages/Profile'
 import SessionEndSummaryModal from './components/SessionEndSummaryModal'
 
 function Navigation() {
@@ -29,12 +30,13 @@ function Navigation() {
         msOverflowStyle: 'none'
       }}>
         {[
-          { to: '/dashboard', label: '🏠 Home' },
-          { to: '/log-catch', label: '🎣 Log' },
-          { to: '/my-catches', label: '📋 Catches' },
-          { to: '/sessions', label: '⏱ Sessions' },
-          { to: '/species', label: '🐟 Species' },
+          { to: '/dashboard',   label: '🏠 Home' },
+          { to: '/log-catch',   label: '🎣 Log' },
+          { to: '/my-catches',  label: '📋 Catches' },
+          { to: '/sessions',    label: '⏱ Sessions' },
+          { to: '/species',     label: '🐟 Species' },
           { to: '/competition', label: '🏆 Competition' },
+          { to: '/profile',     label: '👤 Profile' },
         ].map(({ to, label }) => (
           <Link
             key={to}
@@ -85,16 +87,17 @@ function AppContent() {
         <Navigation />
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
           <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/log-catch" element={<LogCatch />} />
-            <Route path="/my-catches" element={<MyCatches />} />
-            <Route path="/sessions" element={<Sessions />} />
-            <Route path="/species" element={<SpeciesLookup />} />
+            <Route path="/login"            element={<Login />} />
+            <Route path="/register"         element={<Register />} />
+            <Route path="/dashboard"        element={<Dashboard />} />
+            <Route path="/log-catch"        element={<LogCatch />} />
+            <Route path="/my-catches"       element={<MyCatches />} />
+            <Route path="/sessions"         element={<Sessions />} />
+            <Route path="/species"          element={<SpeciesLookup />} />
             <Route path="/competition-admin" element={<CompetitionAdmin />} />
-            <Route path="/competition" element={<CompetitionCatchLogger />} />
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/competition"      element={<CompetitionCatchLogger />} />
+            <Route path="/profile"          element={<Profile />} />
+            <Route path="/"                 element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </div>
       </div>
