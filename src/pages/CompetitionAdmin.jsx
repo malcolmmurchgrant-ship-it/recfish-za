@@ -79,45 +79,40 @@ export default function CompetitionAdminPanel({ onClose }) {
     const team = teams.find(t => t.id === teamId)
     if (!team) { setSaving(false); return }
 
-    // Get boat for this team
-    const boat = boats.find(b => b.id === team.boat_id)
+    const errors = []
 
-    // Insert team in new competition
-    const { data: newTeam, error: teamErr } = await supabase
+    // Update team competition_id directly
+    const { error: teamErr } = await supabase
       .from('competition_teams')
-      .insert([{ competition_id: newCompId, team_name: team.team_name, province: team.province, team_type: team.team_type }])
-      .select().single()
+      .update({ competition_id: newCompId })
+      .eq('id', teamId)
+    if (teamErr) errors.push('Team: ' + teamErr.message)
 
-    if (teamErr) { showMessage('Error moving team: ' + teamErr.message, 'error'); setSaving(false); return }
-
-    // Move boat if exists
+    // Update boat competition_id if assigned
+    const boat = boats.find(b => b.id === team.boat_id)
     if (boat) {
-      await supabase.from('competition_boats')
-        .insert([{ competition_id: newCompId, boat_name: boat.boat_name, skipper_name: boat.skipper_name }])
+      const { error: boatErr } = await supabase
+        .from('competition_boats')
+        .update({ competition_id: newCompId })
+        .eq('id', boat.id)
+      if (boatErr) errors.push('Boat: ' + boatErr.message)
     }
 
-    // Move participants
+    // Update participants competition_id
     const teamParticipants = participants.filter(p => p.team_id === teamId)
     if (teamParticipants.length > 0) {
-      await supabase.from('competition_participants').insert(
-        teamParticipants.map(p => ({
-          competition_id: newCompId,
-          user_id: p.user_id,
-          team_id: newTeam.id,
-          full_name: p.full_name,
-          division: p.division,
-          category: p.category,
-          line_class_kg: p.line_class_kg
-        }))
-      )
+      const { error: partErr } = await supabase
+        .from('competition_participants')
+        .update({ competition_id: newCompId })
+        .eq('team_id', teamId)
+      if (partErr) errors.push('Participants: ' + partErr.message)
     }
 
-    // Delete from old competition
-    await supabase.from('competition_participants').delete().eq('team_id', teamId)
-    await supabase.from('competition_teams').delete().eq('id', teamId)
-    if (boat) await supabase.from('competition_boats').delete().eq('id', boat.id)
-
-    showMessage(`${team.team_name} moved successfully`)
+    if (errors.length > 0) {
+      showMessage('Errors: ' + errors.join(' | '), 'error')
+    } else {
+      showMessage(`${team.team_name} moved successfully`)
+    }
     loadData()
     setSaving(false)
   }
