@@ -236,9 +236,9 @@ function medalFill(data) {
   else if (data.row.index === 2) data.cell.styles.fillColor = BRONZE_BG
 }
 
-// ── PAGE 1 ────────────────────────────────────────────────────
-function addPage1(doc, natStandings, intStandings, topCatches, skippers,
-                   intAnglers, dayLabel, dateStr, compName, venue, isFinal) {
+// ── NATIONALS PAGE 1 ─────────────────────────────────────────
+function addNationalsPage1(doc, natStandings, topCatches, skippers,
+                            dayLabel, dateStr, compName, venue, isFinal) {
   addHeader(doc, compName, venue, dayLabel, dateStr, isFinal)
   let y = 40
 
@@ -248,7 +248,7 @@ function addPage1(doc, natStandings, intStandings, topCatches, skippers,
 
   autoTable(doc, {
     startY: y,
-    head: [['Pos', 'Team', 'Boat', 'Skipper', 'Fish', 'Points', 'CPUE kg/hr', 'CPUE fish/hr']],
+    head: [['#', 'Team', 'Boat', 'Skipper', 'Fish', 'Points', 'kg/hr', 'f/hr']],
     body: natStandings.map(t => [
       t.pos, t.team, t.boat, t.skipper, t.fish,
       t.total.toLocaleString('en-ZA', { minimumFractionDigits: 2 }),
@@ -272,7 +272,7 @@ function addPage1(doc, natStandings, intStandings, topCatches, skippers,
 
   autoTable(doc, {
     startY: y,
-    head: [['Rank', 'Angler', 'Team', 'Species', 'Weight', 'Line', 'Points']],
+    head: [['#', 'Angler', 'Team', 'Species', 'Weight', 'Line', 'Points']],
     body: topCatches.map((c, i) => [
       i + 1, c.angler, c.team, c.species,
       `${c.weight.toFixed(2)} kg`, c.lc,
@@ -296,7 +296,7 @@ function addPage1(doc, natStandings, intStandings, topCatches, skippers,
 
   autoTable(doc, {
     startY: y,
-    head: [['Pos', 'Skipper', 'Boat', 'GP', 'kg/hr', 'f/hr']],
+    head: [['#', 'Skipper', 'Boat', 'GP', 'kg/hr', 'f/hr']],
     body: skippers.map(s => [s.pos, s.skipper, s.boat, s.gp, s.cpue_kg.toFixed(2), s.cpue_fish.toFixed(2)]),
     headStyles:    { fillColor: NAVY2, textColor: WHITE, fontStyle: 'bold', fontSize: 8 },
     bodyStyles:    { fontSize: 8, textColor: DARK, overflow: 'ellipsize', cellPadding: 2 },
@@ -314,7 +314,7 @@ function addPage1(doc, natStandings, intStandings, topCatches, skippers,
 
   autoTable(doc, {
     startY: y,
-    head: [['Pos', 'Team', 'Fish', 'Points']],
+    head: [['#', 'Team', 'Fish', 'Points']],
     body: intStandings.map(t => [
       t.pos, t.team, t.fish,
       t.total.toLocaleString('en-ZA', { minimumFractionDigits: 2 })
@@ -330,14 +330,69 @@ function addPage1(doc, natStandings, intStandings, topCatches, skippers,
   })
   y = Math.max(doc.lastAutoTable.finalY, doc.previousAutoTable?.finalY || 0) + 5
 
-  // International individual anglers
-  doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(...NAVY)
-  doc.text('International — Individual Angler Standings', 10, y); y += 3
+  addFooter(doc, compName, dayLabel, dateStr)
+}
+
+// ── INTERNATIONAL PAGE 1 ──────────────────────────────────────
+function addInternationalPage1(doc, intStandings, intAngScores, topCatches,
+                                dayLabel, dateStr, compName, venue, isFinal) {
+  addHeader(doc, compName, venue, dayLabel, dateStr, isFinal)
+  let y = 40
+
+  // International team standings
+  doc.setFontSize(10); doc.setFont('helvetica', 'bold')
+  doc.setTextColor(...NAVY); doc.text('International — Team Standings', 10, y); y += 3
 
   autoTable(doc, {
     startY: y,
-    head: [['Pos', 'Angler', 'Country / Team', 'Fish', 'Points', 'CPUE kg/hr', 'CPUE fish/hr']],
-    body: intAnglers.map(a => [
+    head: [['#', 'Team', 'Boat', 'Skipper', 'Fish', 'Points', 'kg/hr', 'f/hr']],
+    body: intStandings.map(t => [
+      t.pos, t.team, t.boat, t.skipper, t.fish,
+      t.total.toLocaleString('en-ZA', { minimumFractionDigits: 2 }),
+      t.cpue_kg.toFixed(2), t.cpue_fish.toFixed(2)
+    ]),
+    headStyles:    { fillColor: PURPLE, textColor: WHITE, fontStyle: 'bold', fontSize: 8 },
+    bodyStyles:    { fontSize: 8, textColor: DARK },
+    alternateRowStyles: { fillColor: PALE_PUR },
+    columnStyles:  { 0: { halign: 'center', cellWidth: 9 }, 4: { halign: 'center', cellWidth: 11 },
+                     5: { halign: 'right', fontStyle: 'bold', cellWidth: 22 },
+                     6: { halign: 'center', cellWidth: 16 }, 7: { halign: 'center', cellWidth: 16 } },
+    didParseCell: medalFill,
+    margin: { left: 10, right: 10 },
+  })
+  y = doc.lastAutoTable.finalY + 5
+
+  // Top catches
+  const topLabel = isFinal ? 'Top 10 Catches — All Days' : `Top 5 Catches — ${dayLabel.replace(' Results','')}`
+  doc.setFontSize(10); doc.setFont('helvetica', 'bold')
+  doc.setTextColor(...NAVY); doc.text(topLabel, 10, y); y += 3
+
+  autoTable(doc, {
+    startY: y,
+    head: [['#', 'Angler', 'Team', 'Species', 'Weight', 'Line', 'Points']],
+    body: topCatches.map((c, i) => [
+      i + 1, c.angler, c.team, c.species,
+      `${c.weight.toFixed(2)} kg`, c.lc,
+      c.pts.toLocaleString('en-ZA', { minimumFractionDigits: 2 })
+    ]),
+    headStyles:    { fillColor: TEAL, textColor: WHITE, fontStyle: 'bold', fontSize: 8 },
+    bodyStyles:    { fontSize: 8, textColor: DARK },
+    alternateRowStyles: { fillColor: PALE_GRN },
+    columnStyles:  { 0: { halign: 'center', cellWidth: 10 }, 4: { halign: 'center' },
+                     5: { halign: 'center', cellWidth: 14 }, 6: { halign: 'right', fontStyle: 'bold', cellWidth: 22 } },
+    didParseCell: medalFill,
+    margin: { left: 10, right: 10 },
+  })
+  y = doc.lastAutoTable.finalY + 5
+
+  // Individual angler standings
+  doc.setFontSize(10); doc.setFont('helvetica', 'bold')
+  doc.setTextColor(...NAVY); doc.text('International — Individual Angler Standings', 10, y); y += 3
+
+  autoTable(doc, {
+    startY: y,
+    head: [['#', 'Angler', 'Country / Team', 'Fish', 'Points', 'kg/hr', 'f/hr']],
+    body: intAngScores.map(a => [
       a.pos, a.angler, a.team, a.fish,
       a.total.toLocaleString('en-ZA', { minimumFractionDigits: 2 }),
       a.cpue_kg.toFixed(2), a.cpue_fish.toFixed(2)
@@ -347,7 +402,7 @@ function addPage1(doc, natStandings, intStandings, topCatches, skippers,
     alternateRowStyles: { fillColor: PALE_PUR },
     columnStyles:  { 0: { halign: 'center', cellWidth: 10 }, 3: { halign: 'center', cellWidth: 12 },
                      4: { halign: 'right', fontStyle: 'bold', cellWidth: 22 },
-                     5: { halign: 'center', cellWidth: 18 }, 6: { halign: 'center', cellWidth: 18 } },
+                     5: { halign: 'center', cellWidth: 16 }, 6: { halign: 'center', cellWidth: 16 } },
     didParseCell: medalFill,
     margin: { left: 10, right: 10 },
   })
@@ -444,7 +499,30 @@ function addAnglerDetailPage(doc, catchDetail, sectionTitle,
   addFooter(doc, compName, dayLabel, dateStr)
 }
 
-// ── MAIN EXPORT ───────────────────────────────────────────────
+// ── FETCH HELPERS ────────────────────────────────────────────
+async function fetchCompData(supabase, compId, dayNumber) {
+  const [teams, anglers, boats, days] = await Promise.all([
+    supabase.from('competition_teams').select('*').eq('competition_id', compId).then(r => r.data || []),
+    supabase.from('competition_participants').select('*').eq('competition_id', compId).then(r => r.data || []),
+    supabase.from('competition_boats').select('*').eq('competition_id', compId).then(r => r.data || []),
+    supabase.from('competition_days').select('*').eq('competition_id', compId).order('day_number').then(r => r.data || []),
+  ])
+  let catches = []
+  if (dayNumber === null) {
+    const r = await supabase.from('competition_catches').select('*').eq('competition_id', compId)
+    catches = r.data || []
+  } else {
+    const day = days.find(d => d.day_number === dayNumber)
+    if (day) {
+      const r = await supabase.from('competition_catches').select('*')
+        .eq('competition_id', compId).eq('competition_day_id', day.id)
+      catches = r.data || []
+    }
+  }
+  return { teams, anglers, boats, days, catches }
+}
+
+// ── NATIONALS PDF ─────────────────────────────────────────────
 export async function generateResultsPDF(supabase, dayNumber = null) {
   const isFinal  = dayNumber === null
   const compName = 'SADSAA Tuna Nationals 2026'
@@ -452,63 +530,54 @@ export async function generateResultsPDF(supabase, dayNumber = null) {
   const dayLabel = isFinal ? 'Final Results' : `Day ${dayNumber} Results`
   const dateStr  = new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })
 
-  const [natTeams, intTeams, natAnglers, intAnglers, natBoats, intBoats, natDays, intDays] =
-    await Promise.all([
-      supabase.from('competition_teams').select('*').eq('competition_id', NAT_COMP_ID).then(r => r.data || []),
-      supabase.from('competition_teams').select('*').eq('competition_id', INT_COMP_ID).then(r => r.data || []),
-      supabase.from('competition_participants').select('*').eq('competition_id', NAT_COMP_ID).then(r => r.data || []),
-      supabase.from('competition_participants').select('*').eq('competition_id', INT_COMP_ID).then(r => r.data || []),
-      supabase.from('competition_boats').select('*').eq('competition_id', NAT_COMP_ID).then(r => r.data || []),
-      supabase.from('competition_boats').select('*').eq('competition_id', INT_COMP_ID).then(r => r.data || []),
-      supabase.from('competition_days').select('*').eq('competition_id', NAT_COMP_ID).order('day_number').then(r => r.data || []),
-      supabase.from('competition_days').select('*').eq('competition_id', INT_COMP_ID).order('day_number').then(r => r.data || []),
-    ])
+  const d = await fetchCompData(supabase, NAT_COMP_ID, dayNumber)
 
-  let natCatches = [], intCatches = []
-  if (isFinal) {
-    const [nr, ir] = await Promise.all([
-      supabase.from('competition_catches').select('*').eq('competition_id', NAT_COMP_ID),
-      supabase.from('competition_catches').select('*').eq('competition_id', INT_COMP_ID),
-    ])
-    natCatches = nr.data || []; intCatches = ir.data || []
-  } else {
-    const natDay = natDays.find(d => d.day_number === dayNumber)
-    const intDay = intDays.find(d => d.date === natDay?.date)
-    const [nr, ir] = await Promise.all([
-      natDay ? supabase.from('competition_catches').select('*').eq('competition_id', NAT_COMP_ID).eq('competition_day_id', natDay.id) : Promise.resolve({ data: [] }),
-      intDay ? supabase.from('competition_catches').select('*').eq('competition_id', INT_COMP_ID).eq('competition_day_id', intDay.id) : Promise.resolve({ data: [] }),
-    ])
-    natCatches = nr.data || []; intCatches = ir.data || []
-  }
-
-  const allCatches = [...natCatches, ...intCatches]
-  const allAnglers = [...natAnglers, ...intAnglers]
-  const allTeams   = [...natTeams,   ...intTeams]
-
-  const natStandings   = calcTeamScores(natCatches, natTeams, natBoats)
-  const intStandings   = calcTeamScores(intCatches, intTeams, intBoats)
-  const intAngScores   = calcAnglerScores(intCatches, intAnglers, intTeams)
-  const topCatches     = calcTopCatches(allCatches, allAnglers, allTeams, isFinal ? 10 : 5)
-  const skippers       = calcSkipperGP(natCatches, natTeams, natBoats)
-  const natCatchDetail = calcAnglerCatchDetail(natCatches, natAnglers, natTeams)
-  const intCatchDetail = calcAnglerCatchDetail(intCatches, intAnglers, intTeams)
+  const natStandings   = calcTeamScores(d.catches, d.teams, d.boats)
+  const topCatches     = calcTopCatches(d.catches, d.anglers, d.teams, isFinal ? 10 : 5)
+  const skippers       = calcSkipperGP(d.catches, d.teams, d.boats)
+  const natCatchDetail = calcAnglerCatchDetail(d.catches, d.anglers, d.teams)
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
 
-  // Page 1
-  addPage1(doc, natStandings, intStandings, topCatches, skippers,
-           intAngScores, dayLabel, dateStr, compName, venue, isFinal)
+  // Page 1 — Nationals only
+  addNationalsPage1(doc, natStandings, topCatches, skippers, dayLabel, dateStr, compName, venue, isFinal)
 
-  // Page 2 — Nationals angler detail
+  // Page 2+ — Nationals angler detail
   addAnglerDetailPage(doc, natCatchDetail, 'Nationals — Individual Angler Catches',
-                      compName, venue, dayLabel, dateStr, isFinal)
-
-  // Page 3+ — International angler detail
-  addAnglerDetailPage(doc, intCatchDetail, 'International — Individual Angler Catches',
                       compName, venue, dayLabel, dateStr, isFinal)
 
   const filename = isFinal
     ? 'TunaNationals2026_FinalResults.pdf'
     : `TunaNationals2026_Day${dayNumber}_Results.pdf`
+  doc.save(filename)
+}
+
+// ── INTERNATIONAL PDF ─────────────────────────────────────────
+export async function generateIntResultsPDF(supabase, dayNumber = null) {
+  const isFinal  = dayNumber === null
+  const compName = 'SADSAA Tuna International 2026'
+  const venue    = 'Atlantic Boat Club, Hout Bay, Cape Town'
+  const dayLabel = isFinal ? 'Final Results' : `Day ${dayNumber} Results`
+  const dateStr  = new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })
+
+  const d = await fetchCompData(supabase, INT_COMP_ID, dayNumber)
+
+  const intStandings   = calcTeamScores(d.catches, d.teams, d.boats)
+  const intAngScores   = calcAnglerScores(d.catches, d.anglers, d.teams)
+  const topCatches     = calcTopCatches(d.catches, d.anglers, d.teams, isFinal ? 10 : 5)
+  const intCatchDetail = calcAnglerCatchDetail(d.catches, d.anglers, d.teams)
+
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+
+  // Page 1 — International only
+  addInternationalPage1(doc, intStandings, intAngScores, topCatches, dayLabel, dateStr, compName, venue, isFinal)
+
+  // Page 2+ — International angler detail
+  addAnglerDetailPage(doc, intCatchDetail, 'International — Individual Angler Catches',
+                      compName, venue, dayLabel, dateStr, isFinal)
+
+  const filename = isFinal
+    ? 'TunaInternational2026_FinalResults.pdf'
+    : `TunaInternational2026_Day${dayNumber}_Results.pdf`
   doc.save(filename)
 }
