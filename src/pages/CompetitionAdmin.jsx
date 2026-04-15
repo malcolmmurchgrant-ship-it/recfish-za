@@ -11,8 +11,83 @@ const AUTHORISED_ADMINS = [
 const NAT_COMP_ID = 'ff6e95a9-4f9e-4b54-ad47-a913831d336c'
 const INT_COMP_ID = '4a905558-8a94-4dc2-8305-bce37bfc1fe4'
 const GAMEFISH_ID = 'ec9c5e41-a41a-4f2f-b8f6-75843b3b4f77'
-
 const NAVY = '#1e3a8a'
+
+function CatchEditForm({ editingCatch, setEditingCatch, teams, participants, boats, saving, onSave, onCancel }) {
+  const inputStyle = { width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '0.9rem', marginBottom: '0.5rem' }
+  const btnStyle = (color) => ({ padding: '0.5rem 1rem', background: color, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' })
+  return (
+    <div style={{ padding: '1rem', background: '#eff6ff', border: '2px solid #1e40af', borderRadius: '8px', marginTop: '0.5rem' }}>
+      <div style={{ fontWeight: '600', fontSize: '0.85rem', color: NAVY, marginBottom: '0.75rem' }}>Editing catch</div>
+      <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Team</label>
+      <select style={inputStyle} value={editingCatch.team_id}
+        onChange={e => setEditingCatch(c => ({ ...c, team_id: e.target.value, angler_id: '' }))}>
+        {teams.map(t => <option key={t.id} value={t.id}>{t.team_name}</option>)}
+      </select>
+      <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Angler</label>
+      <select style={inputStyle} value={editingCatch.angler_id}
+        onChange={e => setEditingCatch(c => ({ ...c, angler_id: e.target.value }))}>
+        <option value="">— Select angler —</option>
+        {participants.filter(p => p.team_id === editingCatch.team_id).map(p =>
+          <option key={p.id} value={p.id}>{p.full_name}</option>
+        )}
+      </select>
+      <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Boat</label>
+      <select style={inputStyle} value={editingCatch.boat_id || ''}
+        onChange={e => setEditingCatch(c => ({ ...c, boat_id: e.target.value }))}>
+        <option value="">— Select boat —</option>
+        {boats.map(b => <option key={b.id} value={b.id}>{b.boat_name} — {b.skipper_name}</option>)}
+      </select>
+      <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Species</label>
+      <input style={inputStyle} value={editingCatch.species_name}
+        onChange={e => setEditingCatch(c => ({ ...c, species_name: e.target.value }))} />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+        <div>
+          <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Weight (kg)</label>
+          <input type="number" step="0.01" style={inputStyle} value={editingCatch.weight_kg || ''}
+            onChange={e => setEditingCatch(c => ({ ...c, weight_kg: e.target.value }))} />
+        </div>
+        <div>
+          <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Line Class</label>
+          <select style={inputStyle} value={editingCatch.line_class_kg || 10}
+            onChange={e => setEditingCatch(c => ({ ...c, line_class_kg: e.target.value }))}>
+            <option value={10}>10 kg</option>
+            <option value={15}>15 kg</option>
+          </select>
+        </div>
+      </div>
+      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', cursor: 'pointer' }}>
+        <input type="checkbox" checked={editingCatch.scoring === false}
+          onChange={e => setEditingCatch(c => ({ ...c, scoring: !e.target.checked }))} />
+        <span style={{ fontSize: '0.85rem', fontWeight: '500' }}>Non-scoring (mutilated/predated)</span>
+      </label>
+      <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Notes</label>
+      <input style={inputStyle} value={editingCatch.notes || ''}
+        onChange={e => setEditingCatch(c => ({ ...c, notes: e.target.value }))} />
+      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+        <button onClick={onSave} disabled={saving} style={btnStyle('#166534')}>{saving ? 'Saving...' : 'Save Changes'}</button>
+        <button onClick={onCancel} style={btnStyle('#6b7280')}>Cancel</button>
+      </div>
+    </div>
+  )
+}
+
+function AddDayForm({ days, onAdd, saving, inputStyle, btnStyle }) {
+  const nextDay = (days.length > 0 ? Math.max(...days.map(d => d.day_number)) : 0) + 1
+  const [dayNum, setDayNum] = useState(nextDay)
+  const [date, setDate] = useState('')
+  return (
+    <div>
+      <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Day Number</label>
+      <input type="number" style={inputStyle} value={dayNum} onChange={e => setDayNum(parseInt(e.target.value))} />
+      <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Date</label>
+      <input type="date" style={inputStyle} value={date} onChange={e => setDate(e.target.value)} />
+      <button onClick={() => { if (date) onAdd(dayNum, date) }} disabled={saving || !date} style={btnStyle('#166534')}>
+        {saving ? 'Adding...' : 'Add Day'}
+      </button>
+    </div>
+  )
+}
 
 export default function CompetitionAdminPanel({ onClose }) {
   const { user } = useAuth()
@@ -20,15 +95,11 @@ export default function CompetitionAdminPanel({ onClose }) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState(null)
-
-  // Data
   const [boats, setBoats] = useState([])
   const [teams, setTeams] = useState([])
   const [catches, setCatches] = useState([])
   const [participants, setParticipants] = useState([])
   const [days, setDays] = useState([])
-
-  // Edit states
   const [editingBoat, setEditingBoat] = useState(null)
   const [editingCatch, setEditingCatch] = useState(null)
   const [selectedComp, setSelectedComp] = useState(NAT_COMP_ID)
@@ -60,12 +131,10 @@ export default function CompetitionAdminPanel({ onClose }) {
     setTimeout(() => setMessage(null), 3000)
   }
 
-  // ── BOAT EDITOR ──────────────────────────────────────────────
   const saveBoat = async () => {
     if (!editingBoat) return
     setSaving(true)
-    const { error } = await supabase
-      .from('competition_boats')
+    const { error } = await supabase.from('competition_boats')
       .update({ boat_name: editingBoat.boat_name, skipper_name: editingBoat.skipper_name })
       .eq('id', editingBoat.id)
     if (error) showMessage('Error: ' + error.message, 'error')
@@ -73,51 +142,29 @@ export default function CompetitionAdminPanel({ onClose }) {
     setSaving(false)
   }
 
-  // ── TEAM MOVER ───────────────────────────────────────────────
   const moveTeam = async (teamId, newCompId) => {
     setSaving(true)
     const team = teams.find(t => t.id === teamId)
     if (!team) { setSaving(false); return }
-
     const errors = []
-
-    // Update team competition_id directly
-    const { error: teamErr } = await supabase
-      .from('competition_teams')
-      .update({ competition_id: newCompId })
-      .eq('id', teamId)
+    const { error: teamErr } = await supabase.from('competition_teams').update({ competition_id: newCompId }).eq('id', teamId)
     if (teamErr) errors.push('Team: ' + teamErr.message)
-
-    // Update boat competition_id if assigned
     const boat = boats.find(b => b.id === team.boat_id)
     if (boat) {
-      const { error: boatErr } = await supabase
-        .from('competition_boats')
-        .update({ competition_id: newCompId })
-        .eq('id', boat.id)
+      const { error: boatErr } = await supabase.from('competition_boats').update({ competition_id: newCompId }).eq('id', boat.id)
       if (boatErr) errors.push('Boat: ' + boatErr.message)
     }
-
-    // Update participants competition_id
-    const teamParticipants = participants.filter(p => p.team_id === teamId)
-    if (teamParticipants.length > 0) {
-      const { error: partErr } = await supabase
-        .from('competition_participants')
-        .update({ competition_id: newCompId })
-        .eq('team_id', teamId)
+    const teamParts = participants.filter(p => p.team_id === teamId)
+    if (teamParts.length > 0) {
+      const { error: partErr } = await supabase.from('competition_participants').update({ competition_id: newCompId }).eq('team_id', teamId)
       if (partErr) errors.push('Participants: ' + partErr.message)
     }
-
-    if (errors.length > 0) {
-      showMessage('Errors: ' + errors.join(' | '), 'error')
-    } else {
-      showMessage(`${team.team_name} moved successfully`)
-    }
+    if (errors.length > 0) showMessage('Errors: ' + errors.join(' | '), 'error')
+    else showMessage(team.team_name + ' moved successfully')
     loadData()
     setSaving(false)
   }
 
-  // ── CATCH EDITOR ─────────────────────────────────────────────
   const calcPoints = (weightKg, lineClassKg, scoring) => {
     if (!scoring || !weightKg || parseFloat(weightKg) <= 0) return 0
     const w = parseFloat(weightKg)
@@ -129,25 +176,18 @@ export default function CompetitionAdminPanel({ onClose }) {
   const saveCatch = async () => {
     if (!editingCatch) return
     setSaving(true)
-    const recalcPoints = calcPoints(
-      editingCatch.weight_kg,
-      editingCatch.line_class_kg,
-      editingCatch.scoring
-    )
-    const { error } = await supabase
-      .from('competition_catches')
-      .update({
-        team_id:      editingCatch.team_id,
-        angler_id:    editingCatch.angler_id,
-        boat_id:      editingCatch.boat_id,
-        species_name: editingCatch.species_name,
-        weight_kg:    editingCatch.weight_kg ? parseFloat(editingCatch.weight_kg) : null,
-        line_class_kg: parseInt(editingCatch.line_class_kg || 10),
-        points:       recalcPoints,
-        scoring:      editingCatch.scoring,
-        notes:        editingCatch.notes,
-      })
-      .eq('id', editingCatch.id)
+    const recalcPoints = calcPoints(editingCatch.weight_kg, editingCatch.line_class_kg, editingCatch.scoring)
+    const { error } = await supabase.from('competition_catches').update({
+      team_id: editingCatch.team_id,
+      angler_id: editingCatch.angler_id,
+      boat_id: editingCatch.boat_id,
+      species_name: editingCatch.species_name,
+      weight_kg: editingCatch.weight_kg ? parseFloat(editingCatch.weight_kg) : null,
+      line_class_kg: parseInt(editingCatch.line_class_kg || 10),
+      points: recalcPoints,
+      scoring: editingCatch.scoring,
+      notes: editingCatch.notes,
+    }).eq('id', editingCatch.id)
     if (error) showMessage('Error: ' + error.message, 'error')
     else { showMessage('Catch updated — points recalculated'); setEditingCatch(null); loadData() }
     setSaving(false)
@@ -162,17 +202,13 @@ export default function CompetitionAdminPanel({ onClose }) {
     setSaving(false)
   }
 
-  // ── ADD COMPETITION DAY ───────────────────────────────────────
   const addDay = async (dayNumber, date) => {
     setSaving(true)
     const { error } = await supabase.from('competition_days').insert([{
-      competition_id: selectedComp,
-      day_number: dayNumber,
-      date,
-      session_status: 'pending'
+      competition_id: selectedComp, day_number: dayNumber, date, session_status: 'pending'
     }])
     if (error) showMessage('Error: ' + error.message, 'error')
-    else { showMessage(`Day ${dayNumber} added`); loadData() }
+    else { showMessage('Day ' + dayNumber + ' added'); loadData() }
     setSaving(false)
   }
 
@@ -191,10 +227,20 @@ export default function CompetitionAdminPanel({ onClose }) {
   const inputStyle = { width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '0.9rem', marginBottom: '0.5rem' }
   const btnStyle = (color) => ({ padding: '0.5rem 1rem', background: color, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' })
 
+  const anglerGroups = {}
+  catches.forEach(c => {
+    const key = c.angler_id || 'unknown'
+    if (!anglerGroups[key]) {
+      const angler = participants.find(p => p.id === c.angler_id)
+      const team = teams.find(t => t.id === c.team_id)
+      anglerGroups[key] = { angler, team, name: angler?.full_name || 'Unknown', catches: [] }
+    }
+    anglerGroups[key].catches.push(c)
+  })
+  const sortedGroups = Object.values(anglerGroups).sort((a, b) => a.name.localeCompare(b.name))
+
   return (
     <div style={{ minHeight: '100vh', background: '#f3f4f6', paddingBottom: '3rem' }}>
-
-      {/* Header */}
       <div style={{ background: NAVY, color: 'white', padding: '1rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <div style={{ fontSize: '0.7rem', opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.1em' }}>SADSAA — Admin</div>
@@ -203,14 +249,12 @@ export default function CompetitionAdminPanel({ onClose }) {
         <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', borderRadius: '20px', padding: '0.35rem 0.9rem', cursor: 'pointer', fontSize: '0.8rem' }}>✕ Close</button>
       </div>
 
-      {/* Message */}
       {message && (
         <div style={{ background: message.type === 'error' ? '#fee2e2' : '#d1fae5', color: message.type === 'error' ? '#991b1b' : '#065f46', padding: '0.75rem 1.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
           {message.text}
         </div>
       )}
 
-      {/* Competition selector */}
       <div style={{ background: 'white', padding: '0.75rem 1rem', borderBottom: '1px solid #e5e7eb' }}>
         <select value={selectedComp} onChange={e => setSelectedComp(e.target.value)}
           style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '0.9rem', width: '100%' }}>
@@ -220,13 +264,12 @@ export default function CompetitionAdminPanel({ onClose }) {
         </select>
       </div>
 
-      {/* Tabs */}
       <div style={{ display: 'flex', background: 'white', borderBottom: '2px solid #e5e7eb' }}>
-        {[['boats','⛵ Boats & Skippers'],['teams','👥 Teams'],['catches','🎣 Catches'],['days','📅 Days']].map(([v, label]) => (
+        {[['boats','Boats & Skippers'],['teams','Teams'],['catches','Catches'],['days','Days']].map(([v, label]) => (
           <button key={v} onClick={() => setTab(v)} style={{
             flex: 1, padding: '0.7rem 0.25rem', border: 'none', cursor: 'pointer',
             fontWeight: '600', fontSize: '0.75rem', background: 'none',
-            borderBottom: tab === v ? `3px solid ${NAVY}` : '3px solid transparent',
+            borderBottom: tab === v ? '3px solid ' + NAVY : '3px solid transparent',
             color: tab === v ? NAVY : '#6b7280'
           }}>{label}</button>
         ))}
@@ -234,18 +277,27 @@ export default function CompetitionAdminPanel({ onClose }) {
 
       <div style={{ maxWidth: '650px', margin: '0 auto', padding: '1rem' }}>
 
-        {/* ── BOATS & SKIPPERS TAB ── */}
         {tab === 'boats' && (
           <div>
-            <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '1rem' }}>
-              Tap a boat to edit its name or skipper.
-            </p>
+            <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '1rem' }}>Tap a boat to edit its name or skipper.</p>
             {boats.map(boat => {
               const team = teams.find(t => t.boat_id === boat.id)
               const isEditing = editingBoat?.id === boat.id
               return (
                 <div key={boat.id} style={{ background: 'white', borderRadius: '8px', padding: '1rem', marginBottom: '0.75rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-                  {!isEditing ? (
+                  {isEditing ? (
+                    <div>
+                      <div style={{ fontWeight: '600', fontSize: '0.85rem', color: NAVY, marginBottom: '0.5rem' }}>Editing: {boat.boat_name}</div>
+                      <input style={inputStyle} placeholder="Boat name" value={editingBoat.boat_name}
+                        onChange={e => setEditingBoat(b => ({ ...b, boat_name: e.target.value }))} />
+                      <input style={inputStyle} placeholder="Skipper name" value={editingBoat.skipper_name}
+                        onChange={e => setEditingBoat(b => ({ ...b, skipper_name: e.target.value }))} />
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                        <button onClick={saveBoat} disabled={saving} style={btnStyle('#166534')}>{saving ? 'Saving...' : 'Save'}</button>
+                        <button onClick={() => setEditingBoat(null)} style={btnStyle('#6b7280')}>Cancel</button>
+                      </div>
+                    </div>
+                  ) : (
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
                         <div style={{ fontWeight: '700', color: '#111827' }}>{boat.boat_name}</div>
@@ -254,36 +306,16 @@ export default function CompetitionAdminPanel({ onClose }) {
                       </div>
                       <button onClick={() => setEditingBoat({ ...boat })} style={btnStyle('#1e40af')}>Edit</button>
                     </div>
-                  ) : (
-                    <div>
-                      <div style={{ fontWeight: '600', fontSize: '0.85rem', color: NAVY, marginBottom: '0.5rem' }}>Editing: {boat.boat_name}</div>
-                      <input style={inputStyle} placeholder="Boat name" value={editingBoat.boat_name}
-                        onChange={e => setEditingBoat(b => ({ ...b, boat_name: e.target.value }))} />
-                      <input style={inputStyle} placeholder="Skipper name" value={editingBoat.skipper_name}
-                        onChange={e => setEditingBoat(b => ({ ...b, skipper_name: e.target.value }))} />
-                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                        <button onClick={saveBoat} disabled={saving} style={btnStyle('#166534')}>
-                          {saving ? 'Saving...' : 'Save'}
-                        </button>
-                        <button onClick={() => setEditingCatch(null)} style={btnStyle('#6b7280')}>Cancel</button>
-                      </div>
-                    </div>
-                            )}
-                          </div>
-                        )
-                      })}
-                  </div>
-                ))}
-            })()}
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
 
-        {/* ── TEAMS TAB ── */}
         {tab === 'teams' && (
           <div>
-            <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '1rem' }}>
-              Move a team between Nationals and International competitions.
-            </p>
+            <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '1rem' }}>Move a team between Nationals and International competitions.</p>
             {teams.map(team => {
               const boat = boats.find(b => b.id === team.boat_id)
               const otherComp = selectedComp === NAT_COMP_ID ? INT_COMP_ID : NAT_COMP_ID
@@ -292,14 +324,12 @@ export default function CompetitionAdminPanel({ onClose }) {
                 <div key={team.id} style={{ background: 'white', borderRadius: '8px', padding: '1rem', marginBottom: '0.75rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <div style={{ fontWeight: '700', color: '#111827' }}>{team.team_name}</div>
-                    <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>{boat ? `${boat.boat_name} — ${boat.skipper_name}` : 'No boat assigned'}</div>
+                    <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>{boat ? boat.boat_name + ' — ' + boat.skipper_name : 'No boat assigned'}</div>
                     <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>{participants.filter(p => p.team_id === team.id).length} anglers</div>
                   </div>
-                  <button
-                    onClick={() => { if (confirm(`Move ${team.team_name} to ${otherCompName}?`)) moveTeam(team.id, otherComp) }}
-                    disabled={saving}
-                    style={btnStyle('#7c3aed')}>
-                    → {otherCompName}
+                  <button onClick={() => { if (confirm('Move ' + team.team_name + ' to ' + otherCompName + '?')) moveTeam(team.id, otherComp) }}
+                    disabled={saving} style={btnStyle('#7c3aed')}>
+                    {'→ ' + otherCompName}
                   </button>
                 </div>
               )
@@ -307,154 +337,83 @@ export default function CompetitionAdminPanel({ onClose }) {
           </div>
         )}
 
-        {/* ── CATCHES TAB ── */}
         {tab === 'catches' && (
           <div>
             <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '1rem' }}>
-              Grouped by angler alphabetically. Tap a catch to edit.
+              Grouped by angler alphabetically, sorted by day. Tap Edit to correct a catch.
             </p>
             {catches.length === 0 && (
               <div style={{ background: 'white', borderRadius: '8px', padding: '2rem', textAlign: 'center', color: '#9ca3af' }}>No catches logged yet.</div>
             )}
-            {(() => {
-              const anglerGroups = {}
-              catches.forEach(c => {
-                const key = c.angler_id || 'unknown'
-                if (!anglerGroups[key]) {
-                  const angler = participants.find(p => p.id === c.angler_id)
-                  const team = teams.find(t => t.id === c.team_id)
-                  anglerGroups[key] = { angler, team, name: angler?.full_name || 'Unknown', catches: [] }
-                }
-                anglerGroups[key].catches.push(c)
+            {sortedGroups.map(group => {
+              const groupTotal = group.catches.reduce((s, c) => s + (parseFloat(c.points) || 0), 0)
+              const sortedCatches = [...group.catches].sort((a, b) => {
+                const da = days.find(d => d.id === a.competition_day_id)?.day_number || 0
+                const db = days.find(d => d.id === b.competition_day_id)?.day_number || 0
+                if (da !== db) return da - db
+                return parseFloat(b.weight_kg || 0) - parseFloat(a.weight_kg || 0)
               })
-              return Object.values(anglerGroups)
-                .sort((a, b) => a.name.localeCompare(b.name))
-                .map(group => (
-                  <div key={group.name} style={{ marginBottom: '1rem' }}>
-                    <div style={{ background: NAVY, color: 'white', borderRadius: '8px 8px 0 0', padding: '0.6rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ fontWeight: '700', fontSize: '0.9rem' }}>{group.name}</div>
-                        <div style={{ fontSize: '0.75rem', opacity: 0.8 }}>{group.team?.team_name} — {group.catches.length} catch{group.catches.length !== 1 ? 'es' : ''}</div>
-                      </div>
-                      <div style={{ fontSize: '0.8rem', opacity: 0.9 }}>
-                        {group.catches.reduce((s, c) => s + (parseFloat(c.points) || 0), 0).toFixed(2)} pts
+              return (
+                <div key={group.name} style={{ marginBottom: '1rem' }}>
+                  <div style={{ background: NAVY, color: 'white', borderRadius: '8px 8px 0 0', padding: '0.6rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontWeight: '700', fontSize: '0.9rem' }}>{group.name}</div>
+                      <div style={{ fontSize: '0.75rem', opacity: 0.8 }}>
+                        {group.team?.team_name} — {group.catches.length} catch{group.catches.length !== 1 ? 'es' : ''}
                       </div>
                     </div>
-                    {group.catches
-                      .sort((a, b) => {
-                        const da = days.find(d => d.id === a.competition_day_id)?.day_number || 0
-                        const db = days.find(d => d.id === b.competition_day_id)?.day_number || 0
-                        return da !== db ? da - db : parseFloat(b.weight_kg||0) - parseFloat(a.weight_kg||0)
-                      })
-                      .map((c, idx) => {
-                        const day = days.find(d => d.id === c.competition_day_id)
-                        const boat = boats.find(b => b.id === c.boat_id)
-                        const isEditing = editingCatch?.id === c.id
-                        const isLast = idx === group.catches.length - 1
-                        return (
-                          <div key={c.id} style={{ background: idx % 2 === 0 ? '#f8fafc' : 'white', border: '1px solid #e5e7eb', borderTop: 'none', padding: '0.6rem 1rem', borderRadius: isLast ? '0 0 8px 8px' : '0' }}>
-                            {!isEditing ? (
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <div style={{ flex: 1 }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                                    <span style={{ fontWeight: '600', fontSize: '0.875rem', color: '#111827' }}>{c.species_name}</span>
-                                    {c.scoring === false && <span style={{ fontSize: '0.7rem', background: '#fef3c7', color: '#92400e', padding: '0.1rem 0.4rem', borderRadius: '10px' }}>Non-scoring</span>}
-                                  </div>
-                                  <div style={{ fontSize: '0.775rem', color: '#6b7280', marginTop: '0.15rem' }}>
-                                    Day {day?.day_number}&nbsp;•&nbsp;
-                                    {c.weight_kg ? `${parseFloat(c.weight_kg).toFixed(2)} kg` : 'No weight'}&nbsp;•&nbsp;
-                                    {c.line_class_kg} kg line&nbsp;•&nbsp;
-                                    <span style={{ color: '#7c3aed', fontWeight: '600' }}>{parseFloat(c.points||0).toFixed(2)} pts</span>
-                                  </div>
-                                </div>
-                                <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
-                                  <button onClick={() => setEditingCatch({ ...c })} style={btnStyle('#1e40af')}>Edit</button>
-                                  <button onClick={() => deleteCatch(c.id)} style={btnStyle('#ef4444')}>Del</button>
-                                </div>
-                              </div>
-                            ) : (
-                              <div>
-                                <div style={{ fontWeight: '600', fontSize: '0.85rem', color: NAVY, marginBottom: '0.75rem' }}>Editing catch</div>
-
-                      <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Team</label>
-                      <select style={inputStyle} value={editingCatch.team_id}
-                        onChange={e => setEditingCatch(c => ({ ...c, team_id: e.target.value, angler_id: '' }))}>
-                        {teams.map(t => <option key={t.id} value={t.id}>{t.team_name}</option>)}
-                      </select>
-
-                      <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Angler</label>
-                      <select style={inputStyle} value={editingCatch.angler_id}
-                        onChange={e => setEditingCatch(c => ({ ...c, angler_id: e.target.value }))}>
-                        <option value="">— Select angler —</option>
-                        {participants.filter(p => p.team_id === editingCatch.team_id).map(p =>
-                          <option key={p.id} value={p.id}>{p.full_name}</option>
-                        )}
-                      </select>
-
-                      <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Boat</label>
-                      <select style={inputStyle} value={editingCatch.boat_id || ''}
-                        onChange={e => setEditingCatch(c => ({ ...c, boat_id: e.target.value }))}>
-                        <option value="">— Select boat —</option>
-                        {boats.map(b => <option key={b.id} value={b.id}>{b.boat_name} — {b.skipper_name}</option>)}
-                      </select>
-
-                      <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Species</label>
-                      <input style={inputStyle} value={editingCatch.species_name}
-                        onChange={e => setEditingCatch(c => ({ ...c, species_name: e.target.value }))} />
-
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                        <div>
-                          <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Weight (kg)</label>
-                          <input type="number" step="0.01" style={inputStyle} value={editingCatch.weight_kg || ''}
-                            onChange={e => setEditingCatch(c => ({ ...c, weight_kg: e.target.value }))} />
-                        </div>
-                        <div>
-                          <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Line Class</label>
-                          <select style={inputStyle} value={editingCatch.line_class_kg || 10}
-                            onChange={e => setEditingCatch(c => ({ ...c, line_class_kg: e.target.value }))}>
-                            <option value={10}>10 kg</option>
-                            <option value={15}>15 kg</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Points</label>
-                      <input type="number" step="0.01" style={inputStyle} value={editingCatch.points || ''}
-                        onChange={e => setEditingCatch(c => ({ ...c, points: e.target.value }))} />
-
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', cursor: 'pointer' }}>
-                        <input type="checkbox" checked={editingCatch.scoring === false}
-                          onChange={e => setEditingCatch(c => ({ ...c, scoring: !e.target.checked }))} />
-                        <span style={{ fontSize: '0.85rem', fontWeight: '500' }}>Non-scoring (mutilated/predated)</span>
-                      </label>
-
-                      <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Notes</label>
-                      <input style={inputStyle} value={editingCatch.notes || ''}
-                        onChange={e => setEditingCatch(c => ({ ...c, notes: e.target.value }))} />
-
-                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                        <button onClick={saveCatch} disabled={saving} style={btnStyle('#166534')}>
-                          {saving ? 'Saving...' : 'Save Changes'}
-                        </button>
-                        <button onClick={() => setEditingCatch(null)} style={btnStyle('#6b7280')}>Cancel</button>
-                      </div>
-                    </div>
-                            )}
-                          </div>
-                        )
-                      })}
+                    <div style={{ fontSize: '0.8rem', opacity: 0.9 }}>{groupTotal.toFixed(2)} pts</div>
                   </div>
-                ))
-            })()}
+                  {sortedCatches.map((c, idx) => {
+                    const day = days.find(d => d.id === c.competition_day_id)
+                    const isLast = idx === sortedCatches.length - 1
+                    const isEditing = editingCatch?.id === c.id
+                    return (
+                      <div key={c.id} style={{ background: idx % 2 === 0 ? '#f8fafc' : 'white', border: '1px solid #e5e7eb', borderTop: 'none', padding: '0.6rem 1rem', borderRadius: isLast && !isEditing ? '0 0 8px 8px' : '0' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                              <span style={{ fontWeight: '600', fontSize: '0.875rem', color: '#111827' }}>{c.species_name}</span>
+                              {c.scoring === false && (
+                                <span style={{ fontSize: '0.7rem', background: '#fef3c7', color: '#92400e', padding: '0.1rem 0.4rem', borderRadius: '10px' }}>Non-scoring</span>
+                              )}
+                            </div>
+                            <div style={{ fontSize: '0.775rem', color: '#6b7280', marginTop: '0.15rem' }}>
+                              {'Day ' + (day?.day_number || '?') + '  •  '}
+                              {c.weight_kg ? parseFloat(c.weight_kg).toFixed(2) + ' kg' : 'No weight'}
+                              {'  •  ' + (c.line_class_kg || 10) + ' kg line  •  '}
+                              <span style={{ color: '#7c3aed', fontWeight: '600' }}>{parseFloat(c.points || 0).toFixed(2)} pts</span>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
+                            <button onClick={() => setEditingCatch({ ...c })} style={btnStyle('#1e40af')}>Edit</button>
+                            <button onClick={() => deleteCatch(c.id)} style={btnStyle('#ef4444')}>Del</button>
+                          </div>
+                        </div>
+                        {isEditing && (
+                          <CatchEditForm
+                            editingCatch={editingCatch}
+                            setEditingCatch={setEditingCatch}
+                            teams={teams}
+                            participants={participants}
+                            boats={boats}
+                            saving={saving}
+                            onSave={saveCatch}
+                            onCancel={() => setEditingCatch(null)}
+                          />
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })}
           </div>
         )}
 
-        {/* ── DAYS TAB ── */}
         {tab === 'days' && (
           <div>
-            <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '1rem' }}>
-              Current competition days. Add a day if the competition starts later than planned.
-            </p>
+            <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '1rem' }}>Current competition days. Add a day if needed.</p>
             {days.map(d => (
               <div key={d.id} style={{ background: 'white', borderRadius: '8px', padding: '0.875rem 1rem', marginBottom: '0.5rem', boxShadow: '0 1px 2px rgba(0,0,0,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
@@ -472,24 +431,8 @@ export default function CompetitionAdminPanel({ onClose }) {
             </div>
           </div>
         )}
-      </div>
-    </div>
-  )
-}
 
-function AddDayForm({ days, onAdd, saving, inputStyle, btnStyle }) {
-  const nextDay = (days.length > 0 ? Math.max(...days.map(d => d.day_number)) : 0) + 1
-  const [dayNum, setDayNum] = useState(nextDay)
-  const [date, setDate] = useState('')
-  return (
-    <div>
-      <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Day Number</label>
-      <input type="number" style={inputStyle} value={dayNum} onChange={e => setDayNum(parseInt(e.target.value))} />
-      <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Date</label>
-      <input type="date" style={inputStyle} value={date} onChange={e => setDate(e.target.value)} />
-      <button onClick={() => { if (date) onAdd(dayNum, date) }} disabled={saving || !date} style={btnStyle('#166534')}>
-        {saving ? 'Adding...' : 'Add Day'}
-      </button>
+      </div>
     </div>
   )
 }
