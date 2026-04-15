@@ -288,47 +288,26 @@ function addNationalsPage1(doc, natStandings, topCatches, skippers,
   })
   y = doc.lastAutoTable.finalY + 5
 
-  // Skippers + International teams side by side
-  const midX = doc.internal.pageSize.width / 2
+  // Skipper Grand Prix — full width
   doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(...NAVY)
-  doc.text('Skipper Grand Prix', 10, y)
-  doc.text('International — Teams', midX + 2, y); y += 3
+  doc.text('Skipper Grand Prix', 10, y); y += 3
 
   autoTable(doc, {
     startY: y,
-    head: [['#', 'Skipper', 'Boat', 'GP', 'kg/hr', 'f/hr']],
+    head: [['#', 'Skipper', 'Boat', 'GP Points', 'CPUE kg/hr', 'CPUE fish/hr']],
     body: skippers.map(s => [s.pos, s.skipper, s.boat, s.gp, s.cpue_kg.toFixed(2), s.cpue_fish.toFixed(2)]),
     headStyles:    { fillColor: NAVY2, textColor: WHITE, fontStyle: 'bold', fontSize: 8 },
-    bodyStyles:    { fontSize: 8, textColor: DARK, overflow: 'ellipsize', cellPadding: 2 },
-    alternateRowStyles: { fillColor: PALE_BLU },
-    columnStyles:  { 0: { halign: 'center', cellWidth: 7 },
-                     1: { cellWidth: 30 },
-                     2: { cellWidth: 28 },
-                     3: { halign: 'center', cellWidth: 8 },
-                     4: { halign: 'center', cellWidth: 14 },
-                     5: { halign: 'center', cellWidth: 14 } },
-    didParseCell: medalFill,
-    margin: { left: 10, right: midX + 2 },
-    tableWidth: midX - 14,
-  })
-
-  autoTable(doc, {
-    startY: y,
-    head: [['#', 'Team', 'Fish', 'Points']],
-    body: intStandings.map(t => [
-      t.pos, t.team, t.fish,
-      t.total.toLocaleString('en-ZA', { minimumFractionDigits: 2 })
-    ]),
-    headStyles:    { fillColor: PURPLE, textColor: WHITE, fontStyle: 'bold', fontSize: 8 },
     bodyStyles:    { fontSize: 8, textColor: DARK },
-    alternateRowStyles: { fillColor: PALE_PUR },
-    columnStyles:  { 0: { halign: 'center', cellWidth: 8 }, 2: { halign: 'center', cellWidth: 10 },
-                     3: { halign: 'right', fontStyle: 'bold', cellWidth: 22 } },
+    alternateRowStyles: { fillColor: PALE_BLU },
+    columnStyles:  { 0: { halign: 'center', cellWidth: 9 },
+                     1: { cellWidth: 45 },
+                     2: { cellWidth: 40 },
+                     3: { halign: 'center', cellWidth: 20 },
+                     4: { halign: 'center', cellWidth: 22 },
+                     5: { halign: 'center', cellWidth: 22 } },
     didParseCell: medalFill,
-    margin: { left: midX + 2, right: 10 },
-    tableWidth: midX - 14,
+    margin: { left: 10, right: 10 },
   })
-  y = Math.max(doc.lastAutoTable.finalY, doc.previousAutoTable?.finalY || 0) + 5
 
   addFooter(doc, compName, dayLabel, dateStr)
 }
