@@ -268,10 +268,13 @@ export default function CompetitionAdminPanel({ onClose }) {
                         <button onClick={() => setEditingBoat(null)} style={btnStyle('#6b7280')}>Cancel</button>
                       </div>
                     </div>
-                  )}
-                </div>
-              )
-            })}
+                            )}
+                          </div>
+                        )
+                      })}
+                  </div>
+                ))
+            })()}
           </div>
         )}
 
@@ -308,42 +311,70 @@ export default function CompetitionAdminPanel({ onClose }) {
         {tab === 'catches' && (
           <div>
             <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '1rem' }}>
-              Edit or delete any logged catch. Tap a catch to edit.
+              Grouped by angler alphabetically. Tap a catch to edit.
             </p>
             {catches.length === 0 && (
               <div style={{ background: 'white', borderRadius: '8px', padding: '2rem', textAlign: 'center', color: '#9ca3af' }}>No catches logged yet.</div>
             )}
-            {catches.map(c => {
-              const team = teams.find(t => t.id === c.team_id)
-              const angler = participants.find(p => p.id === c.angler_id)
-              const boat = boats.find(b => b.id === c.boat_id)
-              const day = days.find(d => d.id === c.competition_day_id)
-              const isEditing = editingCatch?.id === c.id
-
-              return (
-                <div key={c.id} style={{ background: 'white', borderRadius: '8px', padding: '1rem', marginBottom: '0.75rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-                  {!isEditing ? (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: '700', color: '#111827', fontSize: '0.9rem' }}>
-                          {c.species_name}
-                          {c.scoring === false && <span style={{ marginLeft: '0.4rem', fontSize: '0.7rem', background: '#fef3c7', color: '#92400e', padding: '0.1rem 0.4rem', borderRadius: '10px' }}>Non-scoring</span>}
-                        </div>
-                        <div style={{ fontSize: '0.775rem', color: '#6b7280' }}>
-                          {angler?.full_name} • {team?.team_name} • {boat?.boat_name}
-                        </div>
-                        <div style={{ fontSize: '0.775rem', color: '#6b7280' }}>
-                          Day {day?.day_number} — {c.weight_kg ? `${parseFloat(c.weight_kg).toFixed(2)} kg` : 'No weight'} • {c.line_class_kg} kg line • {c.points} pts
-                        </div>
+            {(() => {
+              const anglerGroups = {}
+              catches.forEach(c => {
+                const key = c.angler_id || 'unknown'
+                if (!anglerGroups[key]) {
+                  const angler = participants.find(p => p.id === c.angler_id)
+                  const team = teams.find(t => t.id === c.team_id)
+                  anglerGroups[key] = { angler, team, name: angler?.full_name || 'Unknown', catches: [] }
+                }
+                anglerGroups[key].catches.push(c)
+              })
+              return Object.values(anglerGroups)
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map(group => (
+                  <div key={group.name} style={{ marginBottom: '1rem' }}>
+                    <div style={{ background: NAVY, color: 'white', borderRadius: '8px 8px 0 0', padding: '0.6rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontWeight: '700', fontSize: '0.9rem' }}>{group.name}</div>
+                        <div style={{ fontSize: '0.75rem', opacity: 0.8 }}>{group.team?.team_name} — {group.catches.length} catch{group.catches.length !== 1 ? 'es' : ''}</div>
                       </div>
-                      <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
-                        <button onClick={() => setEditingCatch({ ...c })} style={btnStyle('#1e40af')}>Edit</button>
-                        <button onClick={() => deleteCatch(c.id)} style={btnStyle('#ef4444')}>Delete</button>
+                      <div style={{ fontSize: '0.8rem', opacity: 0.9 }}>
+                        {group.catches.reduce((s, c) => s + (parseFloat(c.points) || 0), 0).toFixed(2)} pts
                       </div>
                     </div>
-                  ) : (
-                    <div>
-                      <div style={{ fontWeight: '600', fontSize: '0.85rem', color: NAVY, marginBottom: '0.75rem' }}>Editing catch</div>
+                    {group.catches
+                      .sort((a, b) => {
+                        const da = days.find(d => d.id === a.competition_day_id)?.day_number || 0
+                        const db = days.find(d => d.id === b.competition_day_id)?.day_number || 0
+                        return da !== db ? da - db : parseFloat(b.weight_kg||0) - parseFloat(a.weight_kg||0)
+                      })
+                      .map((c, idx) => {
+                        const day = days.find(d => d.id === c.competition_day_id)
+                        const boat = boats.find(b => b.id === c.boat_id)
+                        const isEditing = editingCatch?.id === c.id
+                        const isLast = idx === group.catches.length - 1
+                        return (
+                          <div key={c.id} style={{ background: idx % 2 === 0 ? '#f8fafc' : 'white', border: '1px solid #e5e7eb', borderTop: 'none', padding: '0.6rem 1rem', borderRadius: isLast ? '0 0 8px 8px' : '0' }}>
+                            {!isEditing ? (
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                    <span style={{ fontWeight: '600', fontSize: '0.875rem', color: '#111827' }}>{c.species_name}</span>
+                                    {c.scoring === false && <span style={{ fontSize: '0.7rem', background: '#fef3c7', color: '#92400e', padding: '0.1rem 0.4rem', borderRadius: '10px' }}>Non-scoring</span>}
+                                  </div>
+                                  <div style={{ fontSize: '0.775rem', color: '#6b7280', marginTop: '0.15rem' }}>
+                                    Day {day?.day_number}&nbsp;•&nbsp;
+                                    {c.weight_kg ? `${parseFloat(c.weight_kg).toFixed(2)} kg` : 'No weight'}&nbsp;•&nbsp;
+                                    {c.line_class_kg} kg line&nbsp;•&nbsp;
+                                    <span style={{ color: '#7c3aed', fontWeight: '600' }}>{parseFloat(c.points||0).toFixed(2)} pts</span>
+                                  </div>
+                                </div>
+                                <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
+                                  <button onClick={() => setEditingCatch({ ...c })} style={btnStyle('#1e40af')}>Edit</button>
+                                  <button onClick={() => deleteCatch(c.id)} style={btnStyle('#ef4444')}>Del</button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div>
+                                <div style={{ fontWeight: '600', fontSize: '0.85rem', color: NAVY, marginBottom: '0.75rem' }}>Editing catch</div>
 
                       <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Team</label>
                       <select style={inputStyle} value={editingCatch.team_id}
@@ -408,10 +439,13 @@ export default function CompetitionAdminPanel({ onClose }) {
                         <button onClick={() => setEditingCatch(null)} style={btnStyle('#6b7280')}>Cancel</button>
                       </div>
                     </div>
-                  )}
-                </div>
-              )
-            })}
+                            )}
+                          </div>
+                        )
+                      })}
+                  </div>
+                ))
+            })()}
           </div>
         )}
 
