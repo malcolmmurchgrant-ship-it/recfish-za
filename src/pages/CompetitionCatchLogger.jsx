@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { generateResultsPDF } from '../utils/competitionPDF'
+import { generateResultsPDF, generateIntResultsPDF } from '../utils/competitionPDF'
 import CompetitionAdminPanel from './CompetitionAdmin'
 import { supabase } from '../lib/supabase'
 import {
@@ -381,7 +381,11 @@ export default function CompetitionCatchLogger() {
     if (!selectedComp || selectedComp.type !== 'tuna') return
     setGenerating(true)
     try {
-      await generateResultsPDF(supabase, dayNumber)
+      if (selectedComp.id === '4a905558-8a94-4dc2-8305-bce37bfc1fe4') {
+        await generateIntResultsPDF(supabase, dayNumber)
+      } else {
+        await generateResultsPDF(supabase, dayNumber)
+      }
     } catch (err) {
       alert('Error generating PDF: ' + err.message)
     }
