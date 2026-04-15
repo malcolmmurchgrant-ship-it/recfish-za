@@ -51,7 +51,7 @@ const TEAM_LOGOS = {
 function tunaPoints(weightKg, lineClassKg) {
   const factors = { 10: 0.32, 15: 0.142 }
   const f = factors[parseInt(lineClassKg || 10)] || 0.32
-  return Math.round(Math.pow(weightKg, 2) * f * 100) / 100
+  return parseFloat((Math.pow(weightKg, 2) * f).toFixed(2))
 }
 
 function calcTeamScores(catches, teams, boats) {
@@ -82,7 +82,8 @@ function calcTeamScores(catches, teams, boats) {
     .map((r, i) => ({ ...r, pos: i + 1 }))
 }
 
-function calcAnglerScores(catches, anglers) {
+function calcAnglerScores(catches, anglers, teams) {
+  const teamMap = Object.fromEntries((teams || []).map(t => [t.id, t.team_name]))
   const scores = {}
   anglers.forEach(a => { scores[a.id] = { angler: a, total: 0, fish: 0, weight: 0 } })
   catches.forEach(c => {
@@ -94,7 +95,8 @@ function calcAnglerScores(catches, anglers) {
   })
   return Object.values(scores)
     .map(s => ({
-      pos: 0, angler: s.angler.full_name, team: s.angler.division || '',
+      pos: 0, angler: s.angler.full_name,
+      team: teamMap[s.angler.team_id] || s.angler.division || '',
       fish: s.fish, weight: Math.round(s.weight * 100) / 100,
       total: Math.round(s.total * 100) / 100,
       cpue_kg:   Math.round(s.weight / FISHING_HOURS * 100) / 100,
@@ -294,13 +296,17 @@ function addPage1(doc, natStandings, intStandings, topCatches, skippers,
 
   autoTable(doc, {
     startY: y,
-    head: [['Pos', 'Skipper', 'Boat', 'GP', 'CPUE kg/hr', 'CPUE fish/hr']],
+    head: [['Pos', 'Skipper', 'Boat', 'GP', 'kg/hr', 'f/hr']],
     body: skippers.map(s => [s.pos, s.skipper, s.boat, s.gp, s.cpue_kg.toFixed(2), s.cpue_fish.toFixed(2)]),
     headStyles:    { fillColor: NAVY2, textColor: WHITE, fontStyle: 'bold', fontSize: 8 },
-    bodyStyles:    { fontSize: 8, textColor: DARK },
+    bodyStyles:    { fontSize: 8, textColor: DARK, overflow: 'ellipsize', cellPadding: 2 },
     alternateRowStyles: { fillColor: PALE_BLU },
-    columnStyles:  { 0: { halign: 'center', cellWidth: 8 }, 3: { halign: 'center', cellWidth: 8 },
-                     4: { halign: 'center' }, 5: { halign: 'center' } },
+    columnStyles:  { 0: { halign: 'center', cellWidth: 7 },
+                     1: { cellWidth: 30 },
+                     2: { cellWidth: 28 },
+                     3: { halign: 'center', cellWidth: 8 },
+                     4: { halign: 'center', cellWidth: 14 },
+                     5: { halign: 'center', cellWidth: 14 } },
     didParseCell: medalFill,
     margin: { left: 10, right: midX + 2 },
     tableWidth: midX - 14,
@@ -481,7 +487,7 @@ export async function generateResultsPDF(supabase, dayNumber = null) {
 
   const natStandings   = calcTeamScores(natCatches, natTeams, natBoats)
   const intStandings   = calcTeamScores(intCatches, intTeams, intBoats)
-  const intAngScores   = calcAnglerScores(intCatches, intAnglers)
+  const intAngScores   = calcAnglerScores(intCatches, intAnglers, intTeams)
   const topCatches     = calcTopCatches(allCatches, allAnglers, allTeams, isFinal ? 10 : 5)
   const skippers       = calcSkipperGP(natCatches, natTeams, natBoats)
   const natCatchDetail = calcAnglerCatchDetail(natCatches, natAnglers, natTeams)

@@ -123,7 +123,7 @@ export default function CompetitionAdminPanel({ onClose }) {
     const w = parseFloat(weightKg)
     const factors = { 10: 0.32, 15: 0.142 }
     const f = factors[parseInt(lineClassKg || 10)] || 0.32
-    return Math.round(w * w * f * 100) / 100
+    return parseFloat((w * w * f).toFixed(2))
   }
 
   const saveCatch = async () => {

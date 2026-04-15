@@ -191,7 +191,7 @@ export function buildLeaderboard(catches, teams) {
 // ── TUNA SCORING ─────────────────────────────────────────────
 export function calcTunaPoints(weightKg, lineClassKg) {
   const factor = TUNA_LINE_CLASS_FACTORS[lineClassKg] || TUNA_LINE_CLASS_FACTORS[10]
-  return Math.round(Math.pow(weightKg, 2) * factor * 100) / 100
+  return parseFloat((Math.pow(weightKg, 2) * factor).toFixed(2))
 }
 
 export function checkTunaMinimums(speciesName, weightKg) {
