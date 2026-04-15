@@ -265,7 +265,7 @@ export default function CompetitionAdminPanel({ onClose }) {
                         <button onClick={saveBoat} disabled={saving} style={btnStyle('#166534')}>
                           {saving ? 'Saving...' : 'Save'}
                         </button>
-                        <button onClick={() => setEditingBoat(null)} style={btnStyle('#6b7280')}>Cancel</button>
+                        <button onClick={() => setEditingCatch(null)} style={btnStyle('#6b7280')}>Cancel</button>
                       </div>
                     </div>
                             )}
@@ -273,7 +273,7 @@ export default function CompetitionAdminPanel({ onClose }) {
                         )
                       })}
                   </div>
-                ))
+                ))}
             })()}
           </div>
         )}
