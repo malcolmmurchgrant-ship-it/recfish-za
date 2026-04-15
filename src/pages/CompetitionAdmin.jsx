@@ -118,25 +118,38 @@ export default function CompetitionAdminPanel({ onClose }) {
   }
 
   // ── CATCH EDITOR ─────────────────────────────────────────────
+  const calcPoints = (weightKg, lineClassKg, scoring) => {
+    if (!scoring || !weightKg || parseFloat(weightKg) <= 0) return 0
+    const w = parseFloat(weightKg)
+    const factors = { 10: 0.32, 15: 0.142 }
+    const f = factors[parseInt(lineClassKg || 10)] || 0.32
+    return Math.round(w * w * f * 100) / 100
+  }
+
   const saveCatch = async () => {
     if (!editingCatch) return
     setSaving(true)
+    const recalcPoints = calcPoints(
+      editingCatch.weight_kg,
+      editingCatch.line_class_kg,
+      editingCatch.scoring
+    )
     const { error } = await supabase
       .from('competition_catches')
       .update({
-        team_id:     editingCatch.team_id,
-        angler_id:   editingCatch.angler_id,
-        boat_id:     editingCatch.boat_id,
-        species_name:editingCatch.species_name,
-        weight_kg:   editingCatch.weight_kg ? parseFloat(editingCatch.weight_kg) : null,
+        team_id:      editingCatch.team_id,
+        angler_id:    editingCatch.angler_id,
+        boat_id:      editingCatch.boat_id,
+        species_name: editingCatch.species_name,
+        weight_kg:    editingCatch.weight_kg ? parseFloat(editingCatch.weight_kg) : null,
         line_class_kg: parseInt(editingCatch.line_class_kg || 10),
-        points:      editingCatch.points ? parseFloat(editingCatch.points) : null,
-        scoring:     editingCatch.scoring,
-        notes:       editingCatch.notes,
+        points:       recalcPoints,
+        scoring:      editingCatch.scoring,
+        notes:        editingCatch.notes,
       })
       .eq('id', editingCatch.id)
     if (error) showMessage('Error: ' + error.message, 'error')
-    else { showMessage('Catch updated successfully'); setEditingCatch(null); loadData() }
+    else { showMessage('Catch updated — points recalculated'); setEditingCatch(null); loadData() }
     setSaving(false)
   }
 
