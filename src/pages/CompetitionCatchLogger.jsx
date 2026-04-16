@@ -278,26 +278,30 @@ export default function CompetitionCatchLogger() {
       alert('Please select a team, angler and species.')
       return
     }
-    if (isGamefish && !isReleaseOnly && !speciesIsKingfish && !form.weight_kg) {
-      alert('Please enter a weight.')
-      return
+    if (form.species_name !== 'No Catch') {
+      if (isGamefish && !isReleaseOnly && !speciesIsKingfish && !form.weight_kg) {
+        alert('Please enter a weight.')
+        return
+      }
+      if (isGamefish && speciesIsKingfish && !form.length_cm) {
+        alert('Please enter a length for kingfish.')
+        return
+      }
+      if (isTuna && !form.weight_kg) {
+        alert('Please enter a weight.')
+        return
+      }
     }
-    if (isGamefish && speciesIsKingfish && !form.length_cm) {
-      alert('Please enter a length for kingfish.')
-      return
-    }
-    if (isTuna && !form.weight_kg) {
-      alert('Please enter a weight.')
-      return
-    }
-    if (validationError) { alert(validationError); return }
+    if (validationError && form.species_name !== 'No Catch') { alert(validationError); return }
     if (!activeDayRecord) { alert('Could not find competition day record.'); return }
 
     setSaving(true)
     let points = 0
     const boat = getTeamBoat(form.team_id)
 
-    if (isGamefish) {
+    if (form.species_name === 'No Catch') {
+      points = 0
+    } else if (isGamefish) {
       if (speciesIsBillfish) points = 0
       else if (speciesIsKingfish) points = Math.round(calcKingfishPoints(form.species_name) * 100) / 100
       else points = Math.round(calcKillWeighPoints(parseFloat(form.weight_kg || 0)) * 100) / 100
@@ -314,7 +318,7 @@ export default function CompetitionCatchLogger() {
       fishing_date: activeDayRecord.date,
       species_name: form.species_name,
       line_class_kg: isTuna ? currentLineClass : 10,
-      weight_kg: (isGamefish && isReleaseOnly) ? null : parseFloat(form.weight_kg) || null,
+      weight_kg: (form.species_name === 'No Catch' || (isGamefish && isReleaseOnly)) ? null : parseFloat(form.weight_kg) || null,
       length_cm: form.length_cm ? parseFloat(form.length_cm) : null,
       retained: isGamefish ? !isReleaseOnly : true,
       points: points,
@@ -558,19 +562,38 @@ export default function CompetitionCatchLogger() {
                 <label style={{ display: 'block', fontWeight: '600', fontSize: '0.8rem', color: '#374151', marginBottom: '0.3rem' }}>Species *</label>
                 {isGamefish ? (
                   <select value={form.species_name}
-                    onChange={e => setForm(f => ({ ...f, species_name: e.target.value, weight_kg: '', length_cm: '' }))}
+                    onChange={e => {
+                      const val = e.target.value
+                      setForm(f => ({
+                        ...f,
+                        species_name: val,
+                        weight_kg: val === 'No Catch' ? '0' : '',
+                        length_cm: '',
+                        scoring: val === 'No Catch' ? false : true
+                      }))
+                    }}
                     style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '0.9rem' }}>
                     <option value="">— Select species —</option>
                     <optgroup label="Kill & Weigh">{GAMEFISH_SPECIES.filter(s => !s.release).map(s => <option key={s.name} value={s.name}>{s.name}</option>)}</optgroup>
                     <optgroup label="🟢 Kingfish — Release & Measure">{GAMEFISH_SPECIES.filter(s => s.kingfish).map(s => <option key={s.name} value={s.name}>{s.name}</option>)}</optgroup>
                     <optgroup label="🔵 Billfish — Release Only">{GAMEFISH_SPECIES.filter(s => s.billfish).map(s => <option key={s.name} value={s.name}>{s.name}</option>)}</optgroup>
+                    <option value="No Catch">No Catch — 0 points</option>
                   </select>
                 ) : (
                   <select value={form.species_name}
-                    onChange={e => setForm(f => ({ ...f, species_name: e.target.value, weight_kg: '' }))}
+                    onChange={e => {
+                      const val = e.target.value
+                      setForm(f => ({
+                        ...f,
+                        species_name: val,
+                        weight_kg: val === 'No Catch' ? '0' : '',
+                        scoring: val === 'No Catch' ? false : true
+                      }))
+                    }}
                     style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '0.9rem' }}>
                     <option value="">— Select species —</option>
                     {TUNA_SCORING_SPECIES.map(s => <option key={s.name} value={s.name}>{s.name} (min {s.minWeight}kg)</option>)}
+                    <option value="No Catch">No Catch — 0 points</option>
                   </select>
                 )}
               </div>
