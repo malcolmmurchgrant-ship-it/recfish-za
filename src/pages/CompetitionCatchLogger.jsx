@@ -205,6 +205,7 @@ export default function CompetitionCatchLogger() {
   }
 
   const activeDayRecord = days.find(d => d.day_number === activeDay)
+  const isDayHidden = activeDayRecord?.session_status === 'hidden'
   const teamParticipants = participants.filter(p => p.team_id === form.team_id)
   const anglerDayCatches = dayCatches.filter(c => c.angler_id === form.angler_id)
   const currentLineClass = teamLineClass[`${form.team_id}_${activeDay}`] || 10
@@ -719,7 +720,15 @@ export default function CompetitionCatchLogger() {
         {/* LEADERBOARD VIEW */}
         {view === 'leaderboard' && (
           <div>
-            {isGamefish ? (
+            {isDayHidden && !isAdmin ? (
+              <div style={{ background: 'white', borderRadius: '10px', padding: '3rem 2rem', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>🔒</div>
+                <div style={{ fontWeight: '800', fontSize: '1.1rem', color: NAVY, marginBottom: '0.5rem' }}>Results Hidden</div>
+                <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                  Day {activeDay} results will be revealed after the final day of competition.
+                </div>
+              </div>
+            ) : isGamefish ? (
               ['U19', 'U16'].map(cat => (
                 <div key={cat} style={{ marginBottom: '2rem' }}>
                   <h3 style={{ fontWeight: '800', color: NAVY, marginBottom: '0.75rem', fontSize: '0.9rem', textTransform: 'uppercase' }}>
@@ -744,9 +753,9 @@ export default function CompetitionCatchLogger() {
                   })}
                 </div>
               ))
-            ) : (
+            ) : isDayHidden && !isAdmin ? null : (
               <div>
-                <h3 style={{ fontWeight: '800', color: NAVY, marginBottom: '0.75rem', fontSize: '0.9rem', textTransform: 'uppercase' }}>🏆 Standings</h3>
+                <h3 style={{ fontWeight: '800', color: NAVY, marginBottom: '0.75rem', fontSize: '0.9rem', textTransform: 'uppercase' }}>Standings</h3>
                 {tunaLeaderboard.map((team, idx) => {
                   const day = getTeamDayScore(team.id)
                   const boat = getTeamBoat(team.id)
@@ -773,10 +782,18 @@ export default function CompetitionCatchLogger() {
         {/* SKIPPERS VIEW */}
         {view === 'skippers' && (
           <div>
-            <div style={{ background: '#fef3c7', border: '1px solid #fbbf24', borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '1rem', fontSize: '0.8rem', color: '#92400e' }}>
-              ⚓ Lowest grand prix points wins. Updates live as catches are logged.
-            </div>
-            {skipperLeaderboard().map((boat, idx) => (
+            {isDayHidden && !isAdmin ? (
+              <div style={{ background: 'white', borderRadius: '10px', padding: '3rem 2rem', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>🔒</div>
+                <div style={{ fontWeight: '800', fontSize: '1.1rem', color: NAVY, marginBottom: '0.5rem' }}>Results Hidden</div>
+                <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>Skipper standings will be revealed after the final day.</div>
+              </div>
+            ) : null}
+            {(!isDayHidden || isAdmin) && <div style={{ background: '#fef3c7', border: '1px solid #fbbf24', borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '1rem', fontSize: '0.8rem', color: '#92400e' }}>
+              Lowest grand prix points wins. Updates live as catches are logged.
+            </div>}
+            {(!isDayHidden || isAdmin) &&
+            {(!isDayHidden || isAdmin) && skipperLeaderboard().map((boat, idx) => (
               <div key={boat.id} style={{ background: 'white', borderRadius: '8px', padding: '0.875rem 1rem', marginBottom: '0.5rem', boxShadow: '0 1px 2px rgba(0,0,0,0.07)', display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
                 <div style={{ width: '2rem', height: '2rem', borderRadius: '50%', flexShrink: 0, background: medal(idx), display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '0.875rem', color: idx < 3 ? 'white' : '#6b7280' }}>{idx + 1}</div>
                 <div style={{ flex: 1 }}>

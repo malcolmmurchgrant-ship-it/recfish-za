@@ -13,43 +13,44 @@ const INT_COMP_ID = '4a905558-8a94-4dc2-8305-bce37bfc1fe4'
 const GAMEFISH_ID = 'ec9c5e41-a41a-4f2f-b8f6-75843b3b4f77'
 const NAVY = '#1e3a8a'
 
+// ── CATCH EDIT FORM ────────────────────────────────────────────
 function CatchEditForm({ editingCatch, setEditingCatch, teams, participants, boats, saving, onSave, onCancel }) {
-  const inputStyle = { width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '0.9rem', marginBottom: '0.5rem' }
-  const btnStyle = (color) => ({ padding: '0.5rem 1rem', background: color, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' })
+  const iStyle = { width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '0.9rem', marginBottom: '0.5rem' }
+  const btn = (color) => ({ padding: '0.5rem 1rem', background: color, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' })
   return (
     <div style={{ padding: '1rem', background: '#eff6ff', border: '2px solid #1e40af', borderRadius: '8px', marginTop: '0.5rem' }}>
       <div style={{ fontWeight: '600', fontSize: '0.85rem', color: NAVY, marginBottom: '0.75rem' }}>Editing catch</div>
       <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Team</label>
-      <select style={inputStyle} value={editingCatch.team_id}
+      <select style={iStyle} value={editingCatch.team_id}
         onChange={e => setEditingCatch(c => ({ ...c, team_id: e.target.value, angler_id: '' }))}>
         {teams.map(t => <option key={t.id} value={t.id}>{t.team_name}</option>)}
       </select>
       <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Angler</label>
-      <select style={inputStyle} value={editingCatch.angler_id}
+      <select style={iStyle} value={editingCatch.angler_id}
         onChange={e => setEditingCatch(c => ({ ...c, angler_id: e.target.value }))}>
         <option value="">— Select angler —</option>
         {participants.filter(p => p.team_id === editingCatch.team_id).map(p =>
-          <option key={p.id} value={p.id}>{p.full_name}</option>
+          <option key={p.id} value={p.id}>{p.full_name}{p.status === 'reserve' ? ' (Reserve)' : ''}</option>
         )}
       </select>
       <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Boat</label>
-      <select style={inputStyle} value={editingCatch.boat_id || ''}
+      <select style={iStyle} value={editingCatch.boat_id || ''}
         onChange={e => setEditingCatch(c => ({ ...c, boat_id: e.target.value }))}>
         <option value="">— Select boat —</option>
         {boats.map(b => <option key={b.id} value={b.id}>{b.boat_name} — {b.skipper_name}</option>)}
       </select>
       <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Species</label>
-      <input style={inputStyle} value={editingCatch.species_name}
+      <input style={iStyle} value={editingCatch.species_name}
         onChange={e => setEditingCatch(c => ({ ...c, species_name: e.target.value }))} />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
         <div>
           <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Weight (kg)</label>
-          <input type="number" step="0.01" style={inputStyle} value={editingCatch.weight_kg || ''}
+          <input type="number" step="0.01" style={iStyle} value={editingCatch.weight_kg || ''}
             onChange={e => setEditingCatch(c => ({ ...c, weight_kg: e.target.value }))} />
         </div>
         <div>
           <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Line Class</label>
-          <select style={inputStyle} value={editingCatch.line_class_kg || 10}
+          <select style={iStyle} value={editingCatch.line_class_kg || 10}
             onChange={e => setEditingCatch(c => ({ ...c, line_class_kg: e.target.value }))}>
             <option value={10}>10 kg</option>
             <option value={15}>15 kg</option>
@@ -62,33 +63,35 @@ function CatchEditForm({ editingCatch, setEditingCatch, teams, participants, boa
         <span style={{ fontSize: '0.85rem', fontWeight: '500' }}>Non-scoring (mutilated/predated)</span>
       </label>
       <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Notes</label>
-      <input style={inputStyle} value={editingCatch.notes || ''}
+      <input style={iStyle} value={editingCatch.notes || ''}
         onChange={e => setEditingCatch(c => ({ ...c, notes: e.target.value }))} />
       <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-        <button onClick={onSave} disabled={saving} style={btnStyle('#166534')}>{saving ? 'Saving...' : 'Save Changes'}</button>
-        <button onClick={onCancel} style={btnStyle('#6b7280')}>Cancel</button>
+        <button onClick={onSave} disabled={saving} style={btn('#166534')}>{saving ? 'Saving...' : 'Save Changes'}</button>
+        <button onClick={onCancel} style={btn('#6b7280')}>Cancel</button>
       </div>
     </div>
   )
 }
 
-function AddDayForm({ days, onAdd, saving, inputStyle, btnStyle }) {
+// ── ADD DAY FORM ───────────────────────────────────────────────
+function AddDayForm({ days, onAdd, saving, iStyle, btn }) {
   const nextDay = (days.length > 0 ? Math.max(...days.map(d => d.day_number)) : 0) + 1
   const [dayNum, setDayNum] = useState(nextDay)
   const [date, setDate] = useState('')
   return (
     <div>
       <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Day Number</label>
-      <input type="number" style={inputStyle} value={dayNum} onChange={e => setDayNum(parseInt(e.target.value))} />
+      <input type="number" style={iStyle} value={dayNum} onChange={e => setDayNum(parseInt(e.target.value))} />
       <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Date</label>
-      <input type="date" style={inputStyle} value={date} onChange={e => setDate(e.target.value)} />
-      <button onClick={() => { if (date) onAdd(dayNum, date) }} disabled={saving || !date} style={btnStyle('#166534')}>
+      <input type="date" style={iStyle} value={date} onChange={e => setDate(e.target.value)} />
+      <button onClick={() => { if (date) onAdd(dayNum, date) }} disabled={saving || !date} style={btn('#166534')}>
         {saving ? 'Adding...' : 'Add Day'}
       </button>
     </div>
   )
 }
 
+// ── MAIN COMPONENT ─────────────────────────────────────────────
 export default function CompetitionAdminPanel({ onClose }) {
   const { user } = useAuth()
   const [tab, setTab] = useState('boats')
@@ -102,7 +105,10 @@ export default function CompetitionAdminPanel({ onClose }) {
   const [days, setDays] = useState([])
   const [editingBoat, setEditingBoat] = useState(null)
   const [editingCatch, setEditingCatch] = useState(null)
+  const [editingTeam, setEditingTeam] = useState(null)
   const [selectedComp, setSelectedComp] = useState(NAT_COMP_ID)
+  const [addAngler, setAddAngler] = useState({ teamId: null, name: '', category: 'Crew', status: 'active' })
+  const [showBlackout, setShowBlackout] = useState({})
 
   const userEmail = (user?.email || user?.user_metadata?.email || '').toLowerCase()
   const isAuthorised = AUTHORISED_ADMINS.includes(userEmail)
@@ -131,6 +137,7 @@ export default function CompetitionAdminPanel({ onClose }) {
     setTimeout(() => setMessage(null), 3000)
   }
 
+  // ── BOATS ──────────────────────────────────────────────────────
   const saveBoat = async () => {
     if (!editingBoat) return
     setSaving(true)
@@ -138,33 +145,56 @@ export default function CompetitionAdminPanel({ onClose }) {
       .update({ boat_name: editingBoat.boat_name, skipper_name: editingBoat.skipper_name })
       .eq('id', editingBoat.id)
     if (error) showMessage('Error: ' + error.message, 'error')
-    else { showMessage('Boat updated successfully'); setEditingBoat(null); loadData() }
+    else { showMessage('Boat updated'); setEditingBoat(null); loadData() }
     setSaving(false)
   }
 
-  const moveTeam = async (teamId, newCompId) => {
+  // ── TEAMS ──────────────────────────────────────────────────────
+  const saveTeamName = async (teamId, newName) => {
     setSaving(true)
-    const team = teams.find(t => t.id === teamId)
-    if (!team) { setSaving(false); return }
-    const errors = []
-    const { error: teamErr } = await supabase.from('competition_teams').update({ competition_id: newCompId }).eq('id', teamId)
-    if (teamErr) errors.push('Team: ' + teamErr.message)
-    const boat = boats.find(b => b.id === team.boat_id)
-    if (boat) {
-      const { error: boatErr } = await supabase.from('competition_boats').update({ competition_id: newCompId }).eq('id', boat.id)
-      if (boatErr) errors.push('Boat: ' + boatErr.message)
-    }
-    const teamParts = participants.filter(p => p.team_id === teamId)
-    if (teamParts.length > 0) {
-      const { error: partErr } = await supabase.from('competition_participants').update({ competition_id: newCompId }).eq('team_id', teamId)
-      if (partErr) errors.push('Participants: ' + partErr.message)
-    }
-    if (errors.length > 0) showMessage('Errors: ' + errors.join(' | '), 'error')
-    else showMessage(team.team_name + ' moved successfully')
-    loadData()
+    const { error } = await supabase.from('competition_teams').update({ team_name: newName }).eq('id', teamId)
+    if (error) showMessage('Error: ' + error.message, 'error')
+    else { showMessage('Team name updated'); setEditingTeam(null); loadData() }
     setSaving(false)
   }
 
+  const addAnglerToTeam = async () => {
+    if (!addAngler.name.trim() || !addAngler.teamId) return
+    setSaving(true)
+    const { error } = await supabase.from('competition_participants').insert([{
+      competition_id: selectedComp,
+      team_id: addAngler.teamId,
+      user_id: crypto.randomUUID(),
+      full_name: addAngler.name.trim(),
+      category: addAngler.category,
+      division: 'Senior',
+      line_class_kg: 10,
+      status: addAngler.status,
+    }])
+    if (error) showMessage('Error: ' + error.message, 'error')
+    else { showMessage('Angler added'); setAddAngler({ teamId: null, name: '', category: 'Crew', status: 'active' }); loadData() }
+    setSaving(false)
+  }
+
+  const removeAngler = async (anglerId, anglerName) => {
+    if (!confirm('Remove ' + anglerName + ' from the team?')) return
+    setSaving(true)
+    const { error } = await supabase.from('competition_participants').delete().eq('id', anglerId)
+    if (error) showMessage('Error: ' + error.message, 'error')
+    else { showMessage('Angler removed'); loadData() }
+    setSaving(false)
+  }
+
+  const activateReserve = async (anglerId, anglerName) => {
+    setSaving(true)
+    const { error } = await supabase.from('competition_participants')
+      .update({ status: 'active' }).eq('id', anglerId)
+    if (error) showMessage('Error: ' + error.message, 'error')
+    else { showMessage(anglerName + ' activated'); loadData() }
+    setSaving(false)
+  }
+
+  // ── CATCHES ────────────────────────────────────────────────────
   const calcPoints = (weightKg, lineClassKg, scoring) => {
     if (!scoring || !weightKg || parseFloat(weightKg) <= 0) return 0
     const w = parseFloat(weightKg)
@@ -202,6 +232,7 @@ export default function CompetitionAdminPanel({ onClose }) {
     setSaving(false)
   }
 
+  // ── DAYS ───────────────────────────────────────────────────────
   const addDay = async (dayNumber, date) => {
     setSaving(true)
     const { error } = await supabase.from('competition_days').insert([{
@@ -209,6 +240,16 @@ export default function CompetitionAdminPanel({ onClose }) {
     }])
     if (error) showMessage('Error: ' + error.message, 'error')
     else { showMessage('Day ' + dayNumber + ' added'); loadData() }
+    setSaving(false)
+  }
+
+  const toggleBlackout = async (dayId, current) => {
+    setSaving(true)
+    const newStatus = current === 'hidden' ? 'pending' : 'hidden'
+    const { error } = await supabase.from('competition_days')
+      .update({ session_status: newStatus }).eq('id', dayId)
+    if (error) showMessage('Error: ' + error.message, 'error')
+    else { showMessage('Day ' + (newStatus === 'hidden' ? 'results hidden' : 'results visible')); loadData() }
     setSaving(false)
   }
 
@@ -224,8 +265,9 @@ export default function CompetitionAdminPanel({ onClose }) {
 
   if (loading) return <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>Loading...</div>
 
-  const inputStyle = { width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '0.9rem', marginBottom: '0.5rem' }
-  const btnStyle = (color) => ({ padding: '0.5rem 1rem', background: color, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' })
+  const iStyle = { width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '0.9rem', marginBottom: '0.5rem' }
+  const btn = (color) => ({ padding: '0.5rem 1rem', background: color, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' })
+  const smallBtn = (color) => ({ padding: '0.25rem 0.6rem', background: color, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: '600' })
 
   const anglerGroups = {}
   catches.forEach(c => {
@@ -241,6 +283,8 @@ export default function CompetitionAdminPanel({ onClose }) {
 
   return (
     <div style={{ minHeight: '100vh', background: '#f3f4f6', paddingBottom: '3rem' }}>
+
+      {/* Header */}
       <div style={{ background: NAVY, color: 'white', padding: '1rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <div style={{ fontSize: '0.7rem', opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.1em' }}>SADSAA — Admin</div>
@@ -255,6 +299,7 @@ export default function CompetitionAdminPanel({ onClose }) {
         </div>
       )}
 
+      {/* Competition selector */}
       <div style={{ background: 'white', padding: '0.75rem 1rem', borderBottom: '1px solid #e5e7eb' }}>
         <select value={selectedComp} onChange={e => setSelectedComp(e.target.value)}
           style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '0.9rem', width: '100%' }}>
@@ -264,11 +309,12 @@ export default function CompetitionAdminPanel({ onClose }) {
         </select>
       </div>
 
+      {/* Tabs */}
       <div style={{ display: 'flex', background: 'white', borderBottom: '2px solid #e5e7eb' }}>
-        {[['boats','Boats & Skippers'],['teams','Teams'],['catches','Catches'],['days','Days']].map(([v, label]) => (
+        {[['boats','Boats & Skippers'],['teams','Teams & Anglers'],['catches','Catches'],['days','Days']].map(([v, label]) => (
           <button key={v} onClick={() => setTab(v)} style={{
             flex: 1, padding: '0.7rem 0.25rem', border: 'none', cursor: 'pointer',
-            fontWeight: '600', fontSize: '0.75rem', background: 'none',
+            fontWeight: '600', fontSize: '0.72rem', background: 'none',
             borderBottom: tab === v ? '3px solid ' + NAVY : '3px solid transparent',
             color: tab === v ? NAVY : '#6b7280'
           }}>{label}</button>
@@ -277,9 +323,10 @@ export default function CompetitionAdminPanel({ onClose }) {
 
       <div style={{ maxWidth: '650px', margin: '0 auto', padding: '1rem' }}>
 
+        {/* ── BOATS TAB ── */}
         {tab === 'boats' && (
           <div>
-            <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '1rem' }}>Tap a boat to edit its name or skipper.</p>
+            <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '1rem' }}>Tap Edit to change a boat name or skipper.</p>
             {boats.map(boat => {
               const team = teams.find(t => t.boat_id === boat.id)
               const isEditing = editingBoat?.id === boat.id
@@ -288,13 +335,13 @@ export default function CompetitionAdminPanel({ onClose }) {
                   {isEditing ? (
                     <div>
                       <div style={{ fontWeight: '600', fontSize: '0.85rem', color: NAVY, marginBottom: '0.5rem' }}>Editing: {boat.boat_name}</div>
-                      <input style={inputStyle} placeholder="Boat name" value={editingBoat.boat_name}
+                      <input style={iStyle} placeholder="Boat name" value={editingBoat.boat_name}
                         onChange={e => setEditingBoat(b => ({ ...b, boat_name: e.target.value }))} />
-                      <input style={inputStyle} placeholder="Skipper name" value={editingBoat.skipper_name}
+                      <input style={iStyle} placeholder="Skipper name" value={editingBoat.skipper_name}
                         onChange={e => setEditingBoat(b => ({ ...b, skipper_name: e.target.value }))} />
                       <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                        <button onClick={saveBoat} disabled={saving} style={btnStyle('#166534')}>{saving ? 'Saving...' : 'Save'}</button>
-                        <button onClick={() => setEditingBoat(null)} style={btnStyle('#6b7280')}>Cancel</button>
+                        <button onClick={saveBoat} disabled={saving} style={btn('#166534')}>{saving ? 'Saving...' : 'Save'}</button>
+                        <button onClick={() => setEditingBoat(null)} style={btn('#6b7280')}>Cancel</button>
                       </div>
                     </div>
                   ) : (
@@ -304,7 +351,7 @@ export default function CompetitionAdminPanel({ onClose }) {
                         <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>Skipper: {boat.skipper_name}</div>
                         {team && <div style={{ fontSize: '0.75rem', color: NAVY, marginTop: '0.2rem' }}>Team: {team.team_name}</div>}
                       </div>
-                      <button onClick={() => setEditingBoat({ ...boat })} style={btnStyle('#1e40af')}>Edit</button>
+                      <button onClick={() => setEditingBoat({ ...boat })} style={btn('#1e40af')}>Edit</button>
                     </div>
                   )}
                 </div>
@@ -313,30 +360,123 @@ export default function CompetitionAdminPanel({ onClose }) {
           </div>
         )}
 
+        {/* ── TEAMS & ANGLERS TAB ── */}
         {tab === 'teams' && (
           <div>
-            <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '1rem' }}>Move a team between Nationals and International competitions.</p>
+            <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '1rem' }}>
+              View and edit team members. Add reserves or replacements directly.
+            </p>
             {teams.map(team => {
-              const boat = boats.find(b => b.id === team.boat_id)
-              const otherComp = selectedComp === NAT_COMP_ID ? INT_COMP_ID : NAT_COMP_ID
-              const otherCompName = selectedComp === NAT_COMP_ID ? 'International' : 'Nationals'
+              const teamAnglers = participants
+                .filter(p => p.team_id === team.id)
+                .sort((a, b) => {
+                  if (a.status === 'reserve' && b.status !== 'reserve') return 1
+                  if (b.status === 'reserve' && a.status !== 'reserve') return -1
+                  return a.full_name.localeCompare(b.full_name)
+                })
+              const isEditingName = editingTeam === team.id
+              const isAddingAngler = addAngler.teamId === team.id
+
               return (
-                <div key={team.id} style={{ background: 'white', borderRadius: '8px', padding: '1rem', marginBottom: '0.75rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontWeight: '700', color: '#111827' }}>{team.team_name}</div>
-                    <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>{boat ? boat.boat_name + ' — ' + boat.skipper_name : 'No boat assigned'}</div>
-                    <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>{participants.filter(p => p.team_id === team.id).length} anglers</div>
+                <div key={team.id} style={{ marginBottom: '1.25rem' }}>
+                  {/* Team header */}
+                  <div style={{ background: NAVY, color: 'white', borderRadius: isEditingName ? '8px 8px 0 0' : (teamAnglers.length > 0 || isAddingAngler ? '8px 8px 0 0' : '8px'), padding: '0.75rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    {isEditingName ? (
+                      <input
+                        style={{ flex: 1, padding: '0.3rem 0.5rem', borderRadius: '4px', border: 'none', fontSize: '0.9rem', fontWeight: '700', marginRight: '0.5rem' }}
+                        defaultValue={team.team_name}
+                        id={'team-name-' + team.id}
+                      />
+                    ) : (
+                      <div style={{ fontWeight: '700', fontSize: '0.9rem' }}>{team.team_name}</div>
+                    )}
+                    <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
+                      {isEditingName ? (
+                        <>
+                          <button onClick={() => {
+                            const val = document.getElementById('team-name-' + team.id)?.value
+                            if (val) saveTeamName(team.id, val)
+                          }} style={smallBtn('#166534')}>Save</button>
+                          <button onClick={() => setEditingTeam(null)} style={smallBtn('#6b7280')}>Cancel</button>
+                        </>
+                      ) : (
+                        <>
+                          <button onClick={() => setEditingTeam(team.id)} style={smallBtn('#1e40af')}>Rename</button>
+                          <button onClick={() => setAddAngler({ teamId: team.id, name: '', category: 'Crew', status: 'active' })} style={smallBtn('#166534')}>+ Angler</button>
+                        </>
+                      )}
+                    </div>
                   </div>
-                  <button onClick={() => { if (confirm('Move ' + team.team_name + ' to ' + otherCompName + '?')) moveTeam(team.id, otherComp) }}
-                    disabled={saving} style={btnStyle('#7c3aed')}>
-                    {'→ ' + otherCompName}
-                  </button>
+
+                  {/* Anglers list */}
+                  {teamAnglers.map((angler, idx) => {
+                    const isLast = idx === teamAnglers.length - 1 && !isAddingAngler
+                    const isReserve = angler.status === 'reserve'
+                    return (
+                      <div key={angler.id} style={{
+                        background: isReserve ? '#fefce8' : (idx % 2 === 0 ? '#f8fafc' : 'white'),
+                        border: '1px solid #e5e7eb', borderTop: 'none',
+                        padding: '0.6rem 1rem',
+                        borderRadius: isLast ? '0 0 8px 8px' : '0',
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                      }}>
+                        <div>
+                          <span style={{ fontWeight: '600', fontSize: '0.875rem', color: '#111827' }}>{angler.full_name}</span>
+                          <span style={{ fontSize: '0.75rem', color: '#6b7280', marginLeft: '0.5rem' }}>{angler.category}</span>
+                          {isReserve && (
+                            <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', background: '#fef9c3', color: '#92400e', padding: '0.1rem 0.4rem', borderRadius: '10px' }}>Reserve</span>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.4rem' }}>
+                          {isReserve && (
+                            <button onClick={() => activateReserve(angler.id, angler.full_name)} style={smallBtn('#166534')}>Activate</button>
+                          )}
+                          <button onClick={() => removeAngler(angler.id, angler.full_name)} style={smallBtn('#ef4444')}>Remove</button>
+                        </div>
+                      </div>
+                    )
+                  })}
+
+                  {/* Add angler form */}
+                  {isAddingAngler && (
+                    <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderTop: 'none', padding: '0.875rem 1rem', borderRadius: '0 0 8px 8px' }}>
+                      <div style={{ fontWeight: '600', fontSize: '0.8rem', color: NAVY, marginBottom: '0.5rem' }}>Add angler to {team.team_name}</div>
+                      <input style={iStyle} placeholder="Full name" value={addAngler.name}
+                        onChange={e => setAddAngler(a => ({ ...a, name: e.target.value }))} />
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                        <div>
+                          <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#374151' }}>Role</label>
+                          <select style={iStyle} value={addAngler.category}
+                            onChange={e => setAddAngler(a => ({ ...a, category: e.target.value }))}>
+                            <option>Captain</option>
+                            <option>Crew 1</option>
+                            <option>Crew 2</option>
+                            <option>Crew 3</option>
+                            <option>Crew</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#374151' }}>Status</label>
+                          <select style={iStyle} value={addAngler.status}
+                            onChange={e => setAddAngler(a => ({ ...a, status: e.target.value }))}>
+                            <option value="active">Active</option>
+                            <option value="reserve">Reserve</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <button onClick={addAnglerToTeam} disabled={saving || !addAngler.name.trim()} style={btn('#166534')}>{saving ? 'Adding...' : 'Add Angler'}</button>
+                        <button onClick={() => setAddAngler({ teamId: null, name: '', category: 'Crew', status: 'active' })} style={btn('#6b7280')}>Cancel</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )
             })}
           </div>
         )}
 
+        {/* ── CATCHES TAB ── */}
         {tab === 'catches' && (
           <div>
             <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '1rem' }}>
@@ -386,8 +526,8 @@ export default function CompetitionAdminPanel({ onClose }) {
                             </div>
                           </div>
                           <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
-                            <button onClick={() => setEditingCatch({ ...c })} style={btnStyle('#1e40af')}>Edit</button>
-                            <button onClick={() => deleteCatch(c.id)} style={btnStyle('#ef4444')}>Del</button>
+                            <button onClick={() => setEditingCatch({ ...c })} style={btn('#1e40af')}>Edit</button>
+                            <button onClick={() => deleteCatch(c.id)} style={btn('#ef4444')}>Del</button>
                           </div>
                         </div>
                         {isEditing && (
@@ -411,23 +551,36 @@ export default function CompetitionAdminPanel({ onClose }) {
           </div>
         )}
 
+        {/* ── DAYS TAB ── */}
         {tab === 'days' && (
           <div>
-            <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '1rem' }}>Current competition days. Add a day if needed.</p>
-            {days.map(d => (
-              <div key={d.id} style={{ background: 'white', borderRadius: '8px', padding: '0.875rem 1rem', marginBottom: '0.5rem', boxShadow: '0 1px 2px rgba(0,0,0,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ fontWeight: '700', color: '#111827' }}>Day {d.day_number}</div>
-                  <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>{d.date}</div>
+            <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '1rem' }}>
+              Manage competition days and results visibility.
+              Toggle <strong>Results Hidden</strong> to keep standings secret until the final day.
+            </p>
+            {days.map(d => {
+              const isHidden = d.session_status === 'hidden'
+              return (
+                <div key={d.id} style={{ background: 'white', borderRadius: '8px', padding: '0.875rem 1rem', marginBottom: '0.5rem', boxShadow: '0 1px 2px rgba(0,0,0,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontWeight: '700', color: '#111827' }}>Day {d.day_number}</div>
+                    <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>{d.date}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.75rem', padding: '0.25rem 0.75rem', borderRadius: '20px', background: isHidden ? '#fef3c7' : '#d1fae5', color: isHidden ? '#92400e' : '#065f46', fontWeight: '600' }}>
+                      {isHidden ? 'Results Hidden' : 'Results Visible'}
+                    </span>
+                    <button onClick={() => toggleBlackout(d.id, d.session_status)} disabled={saving}
+                      style={smallBtn(isHidden ? '#166534' : '#92400e')}>
+                      {isHidden ? 'Show' : 'Hide'}
+                    </button>
+                  </div>
                 </div>
-                <div style={{ fontSize: '0.75rem', padding: '0.25rem 0.75rem', borderRadius: '20px', background: d.session_status === 'completed' ? '#d1fae5' : '#eff6ff', color: d.session_status === 'completed' ? '#065f46' : NAVY, fontWeight: '600' }}>
-                  {d.session_status}
-                </div>
-              </div>
-            ))}
+              )
+            })}
             <div style={{ background: 'white', borderRadius: '8px', padding: '1rem', marginTop: '1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
               <div style={{ fontWeight: '600', fontSize: '0.875rem', color: NAVY, marginBottom: '0.75rem' }}>Add a Day</div>
-              <AddDayForm days={days} onAdd={addDay} saving={saving} inputStyle={inputStyle} btnStyle={btnStyle} />
+              <AddDayForm days={days} onAdd={addDay} saving={saving} iStyle={iStyle} btn={btn} />
             </div>
           </div>
         )}

@@ -204,7 +204,7 @@ function calcAnglerCatchDetail(catches, anglers, teams) {
 }
 
 // ── PDF HELPERS ───────────────────────────────────────────────
-function addHeader(doc, compName, venue, dayLabel, dateStr, isFinal = false) {
+function addHeader(doc, compName, venue, dayLabel, fishingDate, isFinal = false) {
   const W = doc.internal.pageSize.width
   doc.setFillColor(...NAVY)
   doc.rect(10, 10, W - 20, 24, 'F')
@@ -214,7 +214,7 @@ function addHeader(doc, compName, venue, dayLabel, dateStr, isFinal = false) {
   doc.setFontSize(8); doc.setFont('helvetica', 'normal')
   doc.setTextColor(...LIGHT_BLU)
   doc.text(venue, 32, 24.5)
-  doc.text(`${dayLabel}  •  ${dateStr}  •  Fishing: ${LINES_IN}–${LINES_UP} (${FISHING_HOURS} hrs)`, 32, 30)
+  doc.text(`${dayLabel}  •  ${fishingDate}  •  Fishing: ${LINES_IN}–${LINES_UP} (${FISHING_HOURS} hrs)`, 32, 30)
   doc.setFontSize(7)
   doc.text(isFinal ? 'FINAL RESULTS' : 'Official Results', W - 12, 19, { align: 'right' })
 }
@@ -516,14 +516,22 @@ export async function generateResultsPDF(supabase, dayNumber = null) {
   const skippers       = calcSkipperGP(d.catches, d.teams, d.boats)
   const natCatchDetail = calcAnglerCatchDetail(d.catches, d.anglers, d.teams)
 
+  // Get actual fishing date from competition days
+  const fishingDay = isFinal ? null : d.days.find(x => x.day_number === dayNumber)
+  const fishingDate = isFinal
+    ? dateStr
+    : (fishingDay?.date
+        ? new Date(fishingDay.date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })
+        : dateStr)
+
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
 
   // Page 1 — Nationals only
-  addNationalsPage1(doc, natStandings, topCatches, skippers, dayLabel, dateStr, compName, venue, isFinal)
+  addNationalsPage1(doc, natStandings, topCatches, skippers, dayLabel, fishingDate, compName, venue, isFinal)
 
   // Page 2+ — Nationals angler detail
   addAnglerDetailPage(doc, natCatchDetail, 'Nationals — Individual Angler Catches',
-                      compName, venue, dayLabel, dateStr, isFinal)
+                      compName, venue, dayLabel, fishingDate, isFinal)
 
   const filename = isFinal
     ? 'TunaNationals2026_FinalResults.pdf'
@@ -546,14 +554,21 @@ export async function generateIntResultsPDF(supabase, dayNumber = null) {
   const topCatches     = calcTopCatches(d.catches, d.anglers, d.teams, isFinal ? 10 : 5)
   const intCatchDetail = calcAnglerCatchDetail(d.catches, d.anglers, d.teams)
 
+  const fishingDay = isFinal ? null : d.days.find(x => x.day_number === dayNumber)
+  const fishingDate = isFinal
+    ? dateStr
+    : (fishingDay?.date
+        ? new Date(fishingDay.date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })
+        : dateStr)
+
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
 
   // Page 1 — International only
-  addInternationalPage1(doc, intStandings, intAngScores, topCatches, dayLabel, dateStr, compName, venue, isFinal)
+  addInternationalPage1(doc, intStandings, intAngScores, topCatches, dayLabel, fishingDate, compName, venue, isFinal)
 
   // Page 2+ — International angler detail
   addAnglerDetailPage(doc, intCatchDetail, 'International — Individual Angler Catches',
-                      compName, venue, dayLabel, dateStr, isFinal)
+                      compName, venue, dayLabel, fishingDate, isFinal)
 
   const filename = isFinal
     ? 'TunaInternational2026_FinalResults.pdf'
