@@ -792,7 +792,6 @@ export default function CompetitionCatchLogger() {
             {(!isDayHidden || isAdmin) && <div style={{ background: '#fef3c7', border: '1px solid #fbbf24', borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '1rem', fontSize: '0.8rem', color: '#92400e' }}>
               Lowest grand prix points wins. Updates live as catches are logged.
             </div>}
-            {(!isDayHidden || isAdmin) &&
             {(!isDayHidden || isAdmin) && skipperLeaderboard().map((boat, idx) => (
               <div key={boat.id} style={{ background: 'white', borderRadius: '8px', padding: '0.875rem 1rem', marginBottom: '0.5rem', boxShadow: '0 1px 2px rgba(0,0,0,0.07)', display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
                 <div style={{ width: '2rem', height: '2rem', borderRadius: '50%', flexShrink: 0, background: medal(idx), display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', fontSize: '0.875rem', color: idx < 3 ? 'white' : '#6b7280' }}>{idx + 1}</div>
