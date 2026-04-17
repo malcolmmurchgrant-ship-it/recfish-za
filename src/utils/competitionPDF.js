@@ -27,9 +27,26 @@ const ORANGE_TXT= [146, 64, 14]
 
 const NAT_COMP_ID    = 'ff6e95a9-4f9e-4b54-ad47-a913831d336c'
 const INT_COMP_ID    = '4a905558-8a94-4dc2-8305-bce37bfc1fe4'
-const FISHING_HOURS  = 10
-const LINES_IN       = '06:00'
-const LINES_UP       = '16:00'
+const FISHING_HOURS_DEFAULT = 10
+const LINES_IN_DEFAULT      = '06:00'
+const LINES_UP_DEFAULT      = '16:00'
+
+function getFishingHours(dayRecord) {
+  if (dayRecord?.fishing_start_time && dayRecord?.fishing_end_time) {
+    const [sh, sm] = dayRecord.fishing_start_time.slice(0,5).split(':').map(Number)
+    const [eh, em] = dayRecord.fishing_end_time.slice(0,5).split(':').map(Number)
+    return ((eh * 60 + em) - (sh * 60 + sm)) / 60
+  }
+  return FISHING_HOURS_DEFAULT
+}
+
+function getLinesIn(dayRecord) {
+  return dayRecord?.fishing_start_time?.slice(0,5) || LINES_IN_DEFAULT
+}
+
+function getLinesUp(dayRecord) {
+  return dayRecord?.fishing_end_time?.slice(0,5) || LINES_UP_DEFAULT
+}
 
 const TEAM_LOGOS = {
   'SADSAA Masters':           '/logos/SADSAA Logo.png',
@@ -54,7 +71,8 @@ function tunaPoints(weightKg, lineClassKg) {
   return parseFloat((Math.pow(weightKg, 2) * f).toFixed(2))
 }
 
-function calcTeamScores(catches, teams, boats) {
+function calcTeamScores(catches, teams, boats, fishingHours) {
+  fishingHours = fishingHours || FISHING_HOURS_DEFAULT
   const scores = {}
   teams.forEach(t => { scores[t.id] = { team: t, total: 0, fish: 0, weight: 0 } })
   catches.forEach(c => {
@@ -75,14 +93,15 @@ function calcTeamScores(catches, teams, boats) {
       skipper: teamBoat[s.team.id]?.skipper_name || '',
       fish: s.fish, weight: Math.round(s.weight * 100) / 100,
       total: Math.round(s.total * 100) / 100,
-      cpue_kg:   Math.round(s.weight / FISHING_HOURS * 100) / 100,
-      cpue_fish: Math.round(s.fish   / FISHING_HOURS * 100) / 100,
+      cpue_kg:   Math.round(s.weight / fishingHours * 100) / 100,
+      cpue_fish: Math.round(s.fish   / fishingHours * 100) / 100,
     }))
     .sort((a, b) => b.total - a.total || b.fish - a.fish)
     .map((r, i) => ({ ...r, pos: i + 1 }))
 }
 
-function calcAnglerScores(catches, anglers, teams) {
+function calcAnglerScores(catches, anglers, teams, fishingHours) {
+  fishingHours = fishingHours || FISHING_HOURS_DEFAULT
   const teamMap = Object.fromEntries((teams || []).map(t => [t.id, t.team_name]))
   const scores = {}
   anglers.forEach(a => { scores[a.id] = { angler: a, total: 0, fish: 0, weight: 0 } })
@@ -99,8 +118,8 @@ function calcAnglerScores(catches, anglers, teams) {
       team: teamMap[s.angler.team_id] || s.angler.division || '',
       fish: s.fish, weight: Math.round(s.weight * 100) / 100,
       total: Math.round(s.total * 100) / 100,
-      cpue_kg:   Math.round(s.weight / FISHING_HOURS * 100) / 100,
-      cpue_fish: Math.round(s.fish   / FISHING_HOURS * 100) / 100,
+      cpue_kg:   Math.round(s.weight / fishingHours * 100) / 100,
+      cpue_fish: Math.round(s.fish   / fishingHours * 100) / 100,
     }))
     .sort((a, b) => b.total - a.total || b.fish - a.fish)
     .map((r, i) => ({ ...r, pos: i + 1 }))
@@ -123,7 +142,8 @@ function calcTopCatches(catches, anglers, teams, n = 5) {
     .slice(0, n)
 }
 
-function calcSkipperGP(catches, teams, boats) {
+function calcSkipperGP(catches, teams, boats, fishingHours) {
+  fishingHours = fishingHours || FISHING_HOURS_DEFAULT
   const teamBoat = {}
   teams.forEach(t => {
     if (t.boat_id) { const b = boats.find(b => b.id === t.boat_id); if (b) teamBoat[t.id] = b }
@@ -170,7 +190,8 @@ function calcSkipperGP(catches, teams, boats) {
     .map((r, i) => ({ ...r, pos: i + 1 }))
 }
 
-function calcAnglerCatchDetail(catches, anglers, teams) {
+function calcAnglerCatchDetail(catches, anglers, teams, fishingHours) {
+  fishingHours = fishingHours || FISHING_HOURS_DEFAULT
   const teamMap = Object.fromEntries(teams.map(t => [t.id, t.team_name]))
   const data = {}
   anglers.forEach(a => {
@@ -204,8 +225,11 @@ function calcAnglerCatchDetail(catches, anglers, teams) {
 }
 
 // ── PDF HELPERS ───────────────────────────────────────────────
-function addHeader(doc, compName, venue, dayLabel, fishingDate, isFinal = false) {
+function addHeader(doc, compName, venue, dayLabel, fishingDate, isFinal = false, linesIn, linesUp, hrs) {
   const W = doc.internal.pageSize.width
+  const li = linesIn || LINES_IN_DEFAULT
+  const lu = linesUp || LINES_UP_DEFAULT
+  const h  = hrs     || FISHING_HOURS_DEFAULT
   doc.setFillColor(...NAVY)
   doc.rect(10, 10, W - 20, 24, 'F')
   doc.setTextColor(...WHITE)
@@ -214,7 +238,7 @@ function addHeader(doc, compName, venue, dayLabel, fishingDate, isFinal = false)
   doc.setFontSize(8); doc.setFont('helvetica', 'normal')
   doc.setTextColor(...LIGHT_BLU)
   doc.text(venue, 32, 24.5)
-  doc.text(`${dayLabel}  •  ${fishingDate}  •  Fishing: ${LINES_IN}–${LINES_UP} (${FISHING_HOURS} hrs)`, 32, 30)
+  doc.text(`${dayLabel}  •  ${fishingDate}  •  Fishing: ${li}–${lu} (${h} hrs)`, 32, 30)
   doc.setFontSize(7)
   doc.text(isFinal ? 'FINAL RESULTS' : 'Official Results', W - 12, 19, { align: 'right' })
 }
@@ -238,8 +262,8 @@ function medalFill(data) {
 
 // ── NATIONALS PAGE 1 ─────────────────────────────────────────
 function addNationalsPage1(doc, natStandings, topCatches, skippers,
-                            dayLabel, dateStr, compName, venue, isFinal) {
-  addHeader(doc, compName, venue, dayLabel, dateStr, isFinal)
+                            dayLabel, dateStr, compName, venue, isFinal, linesIn, linesUp, hrs) {
+  addHeader(doc, compName, venue, dayLabel, dateStr, isFinal, linesIn, linesUp, hrs)
   let y = 40
 
   // Nationals standings with CPUE
@@ -314,8 +338,8 @@ function addNationalsPage1(doc, natStandings, topCatches, skippers,
 
 // ── INTERNATIONAL PAGE 1 ──────────────────────────────────────
 function addInternationalPage1(doc, intStandings, intAngScores, topCatches,
-                                dayLabel, dateStr, compName, venue, isFinal) {
-  addHeader(doc, compName, venue, dayLabel, dateStr, isFinal)
+                                dayLabel, dateStr, compName, venue, isFinal, linesIn, linesUp, hrs) {
+  addHeader(doc, compName, venue, dayLabel, dateStr, isFinal, linesIn, linesUp, hrs)
   let y = 40
 
   // International team standings
@@ -391,9 +415,9 @@ function addInternationalPage1(doc, intStandings, intAngScores, topCatches,
 
 // ── ANGLER DETAIL PAGES ───────────────────────────────────────
 function addAnglerDetailPage(doc, catchDetail, sectionTitle,
-                              compName, venue, dayLabel, dateStr, isFinal) {
+                              compName, venue, dayLabel, dateStr, isFinal, linesIn, linesUp, hrs) {
   doc.addPage()
-  addHeader(doc, compName, venue, dayLabel, dateStr, isFinal)
+  addHeader(doc, compName, venue, dayLabel, dateStr, isFinal, linesIn, linesUp, hrs)
   let y = 40
 
   doc.setFontSize(10); doc.setFont('helvetica', 'bold')
@@ -435,7 +459,7 @@ function addAnglerDetailPage(doc, catchDetail, sectionTitle,
       doc.setTextColor(...ORANGE_TXT)
       doc.setFontSize(7); doc.setFont('helvetica', 'oblique')
       doc.text(
-        `CPUE:  ${ang.cpue_kg.toFixed(2)} kg/hr  |  ${ang.cpue_fish.toFixed(2)} fish/hr  (over ${FISHING_HOURS} hrs fishing)`,
+        `CPUE:  ${ang.cpue_kg.toFixed(2)} kg/hr  |  ${ang.cpue_fish.toFixed(2)} fish/hr  (over ${hrs || FISHING_HOURS_DEFAULT} hrs fishing)`,
         20, y + 4
       )
       doc.setDrawColor(...[229, 231, 235]); doc.setLineWidth(0.1)
@@ -511,27 +535,30 @@ export async function generateResultsPDF(supabase, dayNumber = null) {
 
   const d = await fetchCompData(supabase, NAT_COMP_ID, dayNumber)
 
-  const natStandings   = calcTeamScores(d.catches, d.teams, d.boats)
-  const topCatches     = calcTopCatches(d.catches, d.anglers, d.teams, isFinal ? 10 : 5)
-  const skippers       = calcSkipperGP(d.catches, d.teams, d.boats)
-  const natCatchDetail = calcAnglerCatchDetail(d.catches, d.anglers, d.teams)
-
-  // Get actual fishing date from competition days
+  // Get actual fishing date and hours from competition days
   const fishingDay = isFinal ? null : d.days.find(x => x.day_number === dayNumber)
   const fishingDate = isFinal
     ? dateStr
     : (fishingDay?.date
         ? new Date(fishingDay.date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })
         : dateStr)
+  const fishingHours = getFishingHours(fishingDay)
+  const linesIn  = isFinal ? LINES_IN_DEFAULT  : getLinesIn(fishingDay)
+  const linesUp  = isFinal ? LINES_UP_DEFAULT  : getLinesUp(fishingDay)
+
+  const natStandings   = calcTeamScores(d.catches, d.teams, d.boats, fishingHours)
+  const topCatches     = calcTopCatches(d.catches, d.anglers, d.teams, isFinal ? 10 : 5)
+  const skippers       = calcSkipperGP(d.catches, d.teams, d.boats, fishingHours)
+  const natCatchDetail = calcAnglerCatchDetail(d.catches, d.anglers, d.teams, fishingHours)
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
 
   // Page 1 — Nationals only
-  addNationalsPage1(doc, natStandings, topCatches, skippers, dayLabel, fishingDate, compName, venue, isFinal)
+  addNationalsPage1(doc, natStandings, topCatches, skippers, dayLabel, fishingDate, compName, venue, isFinal, linesIn, linesUp, fishingHours)
 
   // Page 2+ — Nationals angler detail
   addAnglerDetailPage(doc, natCatchDetail, 'Nationals — Individual Angler Catches',
-                      compName, venue, dayLabel, fishingDate, isFinal)
+                      compName, venue, dayLabel, fishingDate, isFinal, linesIn, linesUp, fishingHours)
 
   const filename = isFinal
     ? 'TunaNationals2026_FinalResults.pdf'
@@ -549,26 +576,29 @@ export async function generateIntResultsPDF(supabase, dayNumber = null) {
 
   const d = await fetchCompData(supabase, INT_COMP_ID, dayNumber)
 
-  const intStandings   = calcTeamScores(d.catches, d.teams, d.boats)
-  const intAngScores   = calcAnglerScores(d.catches, d.anglers, d.teams)
-  const topCatches     = calcTopCatches(d.catches, d.anglers, d.teams, isFinal ? 10 : 5)
-  const intCatchDetail = calcAnglerCatchDetail(d.catches, d.anglers, d.teams)
-
   const fishingDay = isFinal ? null : d.days.find(x => x.day_number === dayNumber)
   const fishingDate = isFinal
     ? dateStr
     : (fishingDay?.date
         ? new Date(fishingDay.date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })
         : dateStr)
+  const fishingHours = getFishingHours(fishingDay)
+  const linesIn  = isFinal ? LINES_IN_DEFAULT  : getLinesIn(fishingDay)
+  const linesUp  = isFinal ? LINES_UP_DEFAULT  : getLinesUp(fishingDay)
+
+  const intStandings   = calcTeamScores(d.catches, d.teams, d.boats, fishingHours)
+  const intAngScores   = calcAnglerScores(d.catches, d.anglers, d.teams, fishingHours)
+  const topCatches     = calcTopCatches(d.catches, d.anglers, d.teams, isFinal ? 10 : 5)
+  const intCatchDetail = calcAnglerCatchDetail(d.catches, d.anglers, d.teams, fishingHours)
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
 
   // Page 1 — International only
-  addInternationalPage1(doc, intStandings, intAngScores, topCatches, dayLabel, fishingDate, compName, venue, isFinal)
+  addInternationalPage1(doc, intStandings, intAngScores, topCatches, dayLabel, fishingDate, compName, venue, isFinal, linesIn, linesUp, fishingHours)
 
   // Page 2+ — International angler detail
   addAnglerDetailPage(doc, intCatchDetail, 'International — Individual Angler Catches',
-                      compName, venue, dayLabel, fishingDate, isFinal)
+                      compName, venue, dayLabel, fishingDate, isFinal, linesIn, linesUp, fishingHours)
 
   const filename = isFinal
     ? 'TunaInternational2026_FinalResults.pdf'

@@ -109,11 +109,14 @@ export default function CompetitionAdminPanel({ onClose }) {
   const [selectedComp, setSelectedComp] = useState(NAT_COMP_ID)
   const [addAngler, setAddAngler] = useState({ teamId: null, name: '', category: 'Crew', status: 'active' })
   const [showBlackout, setShowBlackout] = useState({})
+  const [editingDay, setEditingDay] = useState(null)
+  const [compSignOff, setCompSignOff] = useState({ td_name: '', td_verified: false })
+  const [signOffLoaded, setSignOffLoaded] = useState(false)
 
   const userEmail = (user?.email || user?.user_metadata?.email || '').toLowerCase()
   const isAuthorised = AUTHORISED_ADMINS.includes(userEmail)
 
-  useEffect(() => { if (isAuthorised) loadData() }, [selectedComp])
+  useEffect(() => { if (isAuthorised) { loadData(); loadSignOff() } }, [selectedComp])
 
   const loadData = async () => {
     setLoading(true)
@@ -130,6 +133,18 @@ export default function CompetitionAdminPanel({ onClose }) {
     setParticipants(participantsRes.data || [])
     setDays(daysRes.data || [])
     setLoading(false)
+  }
+
+  const loadSignOff = async () => {
+    const { data } = await supabase
+      .from('competitions')
+      .select('td_name, td_verified, td_verified_at')
+      .eq('id', selectedComp)
+      .single()
+    if (data) {
+      setCompSignOff({ td_name: data.td_name || '', td_verified: data.td_verified || false, td_verified_at: data.td_verified_at })
+      setSignOffLoaded(true)
+    }
   }
 
   const showMessage = (text, type = 'success') => {
@@ -240,6 +255,33 @@ export default function CompetitionAdminPanel({ onClose }) {
     }])
     if (error) showMessage('Error: ' + error.message, 'error')
     else { showMessage('Day ' + dayNumber + ' added'); loadData() }
+    setSaving(false)
+  }
+
+  const saveDay = async (day) => {
+    setSaving(true)
+    const { error } = await supabase.from('competition_days').update({
+      fishing_start_time: day.fishing_start_time,
+      fishing_end_time:   day.fishing_end_time,
+      lines_up_time:      day.lines_up_time,
+      capturer_name:      day.capturer_name,
+      capturer_contact:   day.capturer_contact,
+    }).eq('id', day.id)
+    if (error) showMessage('Error: ' + error.message, 'error')
+    else { showMessage('Day ' + day.day_number + ' updated'); setEditingDay(null); loadData() }
+    setSaving(false)
+  }
+
+  const saveSignOff = async () => {
+    setSaving(true)
+    const now = new Date().toISOString()
+    const { error } = await supabase.from('competitions').update({
+      td_name: compSignOff.td_name,
+      td_verified: compSignOff.td_verified,
+      td_verified_at: compSignOff.td_verified ? now : null,
+    }).eq('id', selectedComp)
+    if (error) showMessage('Error: ' + error.message, 'error')
+    else { showMessage('TD sign-off saved'); loadSignOff() }
     setSaving(false)
   }
 
@@ -555,33 +597,148 @@ export default function CompetitionAdminPanel({ onClose }) {
         {tab === 'days' && (
           <div>
             <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '1rem' }}>
-              Manage competition days and results visibility.
-              Toggle <strong>Results Hidden</strong> to keep standings secret until the final day.
+              Manage fishing times, capturer details and results visibility per day.
             </p>
+
             {days.map(d => {
               const isHidden = d.session_status === 'hidden'
+              const isEditing = editingDay?.id === d.id
+              const fishingHours = (() => {
+                if (d.fishing_start_time && d.fishing_end_time) {
+                  const [sh, sm] = d.fishing_start_time.split(':').map(Number)
+                  const [eh, em] = d.fishing_end_time.split(':').map(Number)
+                  return ((eh * 60 + em) - (sh * 60 + sm)) / 60
+                }
+                return null
+              })()
+
               return (
-                <div key={d.id} style={{ background: 'white', borderRadius: '8px', padding: '0.875rem 1rem', marginBottom: '0.5rem', boxShadow: '0 1px 2px rgba(0,0,0,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontWeight: '700', color: '#111827' }}>Day {d.day_number}</div>
-                    <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>{d.date}</div>
+                <div key={d.id} style={{ marginBottom: '0.75rem' }}>
+                  {/* Day header — always visible */}
+                  <div style={{ background: 'white', borderRadius: isEditing ? '8px 8px 0 0' : '8px', padding: '0.875rem 1rem', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <div style={{ fontWeight: '700', color: '#111827', fontSize: '0.95rem' }}>Day {d.day_number} — {d.date}</div>
+                        <div style={{ fontSize: '0.775rem', color: '#6b7280', marginTop: '0.2rem' }}>
+                          Lines In: {d.fishing_start_time?.slice(0,5) || '—'}  •  Lines Up: {d.fishing_end_time?.slice(0,5) || '—'}
+                          {fishingHours !== null && <span> • {fishingHours} hrs</span>}
+                        </div>
+                        {d.capturer_name && (
+                          <div style={{ fontSize: '0.775rem', color: '#6b7280' }}>
+                            Capturer: {d.capturer_name}{d.capturer_contact ? ' — ' + d.capturer_contact : ''}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.4rem' }}>
+                        {/* Hide/Show slider-style toggle */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: '600', color: isHidden ? '#92400e' : '#065f46' }}>
+                            {isHidden ? '🔒 Hidden' : '✅ Visible'}
+                          </span>
+                          <div
+                            onClick={() => toggleBlackout(d.id, d.session_status)}
+                            style={{
+                              width: '44px', height: '24px', borderRadius: '12px', cursor: 'pointer',
+                              background: isHidden ? '#f59e0b' : '#10b981',
+                              position: 'relative', transition: 'background 0.2s',
+                              flexShrink: 0
+                            }}>
+                            <div style={{
+                              width: '18px', height: '18px', borderRadius: '50%', background: 'white',
+                              position: 'absolute', top: '3px',
+                              left: isHidden ? '3px' : '23px',
+                              transition: 'left 0.2s',
+                              boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
+                            }} />
+                          </div>
+                        </div>
+                        <button onClick={() => setEditingDay(isEditing ? null : { ...d, fishing_start_time: d.fishing_start_time?.slice(0,5) || '06:00', fishing_end_time: d.fishing_end_time?.slice(0,5) || '16:00', lines_up_time: d.lines_up_time?.slice(0,5) || '16:00', capturer_name: d.capturer_name || '', capturer_contact: d.capturer_contact || '' })}
+                          style={smallBtn(isEditing ? '#6b7280' : '#1e40af')}>
+                          {isEditing ? 'Cancel' : 'Edit'}
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.75rem', padding: '0.25rem 0.75rem', borderRadius: '20px', background: isHidden ? '#fef3c7' : '#d1fae5', color: isHidden ? '#92400e' : '#065f46', fontWeight: '600' }}>
-                      {isHidden ? 'Results Hidden' : 'Results Visible'}
-                    </span>
-                    <button onClick={() => toggleBlackout(d.id, d.session_status)} disabled={saving}
-                      style={smallBtn(isHidden ? '#166534' : '#92400e')}>
-                      {isHidden ? 'Show' : 'Hide'}
-                    </button>
-                  </div>
+
+                  {/* Edit form */}
+                  {isEditing && (
+                    <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderTop: 'none', padding: '1rem', borderRadius: '0 0 8px 8px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                        <div>
+                          <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.25rem' }}>Lines In</label>
+                          <input type="time" style={iStyle} value={editingDay.fishing_start_time}
+                            onChange={e => setEditingDay(d => ({ ...d, fishing_start_time: e.target.value, lines_up_time: d.fishing_end_time }))} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.25rem' }}>Lines Up</label>
+                          <input type="time" style={iStyle} value={editingDay.fishing_end_time}
+                            onChange={e => setEditingDay(d => ({ ...d, fishing_end_time: e.target.value, lines_up_time: e.target.value }))} />
+                        </div>
+                      </div>
+                      <div style={{ fontSize: '0.775rem', color: '#6b7280', marginBottom: '0.75rem' }}>
+                        {(() => {
+                          if (editingDay.fishing_start_time && editingDay.fishing_end_time) {
+                            const [sh, sm] = editingDay.fishing_start_time.split(':').map(Number)
+                            const [eh, em] = editingDay.fishing_end_time.split(':').map(Number)
+                            const hrs = ((eh * 60 + em) - (sh * 60 + sm)) / 60
+                            return 'Fishing hours: ' + hrs + ' hrs — CPUE will use this value in reports'
+                          }
+                          return ''
+                        })()}
+                      </div>
+                      <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.25rem' }}>Capturer Name</label>
+                      <input style={iStyle} placeholder="Full name of data capturer" value={editingDay.capturer_name}
+                        onChange={e => setEditingDay(d => ({ ...d, capturer_name: e.target.value }))} />
+                      <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.25rem' }}>Capturer Contact Number</label>
+                      <input style={iStyle} placeholder="e.g. 082 555 1234" value={editingDay.capturer_contact}
+                        onChange={e => setEditingDay(d => ({ ...d, capturer_contact: e.target.value }))} />
+                      <button onClick={() => saveDay(editingDay)} disabled={saving} style={btn('#166534')}>
+                        {saving ? 'Saving...' : 'Save Day Details'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )
             })}
-            <div style={{ background: 'white', borderRadius: '8px', padding: '1rem', marginTop: '1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+
+            {/* Add Day */}
+            <div style={{ background: 'white', borderRadius: '8px', padding: '1rem', marginTop: '0.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
               <div style={{ fontWeight: '600', fontSize: '0.875rem', color: NAVY, marginBottom: '0.75rem' }}>Add a Day</div>
               <AddDayForm days={days} onAdd={addDay} saving={saving} iStyle={iStyle} btn={btn} />
             </div>
+
+            {/* TD Sign-off */}
+            <div style={{ background: compSignOff.td_verified ? '#d1fae5' : 'white', border: compSignOff.td_verified ? '2px solid #6ee7b7' : '2px solid #e5e7eb', borderRadius: '8px', padding: '1rem', marginTop: '1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+              <div style={{ fontWeight: '700', fontSize: '0.925rem', color: NAVY, marginBottom: '0.25rem' }}>
+                Tournament Director Sign-off
+              </div>
+              <div style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '0.875rem' }}>
+                The TD verifies that all competition results are true and correct.
+              </div>
+              <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.25rem' }}>TD Name</label>
+              <input style={iStyle} placeholder="Full name of Tournament Director"
+                value={compSignOff.td_name}
+                onChange={e => setCompSignOff(s => ({ ...s, td_name: e.target.value }))} />
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', marginBottom: '0.875rem', padding: '0.75rem', background: compSignOff.td_verified ? '#ecfdf5' : '#f9fafb', borderRadius: '6px', border: '1px solid ' + (compSignOff.td_verified ? '#6ee7b7' : '#e5e7eb') }}>
+                <input type="checkbox" checked={compSignOff.td_verified}
+                  onChange={e => setCompSignOff(s => ({ ...s, td_verified: e.target.checked }))}
+                  style={{ width: '1.2rem', height: '1.2rem', cursor: 'pointer' }} />
+                <div>
+                  <div style={{ fontWeight: '600', fontSize: '0.875rem', color: compSignOff.td_verified ? '#065f46' : '#374151' }}>
+                    {compSignOff.td_verified ? '✅ Results verified as true and correct' : 'I verify these results are true and correct'}
+                  </div>
+                  {compSignOff.td_verified_at && (
+                    <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.15rem' }}>
+                      Verified: {new Date(compSignOff.td_verified_at).toLocaleString('en-ZA')}
+                    </div>
+                  )}
+                </div>
+              </label>
+              <button onClick={saveSignOff} disabled={saving || !compSignOff.td_name.trim()} style={btn(compSignOff.td_verified ? '#166534' : '#1e40af')}>
+                {saving ? 'Saving...' : compSignOff.td_verified ? 'Save Verification' : 'Save TD Details'}
+              </button>
+            </div>
+
           </div>
         )}
 
