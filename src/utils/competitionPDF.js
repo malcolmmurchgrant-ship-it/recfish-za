@@ -504,6 +504,7 @@ function addAnglerDetailPage(doc, catchDetail, sectionTitle,
 
 // ── FETCH HELPERS ────────────────────────────────────────────
 async function fetchCompData(supabase, compId, dayNumber) {
+  const dayNum = dayNumber === null ? null : parseInt(dayNumber)
   const [teams, anglers, boats, days] = await Promise.all([
     supabase.from('competition_teams').select('*').eq('competition_id', compId).then(r => r.data || []),
     supabase.from('competition_participants').select('*').eq('competition_id', compId).then(r => r.data || []),
@@ -511,11 +512,11 @@ async function fetchCompData(supabase, compId, dayNumber) {
     supabase.from('competition_days').select('*').eq('competition_id', compId).order('day_number').then(r => r.data || []),
   ])
   let catches = []
-  if (dayNumber === null) {
+  if (dayNum === null) {
     const r = await supabase.from('competition_catches').select('*').eq('competition_id', compId)
     catches = r.data || []
   } else {
-    const day = days.find(d => d.day_number === dayNumber)
+    const day = days.find(d => parseInt(d.day_number) === dayNum)
     if (day) {
       const r = await supabase.from('competition_catches').select('*')
         .eq('competition_id', compId).eq('competition_day_id', day.id)
@@ -536,7 +537,7 @@ export async function generateResultsPDF(supabase, dayNumber = null) {
   const d = await fetchCompData(supabase, NAT_COMP_ID, dayNumber)
 
   // Get actual fishing date and hours from competition days
-  const fishingDay = isFinal ? null : d.days.find(x => x.day_number === dayNumber)
+  const fishingDay = isFinal ? null : d.days.find(x => parseInt(x.day_number) === parseInt(dayNumber))
   const fishingDate = isFinal
     ? dateStr
     : (fishingDay?.date
@@ -576,7 +577,7 @@ export async function generateIntResultsPDF(supabase, dayNumber = null) {
 
   const d = await fetchCompData(supabase, INT_COMP_ID, dayNumber)
 
-  const fishingDay = isFinal ? null : d.days.find(x => x.day_number === dayNumber)
+  const fishingDay = isFinal ? null : d.days.find(x => parseInt(x.day_number) === parseInt(dayNumber))
   const fishingDate = isFinal
     ? dateStr
     : (fishingDay?.date
