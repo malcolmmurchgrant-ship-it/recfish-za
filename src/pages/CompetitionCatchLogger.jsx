@@ -351,34 +351,23 @@ export default function CompetitionCatchLogger() {
   }
 
   const skipperLeaderboard = () => {
-    const byDay = {}
+    // Accumulated catch points — highest wins
+    const boatTotals = {}
     allCatches.forEach(c => {
-      if (!c.boat_id) return
-      const key = `${c.boat_id}_${c.competition_day_id}`
-      if (!byDay[key]) byDay[key] = { boat_id: c.boat_id, catches: [] }
-      byDay[key].catches.push(c)
+      if (!c.boat_id || !c.weight_kg || c.scoring === false) return
+      const pts = parseFloat(c.points || 0)
+      if (!boatTotals[c.boat_id]) boatTotals[c.boat_id] = { total: 0, fish: 0, weight: 0 }
+      boatTotals[c.boat_id].total  += pts
+      boatTotals[c.boat_id].fish   += 1
+      boatTotals[c.boat_id].weight += parseFloat(c.weight_kg)
     })
-    const dailyByDay = {}
-    Object.values(byDay).forEach(({ boat_id, catches }) => {
-      const dayId = catches[0]?.competition_day_id
-      if (!dailyByDay[dayId]) dailyByDay[dayId] = []
-      const score = isGamefish
-        ? calcTeamDayScore(catches).finalScore
-        : calcTunaTeamDayScore(catches).totalScore
-      dailyByDay[dayId].push({ boat_id, totalPoints: score })
-    })
-    const grandPrixTotals = {}
-    Object.values(dailyByDay).forEach(dayScores => {
-      calcSkipperGrandPrix(dayScores).forEach(({ boat_id, grandPrixPoints }) => {
-        grandPrixTotals[boat_id] = (grandPrixTotals[boat_id] || 0) + grandPrixPoints
-      })
-    })
-    return boats.map(b => ({ ...b, grandPrixTotal: grandPrixTotals[b.id] || 0 }))
+    return boats
+      .map(b => ({ ...b, grandPrixTotal: Math.round((boatTotals[b.id]?.total || 0) * 100) / 100 }))
       .sort((a, b) => {
         if (a.grandPrixTotal === 0 && b.grandPrixTotal === 0) return 0
         if (a.grandPrixTotal === 0) return 1
         if (b.grandPrixTotal === 0) return -1
-        return a.grandPrixTotal - b.grandPrixTotal
+        return b.grandPrixTotal - a.grandPrixTotal
       })
   }
 
@@ -813,7 +802,7 @@ export default function CompetitionCatchLogger() {
               </div>
             ) : null}
             {(!isDayHidden || isAdmin) && <div style={{ background: '#fef3c7', border: '1px solid #fbbf24', borderRadius: '8px', padding: '0.75rem 1rem', marginBottom: '1rem', fontSize: '0.8rem', color: '#92400e' }}>
-              Lowest grand prix points wins. Updates live as catches are logged.
+              Highest accumulated catch points wins. Updates live as catches are logged.
             </div>}
             {(!isDayHidden || isAdmin) && skipperLeaderboard().map((boat, idx) => (
               <div key={boat.id} style={{ background: 'white', borderRadius: '8px', padding: '0.875rem 1rem', marginBottom: '0.5rem', boxShadow: '0 1px 2px rgba(0,0,0,0.07)', display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
@@ -824,7 +813,7 @@ export default function CompetitionCatchLogger() {
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontWeight: '800', fontSize: '1.1rem', color: NAVY }}>{boat.grandPrixTotal || '—'}</div>
-                  <div style={{ fontSize: '0.7rem', color: '#9ca3af' }}>GP pts</div>
+                  <div style={{ fontSize: '0.7rem', color: '#9ca3af' }}>pts</div>
                 </div>
               </div>
             ))}

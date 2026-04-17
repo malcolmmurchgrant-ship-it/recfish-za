@@ -143,50 +143,33 @@ function calcTopCatches(catches, anglers, teams, n = 5) {
 }
 
 function calcSkipperGP(catches, teams, boats, fishingHours) {
+  // Skipper ranking = accumulated catch points (highest wins)
   fishingHours = fishingHours || FISHING_HOURS_DEFAULT
   const teamBoat = {}
   teams.forEach(t => {
     if (t.boat_id) { const b = boats.find(b => b.id === t.boat_id); if (b) teamBoat[t.id] = b }
   })
-  const dayBoatScores = {}
+  const boatTotals = {}
   catches.forEach(c => {
     if (!c.weight_kg || c.scoring === false) return
     const boat = teamBoat[c.team_id]
     if (!boat) return
-    const key = `${boat.id}_${c.competition_day_id}`
     const pts = parseFloat(c.points || tunaPoints(parseFloat(c.weight_kg), c.line_class_kg || 10))
-    if (!dayBoatScores[key]) dayBoatScores[key] = { boat, pts: 0, fish: 0, weight: 0 }
-    dayBoatScores[key].pts    += pts
-    dayBoatScores[key].fish   += 1
-    dayBoatScores[key].weight += parseFloat(c.weight_kg)
+    if (!boatTotals[boat.id]) boatTotals[boat.id] = { boat, total: 0, fish: 0, weight: 0 }
+    boatTotals[boat.id].total  += pts
+    boatTotals[boat.id].fish   += 1
+    boatTotals[boat.id].weight += parseFloat(c.weight_kg)
   })
-  const byDay = {}
-  Object.entries(dayBoatScores).forEach(([key, v]) => {
-    const dayId = key.split('_').slice(1).join('_')
-    if (!byDay[dayId]) byDay[dayId] = []
-    byDay[dayId].push({ boatId: v.boat.id, pts: v.pts })
-  })
-  const gpTotals = {}
-  Object.values(byDay).forEach(dayScores => {
-    dayScores.sort((a, b) => b.pts - a.pts)
-    dayScores.forEach((s, i) => { gpTotals[s.boatId] = (gpTotals[s.boatId] || 0) + (i + 1) })
-  })
-  const boatTotals = {}
-  Object.values(dayBoatScores).forEach(v => {
-    const id = v.boat.id
-    if (!boatTotals[id]) boatTotals[id] = { boat: v.boat, fish: 0, weight: 0 }
-    boatTotals[id].fish   += v.fish
-    boatTotals[id].weight += v.weight
-  })
-  return boats
-    .filter(b => gpTotals[b.id])
-    .map(b => ({
-      pos: 0, skipper: b.skipper_name, boat: b.boat_name,
-      gp: gpTotals[b.id] || 0,
-      cpue_kg:   Math.round((boatTotals[b.id]?.weight || 0) / fishingHours * 100) / 100,
-      cpue_fish: Math.round((boatTotals[b.id]?.fish   || 0) / fishingHours * 100) / 100,
+  return Object.values(boatTotals)
+    .map(v => ({
+      pos: 0,
+      skipper: v.boat.skipper_name,
+      boat:    v.boat.boat_name,
+      gp:      Math.round(v.total * 100) / 100,
+      cpue_kg:   Math.round(v.weight / fishingHours * 100) / 100,
+      cpue_fish: Math.round(v.fish   / fishingHours * 100) / 100,
     }))
-    .sort((a, b) => a.gp - b.gp)
+    .sort((a, b) => b.gp - a.gp)
     .map((r, i) => ({ ...r, pos: i + 1 }))
 }
 
@@ -318,7 +301,7 @@ function addNationalsPage1(doc, natStandings, topCatches, skippers,
 
   autoTable(doc, {
     startY: y,
-    head: [['#', 'Skipper', 'Boat', 'GP Points', 'CPUE kg/hr', 'CPUE fish/hr']],
+    head: [['#', 'Skipper', 'Boat', 'Points', 'CPUE kg/hr', 'CPUE fish/hr']],
     body: skippers.map(s => [s.pos, s.skipper, s.boat, s.gp, s.cpue_kg.toFixed(2), s.cpue_fish.toFixed(2)]),
     headStyles:    { fillColor: NAVY2, textColor: WHITE, fontStyle: 'bold', fontSize: 8 },
     bodyStyles:    { fontSize: 8, textColor: DARK },
