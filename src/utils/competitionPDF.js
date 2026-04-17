@@ -245,8 +245,8 @@ function medalFill(data) {
 
 // ── NATIONALS PAGE 1 ─────────────────────────────────────────
 function addNationalsPage1(doc, natStandings, topCatches, skippers,
-                            dayLabel, dateStr, compName, venue, isFinal, linesIn, linesUp, hrs) {
-  addHeader(doc, compName, venue, dayLabel, dateStr, isFinal, linesIn, linesUp, hrs)
+                            dayLabel, fishingDate, dateStr, compName, venue, isFinal, linesIn, linesUp, hrs) {
+  addHeader(doc, compName, venue, dayLabel, fishingDate, isFinal, linesIn, linesUp, hrs)
   let y = 40
 
   // Nationals standings with CPUE
@@ -321,8 +321,8 @@ function addNationalsPage1(doc, natStandings, topCatches, skippers,
 
 // ── INTERNATIONAL PAGE 1 ──────────────────────────────────────
 function addInternationalPage1(doc, intStandings, intAngScores, topCatches,
-                                dayLabel, dateStr, compName, venue, isFinal, linesIn, linesUp, hrs) {
-  addHeader(doc, compName, venue, dayLabel, dateStr, isFinal, linesIn, linesUp, hrs)
+                                dayLabel, fishingDate, dateStr, compName, venue, isFinal, linesIn, linesUp, hrs) {
+  addHeader(doc, compName, venue, dayLabel, fishingDate, isFinal, linesIn, linesUp, hrs)
   let y = 40
 
   // International team standings
@@ -371,6 +371,29 @@ function addInternationalPage1(doc, intStandings, intAngScores, topCatches,
   })
   y = doc.lastAutoTable.finalY + 5
 
+  // Skipper standings
+  doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(...NAVY)
+  doc.text('Skipper Standings', 10, y); y += 3
+
+  autoTable(doc, {
+    startY: y,
+    head: [['#', 'Skipper', 'Boat', 'Fish', 'Points', 'kg/hr', 'f/hr']],
+    body: intStandings.map(t => [
+      t.pos, t.skipper, t.boat, t.fish,
+      t.total.toLocaleString('en-ZA', { minimumFractionDigits: 2 }),
+      t.cpue_kg.toFixed(2), t.cpue_fish.toFixed(2)
+    ]),
+    headStyles:    { fillColor: NAVY2, textColor: WHITE, fontStyle: 'bold', fontSize: 8 },
+    bodyStyles:    { fontSize: 8, textColor: DARK },
+    alternateRowStyles: { fillColor: PALE_BLU },
+    columnStyles:  { 0: { halign: 'center', cellWidth: 9 }, 3: { halign: 'center', cellWidth: 11 },
+                     4: { halign: 'right', fontStyle: 'bold', cellWidth: 22 },
+                     5: { halign: 'center', cellWidth: 16 }, 6: { halign: 'center', cellWidth: 16 } },
+    didParseCell: medalFill,
+    margin: { left: 10, right: 10 },
+  })
+  y = doc.lastAutoTable.finalY + 5
+
   // Individual angler standings
   doc.setFontSize(10); doc.setFont('helvetica', 'bold')
   doc.setTextColor(...NAVY); doc.text('International — Individual Angler Standings', 10, y); y += 3
@@ -398,9 +421,9 @@ function addInternationalPage1(doc, intStandings, intAngScores, topCatches,
 
 // ── ANGLER DETAIL PAGES ───────────────────────────────────────
 function addAnglerDetailPage(doc, catchDetail, sectionTitle,
-                              compName, venue, dayLabel, dateStr, isFinal, linesIn, linesUp, hrs) {
+                              compName, venue, dayLabel, fishingDate, dateStr, isFinal, linesIn, linesUp, hrs) {
   doc.addPage()
-  addHeader(doc, compName, venue, dayLabel, dateStr, isFinal, linesIn, linesUp, hrs)
+  addHeader(doc, compName, venue, dayLabel, fishingDate, isFinal, linesIn, linesUp, hrs)
   let y = 40
 
   doc.setFontSize(10); doc.setFont('helvetica', 'bold')
@@ -413,7 +436,7 @@ function addAnglerDetailPage(doc, catchDetail, sectionTitle,
     if (y + neededH > doc.internal.pageSize.height - 20) {
       addFooter(doc, compName, dayLabel, dateStr)
       doc.addPage()
-      addHeader(doc, compName, venue, dayLabel, dateStr, isFinal)
+      addHeader(doc, compName, venue, dayLabel, fishingDate, isFinal)
       y = 40
     }
 
@@ -538,11 +561,11 @@ export async function generateResultsPDF(supabase, dayNumber = null) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
 
   // Page 1 — Nationals only
-  addNationalsPage1(doc, natStandings, topCatches, skippers, dayLabel, fishingDate, compName, venue, isFinal, linesIn, linesUp, fishingHours)
+  addNationalsPage1(doc, natStandings, topCatches, skippers, dayLabel, fishingDate, dateStr, compName, venue, isFinal, linesIn, linesUp, fishingHours)
 
   // Page 2+ — Nationals angler detail
   addAnglerDetailPage(doc, natCatchDetail, 'Nationals — Individual Angler Catches',
-                      compName, venue, dayLabel, fishingDate, isFinal, linesIn, linesUp, fishingHours)
+                      compName, venue, dayLabel, fishingDate, dateStr, isFinal, linesIn, linesUp, fishingHours)
 
   const filename = isFinal
     ? 'TunaNationals2026_FinalResults.pdf'
@@ -578,11 +601,11 @@ export async function generateIntResultsPDF(supabase, dayNumber = null) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
 
   // Page 1 — International only
-  addInternationalPage1(doc, intStandings, intAngScores, topCatches, dayLabel, fishingDate, compName, venue, isFinal, linesIn, linesUp, fishingHours)
+  addInternationalPage1(doc, intStandings, intAngScores, topCatches, dayLabel, fishingDate, dateStr, compName, venue, isFinal, linesIn, linesUp, fishingHours)
 
   // Page 2+ — International angler detail
   addAnglerDetailPage(doc, intCatchDetail, 'International — Individual Angler Catches',
-                      compName, venue, dayLabel, fishingDate, isFinal, linesIn, linesUp, fishingHours)
+                      compName, venue, dayLabel, fishingDate, dateStr, isFinal, linesIn, linesUp, fishingHours)
 
   const filename = isFinal
     ? 'TunaInternational2026_FinalResults.pdf'
