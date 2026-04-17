@@ -27,7 +27,7 @@ const ORANGE_TXT= [146, 64, 14]
 
 const NAT_COMP_ID    = 'ff6e95a9-4f9e-4b54-ad47-a913831d336c'
 const INT_COMP_ID    = '4a905558-8a94-4dc2-8305-bce37bfc1fe4'
-const FISHING_HOURS_DEFAULT = 10 // v2
+const FISHING_HOURS_DEFAULT = 10
 const LINES_IN_DEFAULT      = '06:00'
 const LINES_UP_DEFAULT      = '16:00'
 
@@ -183,8 +183,8 @@ function calcSkipperGP(catches, teams, boats, fishingHours) {
     .map(b => ({
       pos: 0, skipper: b.skipper_name, boat: b.boat_name,
       gp: gpTotals[b.id] || 0,
-      cpue_kg:   Math.round((boatTotals[b.id]?.weight || 0) / FISHING_HOURS * 100) / 100,
-      cpue_fish: Math.round((boatTotals[b.id]?.fish   || 0) / FISHING_HOURS * 100) / 100,
+      cpue_kg:   Math.round((boatTotals[b.id]?.weight || 0) / fishingHours * 100) / 100,
+      cpue_fish: Math.round((boatTotals[b.id]?.fish   || 0) / fishingHours * 100) / 100,
     }))
     .sort((a, b) => a.gp - b.gp)
     .map((r, i) => ({ ...r, pos: i + 1 }))
@@ -219,8 +219,8 @@ function calcAnglerCatchDetail(catches, anglers, teams, fishingHours) {
   return [...withFish, ...withoutFish].map((a, i) => ({
     ...a,
     rank:      a.fish > 0 ? i + 1 : '—',
-    cpue_kg:   Math.round(a.weight / FISHING_HOURS * 100) / 100,
-    cpue_fish: Math.round(a.fish   / FISHING_HOURS * 100) / 100,
+    cpue_kg:   Math.round(a.weight / fishingHours * 100) / 100,
+    cpue_fish: Math.round(a.fish   / fishingHours * 100) / 100,
   }))
 }
 
