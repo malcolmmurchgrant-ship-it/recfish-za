@@ -27,7 +27,7 @@ const ORANGE_TXT= [146, 64, 14]
 
 const NAT_COMP_ID    = 'ff6e95a9-4f9e-4b54-ad47-a913831d336c'
 const INT_COMP_ID    = '4a905558-8a94-4dc2-8305-bce37bfc1fe4'
-const FISHING_HOURS_DEFAULT = 10
+const FISHING_HOURS_DEFAULT = 10 // v2
 const LINES_IN_DEFAULT      = '06:00'
 const LINES_UP_DEFAULT      = '16:00'
 
