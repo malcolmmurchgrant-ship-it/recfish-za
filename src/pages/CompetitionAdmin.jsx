@@ -272,6 +272,20 @@ export default function CompetitionAdminPanel({ onClose }) {
     setSaving(false)
   }
 
+  const saveDayStatus = async (dayId, dayNumber, status, reason, cancelTime) => {
+    setSaving(true)
+    const updates = {
+      day_status: status,
+      cancellation_reason: reason || null,
+      cancellation_time: cancelTime || null,
+      cancelled: status !== 'fishing',
+    }
+    const { error } = await supabase.from('competition_days').update(updates).eq('id', dayId)
+    if (error) showMessage('Error: ' + error.message, 'error')
+    else { showMessage('Day ' + dayNumber + ' status updated'); loadData() }
+    setSaving(false)
+  }
+
   const saveSignOff = async () => {
     setSaving(true)
     const now = new Date().toISOString()
@@ -597,7 +611,7 @@ export default function CompetitionAdminPanel({ onClose }) {
         {tab === 'days' && (
           <div>
             <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '1rem' }}>
-              Manage fishing times, capturer details and results visibility per day.
+              Manage fishing times, capturer details, results visibility and weather cancellations per day.
             </p>
 
             {days.map(d => {
@@ -612,13 +626,32 @@ export default function CompetitionAdminPanel({ onClose }) {
                 return null
               })()
 
+              const isCancelled = d.day_status === 'cancelled_before' || d.day_status === 'cancelled_during'
+              const statusColour = isCancelled ? '#fee2e2' : d.day_status === 'rest_day' ? '#fef3c7' : 'white'
+              const statusBorder = isCancelled ? '2px solid #fca5a5' : d.day_status === 'rest_day' ? '2px solid #fbbf24' : '1px solid transparent'
+              const statusLabel = {
+                fishing: null,
+                cancelled_before: '⛔ Cancelled — before start',
+                cancelled_during: '⛔ Cancelled during fishing',
+                rest_day: '🛟 Rest / travel day',
+              }[d.day_status]
+
               return (
                 <div key={d.id} style={{ marginBottom: '0.75rem' }}>
                   {/* Day header — always visible */}
-                  <div style={{ background: 'white', borderRadius: isEditing ? '8px 8px 0 0' : '8px', padding: '0.875rem 1rem', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}>
+                  <div style={{ background: statusColour, border: statusBorder, borderRadius: isEditing ? '8px 8px 0 0' : '8px', padding: '0.875rem 1rem', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div>
-                        <div style={{ fontWeight: '700', color: '#111827', fontSize: '0.95rem' }}>Day {d.day_number} — {d.date}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ fontWeight: '700', color: isCancelled ? '#991b1b' : '#111827', fontSize: '0.95rem' }}>Day {d.day_number} — {d.date}</span>
+                          {statusLabel && <span style={{ fontSize: '0.72rem', fontWeight: '700', color: isCancelled ? '#991b1b' : '#92400e', background: isCancelled ? '#fee2e2' : '#fef3c7', padding: '0.15rem 0.5rem', borderRadius: '10px' }}>{statusLabel}</span>}
+                        </div>
+                        {isCancelled && d.cancellation_reason && (
+                          <div style={{ fontSize: '0.775rem', color: '#991b1b', marginTop: '0.2rem', fontStyle: 'italic' }}>
+                            Reason: {d.cancellation_reason}
+                            {d.day_status === 'cancelled_during' && d.cancellation_time && ` — called off at ${d.cancellation_time.slice(0,5)}`}
+                          </div>
+                        )}
                         <div style={{ fontSize: '0.775rem', color: '#6b7280', marginTop: '0.2rem' }}>
                           Lines In: {d.fishing_start_time?.slice(0,5) || '—'}  •  Lines Up: {d.fishing_end_time?.slice(0,5) || '—'}
                           {fishingHours !== null && <span> • {fishingHours} hrs</span>}
@@ -652,7 +685,7 @@ export default function CompetitionAdminPanel({ onClose }) {
                             }} />
                           </div>
                         </div>
-                        <button onClick={() => setEditingDay(isEditing ? null : { ...d, fishing_start_time: d.fishing_start_time?.slice(0,5) || '06:00', fishing_end_time: d.fishing_end_time?.slice(0,5) || '16:00', lines_up_time: d.lines_up_time?.slice(0,5) || '16:00', capturer_name: d.capturer_name || '', capturer_contact: d.capturer_contact || '' })}
+                        <button onClick={() => setEditingDay(isEditing ? null : { ...d, fishing_start_time: d.fishing_start_time?.slice(0,5) || '06:00', fishing_end_time: d.fishing_end_time?.slice(0,5) || '16:00', lines_up_time: d.lines_up_time?.slice(0,5) || '16:00', capturer_name: d.capturer_name || '', capturer_contact: d.capturer_contact || '', day_status: d.day_status || 'fishing', cancellation_reason: d.cancellation_reason || '', cancellation_time: d.cancellation_time?.slice(0,5) || '' })}
                           style={smallBtn(isEditing ? '#6b7280' : '#1e40af')}>
                           {isEditing ? 'Cancel' : 'Edit'}
                         </button>
@@ -692,6 +725,46 @@ export default function CompetitionAdminPanel({ onClose }) {
                       <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.25rem' }}>Capturer Contact Number</label>
                       <input style={iStyle} placeholder="e.g. 082 555 1234" value={editingDay.capturer_contact}
                         onChange={e => setEditingDay(d => ({ ...d, capturer_contact: e.target.value }))} />
+                      {/* Weather Committee */}
+                      <div style={{ marginTop: '1rem', borderTop: '1px solid #bfdbfe', paddingTop: '1rem' }}>
+                        <div style={{ fontWeight: '700', fontSize: '0.85rem', color: '#991b1b', marginBottom: '0.5rem' }}>⛅ Weather Committee</div>
+                        <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.25rem' }}>Day Status</label>
+                        <select style={iStyle} value={editingDay.day_status || 'fishing'}
+                          onChange={e => setEditingDay(d => ({ ...d, day_status: e.target.value, cancellation_time: e.target.value !== 'cancelled_during' ? '' : d.cancellation_time }))}>
+                          <option value="fishing">✅ Fishing — normal day</option>
+                          <option value="cancelled_before">⛔ Cancelled before start</option>
+                          <option value="cancelled_during">⛔ Cancelled during fishing</option>
+                          <option value="rest_day">🛟 Rest / travel day</option>
+                        </select>
+                        {(editingDay.day_status === 'cancelled_before' || editingDay.day_status === 'cancelled_during') && (
+                          <>
+                            <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.25rem' }}>Reason</label>
+                            <input style={iStyle} placeholder="e.g. Gale force winds, Rough seas" value={editingDay.cancellation_reason || ''}
+                              onChange={e => setEditingDay(d => ({ ...d, cancellation_reason: e.target.value }))} />
+                          </>
+                        )}
+                        {editingDay.day_status === 'cancelled_during' && (
+                          <>
+                            <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.25rem' }}>Time called off</label>
+                            <input type="time" style={iStyle} value={editingDay.cancellation_time || ''}
+                              onChange={e => setEditingDay(d => ({ ...d, cancellation_time: e.target.value }))} />
+                          </>
+                        )}
+                        {(editingDay.day_status === 'cancelled_before' || editingDay.day_status === 'cancelled_during' || editingDay.day_status === 'rest_day') && (
+                          <button onClick={() => saveDayStatus(editingDay.id, editingDay.day_number, editingDay.day_status, editingDay.cancellation_reason, editingDay.cancellation_time)}
+                            disabled={saving}
+                            style={{ ...btn('#dc2626'), marginBottom: '0.5rem' }}>
+                            {saving ? 'Saving...' : 'Save Day Status'}
+                          </button>
+                        )}
+                        {editingDay.day_status === 'fishing' && (editingDay.cancellation_reason || editingDay.cancellation_time) && (
+                          <button onClick={() => saveDayStatus(editingDay.id, editingDay.day_number, 'fishing', null, null)}
+                            disabled={saving}
+                            style={{ ...btn('#166534'), marginBottom: '0.5rem' }}>
+                            {saving ? 'Saving...' : 'Clear Cancellation'}
+                          </button>
+                        )}
+                      </div>
                       <button onClick={() => saveDay(editingDay)} disabled={saving} style={btn('#166534')}>
                         {saving ? 'Saving...' : 'Save Day Details'}
                       </button>
