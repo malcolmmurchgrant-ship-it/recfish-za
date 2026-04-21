@@ -173,9 +173,10 @@ function calcSkipperGP(catches, teams, boats, fishingHours) {
     .map((r, i) => ({ ...r, pos: i + 1 }))
 }
 
-function calcAnglerCatchDetail(catches, anglers, teams, fishingHours) {
+function calcAnglerCatchDetail(catches, anglers, teams, fishingHours, days) {
   fishingHours = fishingHours || FISHING_HOURS_DEFAULT
   const teamMap = Object.fromEntries(teams.map(t => [t.id, t.team_name]))
+  const dayMap  = Object.fromEntries((days || []).map(d => [d.id, d]))
   const data = {}
   anglers.forEach(a => {
     data[a.id] = { name: a.full_name, team: teamMap[a.team_id] || a.division || '',
@@ -187,9 +188,15 @@ function calcAnglerCatchDetail(catches, anglers, teams, fishingHours) {
     const pts = scoring
       ? parseFloat(c.points || tunaPoints(parseFloat(c.weight_kg), c.line_class_kg || 10))
       : 0
+    const dayRecord = dayMap[c.competition_day_id]
+    const dayNum  = dayRecord?.day_number || ''
+    const dayDate = dayRecord?.date
+      ? new Date(dayRecord.date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
+      : ''
     data[c.angler_id].catches.push({
       species: c.species_name || '', weight: c.weight_kg ? parseFloat(c.weight_kg) : 0,
-      lc: `${c.line_class_kg || 10} kg`, pts, scoring
+      lc: `${c.line_class_kg || 10} kg`, pts, scoring,
+      day: dayNum, date: dayDate
     })
     if (scoring) {
       data[c.angler_id].total  += pts
@@ -484,6 +491,13 @@ function addAnglerDetailPage(doc, catchDetail, sectionTitle,
         doc.text(`${i + 1}.`, 16, y + 4, { align: 'center' })
         doc.setTextColor(...DARK); doc.setFontSize(8)
         doc.text(c.species, 20, y + 4)
+        // Day / date label
+        if (c.day) {
+          const dayLabel = c.date ? `Day ${c.day}  •  ${c.date}` : `Day ${c.day}`
+          doc.setTextColor(...GRAY); doc.setFontSize(7); doc.setFont('helvetica', 'oblique')
+          doc.text(dayLabel, 72, y + 4)
+        }
+        doc.setTextColor(...DARK); doc.setFontSize(8); doc.setFont('helvetica', 'normal')
         doc.text(`${c.weight.toFixed(2)} kg`, 112, y + 4, { align: 'right' })
         doc.text(c.lc, 126, y + 4, { align: 'center' })
         if (c.scoring) {
@@ -556,7 +570,7 @@ export async function generateResultsPDF(supabase, dayNumber = null) {
   const natStandings   = calcTeamScores(d.catches, d.teams, d.boats, fishingHours)
   const topCatches     = calcTopCatches(d.catches, d.anglers, d.teams, isFinal ? 10 : 5)
   const skippers       = calcSkipperGP(d.catches, d.teams, d.boats, fishingHours)
-  const natCatchDetail = calcAnglerCatchDetail(d.catches, d.anglers, d.teams, fishingHours)
+  const natCatchDetail = calcAnglerCatchDetail(d.catches, d.anglers, d.teams, fishingHours, d.days)
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
 
@@ -596,7 +610,7 @@ export async function generateIntResultsPDF(supabase, dayNumber = null) {
   const intStandings   = calcTeamScores(d.catches, d.teams, d.boats, fishingHours)
   const intAngScores   = calcAnglerScores(d.catches, d.anglers, d.teams, fishingHours)
   const topCatches     = calcTopCatches(d.catches, d.anglers, d.teams, isFinal ? 10 : 5)
-  const intCatchDetail = calcAnglerCatchDetail(d.catches, d.anglers, d.teams, fishingHours)
+  const intCatchDetail = calcAnglerCatchDetail(d.catches, d.anglers, d.teams, fishingHours, d.days)
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
 
