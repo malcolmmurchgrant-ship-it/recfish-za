@@ -234,12 +234,14 @@ function calcAnglerCatchDetail(catches, anglers, teams, fishingHours, days) {
 }
 
 // ── PDF HELPERS ───────────────────────────────────────────────
-function addHeader(doc, compName, venue, dayLabel, fishingDate, isFinal = false, linesIn, linesUp, hrs) {
+function addHeader(doc, compName, venue, dayLabel, fishingDate, isFinal = false, linesIn, linesUp, hrs, dayStatus) {
   const W = doc.internal.pageSize.width
   const li = linesIn || LINES_IN_DEFAULT
   const lu = linesUp || LINES_UP_DEFAULT
   const h  = hrs     || FISHING_HOURS_DEFAULT
-  doc.setFillColor(...NAVY)
+  const isCancelled = dayStatus === 'cancelled_before' || dayStatus === 'cancelled_during'
+  // Use red header background for cancelled days
+  doc.setFillColor(...(isCancelled ? [153, 27, 27] : NAVY))
   doc.rect(10, 10, W - 20, 24, 'F')
   doc.setTextColor(...WHITE)
   doc.setFontSize(14); doc.setFont('helvetica', 'bold')
@@ -247,9 +249,18 @@ function addHeader(doc, compName, venue, dayLabel, fishingDate, isFinal = false,
   doc.setFontSize(8); doc.setFont('helvetica', 'normal')
   doc.setTextColor(...LIGHT_BLU)
   doc.text(venue, 32, 24.5)
-  doc.text(`${dayLabel}  •  ${fishingDate}  •  Fishing: ${li}–${lu} (${h} hrs)`, 32, 30)
+  if (isCancelled) {
+    const cancelText = dayStatus === 'cancelled_before'
+      ? `${dayLabel}  •  ${fishingDate}  •  ⛔ DAY CANCELLED — before start`
+      : `${dayLabel}  •  ${fishingDate}  •  ⛔ DAY CANCELLED — during fishing`
+    doc.setTextColor(...[254, 202, 202])
+    doc.text(cancelText, 32, 30)
+  } else {
+    doc.text(`${dayLabel}  •  ${fishingDate}  •  Fishing: ${li}–${lu} (${h} hrs)`, 32, 30)
+  }
+  doc.setTextColor(...WHITE)
   doc.setFontSize(7)
-  doc.text(isFinal ? 'FINAL RESULTS' : 'Official Results', W - 12, 19, { align: 'right' })
+  doc.text(isFinal ? 'FINAL RESULTS' : isCancelled ? 'DAY CANCELLED' : 'Official Results', W - 12, 19, { align: 'right' })
 }
 
 function addFooter(doc, compName, dayLabel, dateStr) {
@@ -271,8 +282,8 @@ function medalFill(data) {
 
 // ── NATIONALS PAGE 1 ─────────────────────────────────────────
 function addNationalsPage1(doc, natStandings, topCatches, skippers,
-                            dayLabel, fishingDate, dateStr, compName, venue, isFinal, linesIn, linesUp, hrs, days) {
-  addHeader(doc, compName, venue, dayLabel, fishingDate, isFinal, linesIn, linesUp, hrs)
+                            dayLabel, fishingDate, dateStr, compName, venue, isFinal, linesIn, linesUp, hrs, days, dayStatus) {
+  addHeader(doc, compName, venue, dayLabel, fishingDate, isFinal, linesIn, linesUp, hrs, dayStatus)
   let y = 40
 
   // Nationals standings with CPUE
@@ -359,8 +370,8 @@ function addNationalsPage1(doc, natStandings, topCatches, skippers,
 
 // ── INTERNATIONAL PAGE 1 ──────────────────────────────────────
 function addInternationalPage1(doc, intStandings, intAngScores, topCatches,
-                                dayLabel, fishingDate, dateStr, compName, venue, isFinal, linesIn, linesUp, hrs) {
-  addHeader(doc, compName, venue, dayLabel, fishingDate, isFinal, linesIn, linesUp, hrs)
+                                dayLabel, fishingDate, dateStr, compName, venue, isFinal, linesIn, linesUp, hrs, dayStatus) {
+  addHeader(doc, compName, venue, dayLabel, fishingDate, isFinal, linesIn, linesUp, hrs, dayStatus)
   let y = 40
 
   // International team standings
@@ -459,9 +470,9 @@ function addInternationalPage1(doc, intStandings, intAngScores, topCatches,
 
 // ── ANGLER DETAIL PAGES ───────────────────────────────────────
 function addAnglerDetailPage(doc, catchDetail, sectionTitle,
-                              compName, venue, dayLabel, fishingDate, dateStr, isFinal, linesIn, linesUp, hrs, days) {
+                              compName, venue, dayLabel, fishingDate, dateStr, isFinal, linesIn, linesUp, hrs, days, dayStatus) {
   doc.addPage()
-  addHeader(doc, compName, venue, dayLabel, fishingDate, isFinal, linesIn, linesUp, hrs)
+  addHeader(doc, compName, venue, dayLabel, fishingDate, isFinal, linesIn, linesUp, hrs, dayStatus)
   let y = 40
 
   doc.setFontSize(10); doc.setFont('helvetica', 'bold')
@@ -474,7 +485,7 @@ function addAnglerDetailPage(doc, catchDetail, sectionTitle,
     if (y + neededH > doc.internal.pageSize.height - 20) {
       addFooter(doc, compName, dayLabel, dateStr)
       doc.addPage()
-      addHeader(doc, compName, venue, dayLabel, fishingDate, isFinal)
+      addHeader(doc, compName, venue, dayLabel, fishingDate, isFinal, null, null, null, dayStatus)
       y = 40
     }
 
@@ -617,15 +628,16 @@ export async function generateResultsPDF(supabase, dayNumber = null) {
   const topCatches     = calcTopCatches(d.catches, d.anglers, d.teams, isFinal ? 10 : 5)
   const skippers       = calcSkipperGP(d.catches, d.teams, d.boats, fishingHours)
   const natCatchDetail = calcAnglerCatchDetail(d.catches, d.anglers, d.teams, fishingHours, d.days)
+  const dayStatus      = fishingDay?.day_status || 'fishing'
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
 
   // Page 1 — Nationals only
-  addNationalsPage1(doc, natStandings, topCatches, skippers, dayLabel, fishingDate, dateStr, compName, venue, isFinal, linesIn, linesUp, fishingHours, d.days)
+  addNationalsPage1(doc, natStandings, topCatches, skippers, dayLabel, fishingDate, dateStr, compName, venue, isFinal, linesIn, linesUp, fishingHours, d.days, dayStatus)
 
   // Page 2+ — Nationals angler detail
   addAnglerDetailPage(doc, natCatchDetail, 'Nationals — Individual Angler Catches',
-                      compName, venue, dayLabel, fishingDate, dateStr, isFinal, linesIn, linesUp, fishingHours, d.days)
+                      compName, venue, dayLabel, fishingDate, dateStr, isFinal, linesIn, linesUp, fishingHours, d.days, dayStatus)
 
   const filename = isFinal
     ? 'TunaNationals2026_FinalResults.pdf'
@@ -657,15 +669,16 @@ export async function generateIntResultsPDF(supabase, dayNumber = null) {
   const intAngScores   = calcAnglerScores(d.catches, d.anglers, d.teams, fishingHours)
   const topCatches     = calcTopCatches(d.catches, d.anglers, d.teams, isFinal ? 10 : 5)
   const intCatchDetail = calcAnglerCatchDetail(d.catches, d.anglers, d.teams, fishingHours, d.days)
+  const dayStatus      = fishingDay?.day_status || 'fishing'
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
 
   // Page 1 — International only
-  addInternationalPage1(doc, intStandings, intAngScores, topCatches, dayLabel, fishingDate, dateStr, compName, venue, isFinal, linesIn, linesUp, fishingHours)
+  addInternationalPage1(doc, intStandings, intAngScores, topCatches, dayLabel, fishingDate, dateStr, compName, venue, isFinal, linesIn, linesUp, fishingHours, dayStatus)
 
   // Page 2+ — International angler detail
   addAnglerDetailPage(doc, intCatchDetail, 'International — Individual Angler Catches',
-                      compName, venue, dayLabel, fishingDate, dateStr, isFinal, linesIn, linesUp, fishingHours, d.days)
+                      compName, venue, dayLabel, fishingDate, dateStr, isFinal, linesIn, linesUp, fishingHours, d.days, dayStatus)
 
   const filename = isFinal
     ? 'TunaInternational2026_FinalResults.pdf'
