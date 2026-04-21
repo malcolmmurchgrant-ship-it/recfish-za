@@ -353,16 +353,23 @@ function addNationalsPage1(doc, natStandings, topCatches, skippers,
     margin: { left: 10, right: 10 },
   })
 
-  // Cancelled days footnote
+  // Cancelled days footnote — positioned after last table, new page if needed
   const cancelledNotes = getCancelledDaySummary(days || [])
   if (cancelledNotes.length > 0) {
-    const W2 = doc.internal.pageSize.width
-    const fy = doc.internal.pageSize.height - 20
-    doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(...RED_TXT)
+    let fy = doc.lastAutoTable.finalY + 6
+    const neededH = 5 + (cancelledNotes.length * 4.5)
+    const pageH = doc.internal.pageSize.height
+    if (fy + neededH > pageH - 14) {
+      addFooter(doc, compName, dayLabel, dateStr)
+      doc.addPage()
+      addHeader(doc, compName, venue, dayLabel, fishingDate, isFinal, linesIn, linesUp, hrs, dayStatus)
+      fy = 44
+    }
+    doc.setFontSize(7.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(...RED_TXT)
     doc.text('Note — Non-fishing days:', 10, fy)
     doc.setFont('helvetica', 'normal')
     cancelledNotes.forEach((note, i) => {
-      doc.text(note, 10, fy + 4 + (i * 4))
+      doc.text(note, 10, fy + 5 + (i * 4.5))
     })
   }
   addFooter(doc, compName, dayLabel, dateStr)
