@@ -479,9 +479,23 @@ function addAnglerDetailPage(doc, catchDetail, sectionTitle,
       doc.line(10, y + 6, W - 10, y + 6)
       y += 6
 
-      // Catch rows
-      const sorted = [...ang.catches].sort((a, b) => b.pts - a.pts)
+      // Catch rows — grouped by day, then sorted by points desc within each day
+      const sorted = [...ang.catches].sort((a, b) => {
+        if (a.day !== b.day) return (a.day || 999) - (b.day || 999)
+        return b.pts - a.pts
+      })
+      let lastDay = null
       sorted.forEach((c, i) => {
+        // Day group header
+        if (c.day && c.day !== lastDay) {
+          lastDay = c.day
+          const dayHeaderLabel = c.date ? `Day ${c.day}  —  ${c.date}` : `Day ${c.day}`
+          doc.setFillColor(...PALE_BLU)
+          doc.rect(10, y, W - 20, 5, 'F')
+          doc.setTextColor(...NAVY); doc.setFontSize(7); doc.setFont('helvetica', 'bold')
+          doc.text(dayHeaderLabel, 20, y + 3.5)
+          y += 5
+        }
         const bg = i % 2 === 0 ? [248, 250, 252] : WHITE
         doc.setFillColor(...bg)
         doc.rect(10, y, W - 20, 6, 'F')
@@ -491,12 +505,6 @@ function addAnglerDetailPage(doc, catchDetail, sectionTitle,
         doc.text(`${i + 1}.`, 16, y + 4, { align: 'center' })
         doc.setTextColor(...DARK); doc.setFontSize(8)
         doc.text(c.species, 20, y + 4)
-        // Day / date label
-        if (c.day) {
-          const dayLabel = c.date ? `Day ${c.day}  •  ${c.date}` : `Day ${c.day}`
-          doc.setTextColor(...GRAY); doc.setFontSize(7); doc.setFont('helvetica', 'oblique')
-          doc.text(dayLabel, 72, y + 4)
-        }
         doc.setTextColor(...DARK); doc.setFontSize(8); doc.setFont('helvetica', 'normal')
         doc.text(`${c.weight.toFixed(2)} kg`, 112, y + 4, { align: 'right' })
         doc.text(c.lc, 126, y + 4, { align: 'center' })
