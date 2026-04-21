@@ -67,6 +67,15 @@ function getCancelledDaySummary(days) {
     })
 }
 
+function getTotalFishingHours(days) {
+  // Sum hours from fishing days only — excludes cancelled and rest days
+  const activeDays = (days || []).filter(d =>
+    d.day_status === 'fishing' || !d.day_status
+  )
+  if (activeDays.length === 0) return FISHING_HOURS_DEFAULT
+  return activeDays.reduce((sum, d) => sum + getFishingHours(d), 0)
+}
+
 const TEAM_LOGOS = {
   'SADSAA Masters':           '/logos/SADSAA Logo.png',
   'SADSAA':                   '/logos/SADSAA Logo.png',
@@ -255,6 +264,8 @@ function addHeader(doc, compName, venue, dayLabel, fishingDate, isFinal = false,
       : `${dayLabel}  •  ${fishingDate}  •  ⛔ DAY CANCELLED — during fishing`
     doc.setTextColor(...[254, 202, 202])
     doc.text(cancelText, 32, 30)
+  } else if (isFinal) {
+    doc.text(`${dayLabel}  •  ${fishingDate}  •  Total fishing: ${h} hrs`, 32, 30)
   } else {
     doc.text(`${dayLabel}  •  ${fishingDate}  •  Fishing: ${li}–${lu} (${h} hrs)`, 32, 30)
   }
@@ -627,7 +638,8 @@ export async function generateResultsPDF(supabase, dayNumber = null) {
     : (fishingDay?.date
         ? new Date(fishingDay.date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })
         : dateStr)
-  const fishingHours = getFishingHours(fishingDay)
+  // For finals: sum hours across all non-cancelled days; for single day: use that day's hours
+  const fishingHours = isFinal ? getTotalFishingHours(d.days) : getFishingHours(fishingDay)
   const linesIn  = isFinal ? LINES_IN_DEFAULT  : getLinesIn(fishingDay)
   const linesUp  = isFinal ? LINES_UP_DEFAULT  : getLinesUp(fishingDay)
 
@@ -668,7 +680,7 @@ export async function generateIntResultsPDF(supabase, dayNumber = null) {
     : (fishingDay?.date
         ? new Date(fishingDay.date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })
         : dateStr)
-  const fishingHours = getFishingHours(fishingDay)
+  const fishingHours = isFinal ? getTotalFishingHours(d.days) : getFishingHours(fishingDay)
   const linesIn  = isFinal ? LINES_IN_DEFAULT  : getLinesIn(fishingDay)
   const linesUp  = isFinal ? LINES_UP_DEFAULT  : getLinesUp(fishingDay)
 
