@@ -503,7 +503,7 @@ function addAnglerDetailPage(doc, catchDetail, sectionTitle,
     if (y + neededH > doc.internal.pageSize.height - 20) {
       addFooter(doc, compName, dayLabel, dateStr)
       doc.addPage()
-      addHeader(doc, compName, venue, dayLabel, fishingDate, isFinal, null, null, null, dayStatus)
+      addHeader(doc, compName, venue, dayLabel, fishingDate, isFinal, linesIn, linesUp, hrs, dayStatus)
       y = 40
     }
 
