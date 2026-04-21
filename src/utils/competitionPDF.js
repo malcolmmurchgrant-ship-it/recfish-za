@@ -24,6 +24,10 @@ const GRAY      = [107, 114, 128]
 const WHITE     = [255, 255, 255]
 const GOLD_TXT  = [180, 120, 0]
 const ORANGE_TXT= [146, 64, 14]
+const RED_LIGHT = [254, 226, 226]
+const RED_TXT   = [153,  27,  27]
+const AMBER_BG  = [254, 243, 199]
+const AMBER_TXT = [146,  64,  14]
 
 const NAT_COMP_ID    = 'ff6e95a9-4f9e-4b54-ad47-a913831d336c'
 const INT_COMP_ID    = '4a905558-8a94-4dc2-8305-bce37bfc1fe4'
@@ -46,6 +50,21 @@ function getLinesIn(dayRecord) {
 
 function getLinesUp(dayRecord) {
   return dayRecord?.fishing_end_time?.slice(0,5) || LINES_UP_DEFAULT
+}
+
+function getCancelledDaySummary(days) {
+  return (days || [])
+    .filter(d => d.day_status === 'cancelled_before' || d.day_status === 'cancelled_during' || d.day_status === 'rest_day')
+    .sort((a, b) => a.day_number - b.day_number)
+    .map(d => {
+      const dateStr = d.date
+        ? new Date(d.date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
+        : ''
+      if (d.day_status === 'rest_day') return `Day ${d.day_number} (${dateStr}): Rest / travel day`
+      const when = d.day_status === 'cancelled_before' ? 'before start' : `during fishing at ${(d.cancellation_time || '').slice(0,5)}`
+      const reason = d.cancellation_reason ? ` — ${d.cancellation_reason}` : ''
+      return `Day ${d.day_number} (${dateStr}): Cancelled ${when}${reason}`
+    })
 }
 
 const TEAM_LOGOS = {
@@ -252,7 +271,7 @@ function medalFill(data) {
 
 // ── NATIONALS PAGE 1 ─────────────────────────────────────────
 function addNationalsPage1(doc, natStandings, topCatches, skippers,
-                            dayLabel, fishingDate, dateStr, compName, venue, isFinal, linesIn, linesUp, hrs) {
+                            dayLabel, fishingDate, dateStr, compName, venue, isFinal, linesIn, linesUp, hrs, days) {
   addHeader(doc, compName, venue, dayLabel, fishingDate, isFinal, linesIn, linesUp, hrs)
   let y = 40
 
@@ -323,6 +342,18 @@ function addNationalsPage1(doc, natStandings, topCatches, skippers,
     margin: { left: 10, right: 10 },
   })
 
+  // Cancelled days footnote
+  const cancelledNotes = getCancelledDaySummary(days || [])
+  if (cancelledNotes.length > 0) {
+    const W2 = doc.internal.pageSize.width
+    const fy = doc.internal.pageSize.height - 20
+    doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(...RED_TXT)
+    doc.text('Note — Non-fishing days:', 10, fy)
+    doc.setFont('helvetica', 'normal')
+    cancelledNotes.forEach((note, i) => {
+      doc.text(note, 10, fy + 4 + (i * 4))
+    })
+  }
   addFooter(doc, compName, dayLabel, dateStr)
 }
 
@@ -428,7 +459,7 @@ function addInternationalPage1(doc, intStandings, intAngScores, topCatches,
 
 // ── ANGLER DETAIL PAGES ───────────────────────────────────────
 function addAnglerDetailPage(doc, catchDetail, sectionTitle,
-                              compName, venue, dayLabel, fishingDate, dateStr, isFinal, linesIn, linesUp, hrs) {
+                              compName, venue, dayLabel, fishingDate, dateStr, isFinal, linesIn, linesUp, hrs, days) {
   doc.addPage()
   addHeader(doc, compName, venue, dayLabel, fishingDate, isFinal, linesIn, linesUp, hrs)
   let y = 40
@@ -485,15 +516,22 @@ function addAnglerDetailPage(doc, catchDetail, sectionTitle,
         return b.pts - a.pts
       })
       let lastDay = null
-      sorted.forEach((c, i) => {
+      sorted.forEach((c, i) => {  // days available via closure
         // Day group header
         if (c.day && c.day !== lastDay) {
           lastDay = c.day
+          const dayRecord = (days || []).find(d => d.day_number === c.day)
+          const isCancelledDay = dayRecord?.day_status === 'cancelled_before' || dayRecord?.day_status === 'cancelled_during'
+          const isRestDay = dayRecord?.day_status === 'rest_day'
           const dayHeaderLabel = c.date ? `Day ${c.day}  —  ${c.date}` : `Day ${c.day}`
-          doc.setFillColor(...PALE_BLU)
+          doc.setFillColor(...(isCancelledDay ? RED_LIGHT : isRestDay ? AMBER_BG : PALE_BLU))
           doc.rect(10, y, W - 20, 5, 'F')
-          doc.setTextColor(...NAVY); doc.setFontSize(7); doc.setFont('helvetica', 'bold')
-          doc.text(dayHeaderLabel, 20, y + 3.5)
+          doc.setTextColor(...(isCancelledDay ? RED_TXT : isRestDay ? AMBER_TXT : NAVY))
+          doc.setFontSize(7); doc.setFont('helvetica', 'bold')
+          const cancelSuffix = isCancelledDay
+            ? (dayRecord.day_status === 'cancelled_before' ? '  ⛔ CANCELLED before start' : `  ⛔ CANCELLED during fishing${dayRecord.cancellation_time ? ' at ' + dayRecord.cancellation_time.slice(0,5) : ''}`)
+            : isRestDay ? '  🛟 Rest / travel day' : ''
+          doc.text(dayHeaderLabel + cancelSuffix, 20, y + 3.5)
           y += 5
         }
         const bg = i % 2 === 0 ? [248, 250, 252] : WHITE
@@ -583,11 +621,11 @@ export async function generateResultsPDF(supabase, dayNumber = null) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
 
   // Page 1 — Nationals only
-  addNationalsPage1(doc, natStandings, topCatches, skippers, dayLabel, fishingDate, dateStr, compName, venue, isFinal, linesIn, linesUp, fishingHours)
+  addNationalsPage1(doc, natStandings, topCatches, skippers, dayLabel, fishingDate, dateStr, compName, venue, isFinal, linesIn, linesUp, fishingHours, d.days)
 
   // Page 2+ — Nationals angler detail
   addAnglerDetailPage(doc, natCatchDetail, 'Nationals — Individual Angler Catches',
-                      compName, venue, dayLabel, fishingDate, dateStr, isFinal, linesIn, linesUp, fishingHours)
+                      compName, venue, dayLabel, fishingDate, dateStr, isFinal, linesIn, linesUp, fishingHours, d.days)
 
   const filename = isFinal
     ? 'TunaNationals2026_FinalResults.pdf'
@@ -627,7 +665,7 @@ export async function generateIntResultsPDF(supabase, dayNumber = null) {
 
   // Page 2+ — International angler detail
   addAnglerDetailPage(doc, intCatchDetail, 'International — Individual Angler Catches',
-                      compName, venue, dayLabel, fishingDate, dateStr, isFinal, linesIn, linesUp, fishingHours)
+                      compName, venue, dayLabel, fishingDate, dateStr, isFinal, linesIn, linesUp, fishingHours, d.days)
 
   const filename = isFinal
     ? 'TunaInternational2026_FinalResults.pdf'
