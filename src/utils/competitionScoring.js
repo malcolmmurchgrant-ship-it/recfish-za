@@ -123,10 +123,11 @@ export function calcTeamDayScore(catches) {
   if (!catches || catches.length === 0)
     return { rawTotal: 0, multiplier: 1, finalScore: 0, distinctFamilies: 0, catchCount: 0 }
 
+  const scoringCatches = catches.filter(c => c.species_name !== 'No Catch')
   const familiesPresent = new Set()
   let rawTotal = 0
 
-  catches.forEach(c => {
+  scoringCatches.forEach(c => {
     const family = getFamilyGroup(c.species_name)
     familiesPresent.add(family)
     if (BILLFISH_FAMILIES.includes(family)) return
@@ -146,7 +147,7 @@ export function calcTeamDayScore(catches) {
     multiplier,
     finalScore,
     distinctFamilies,
-    catchCount: catches.length
+    catchCount: scoringCatches.length
   }
 }
 
@@ -167,7 +168,7 @@ export function buildLeaderboard(catches, teams) {
     if (!teamScores[c.team_id].days[c.competition_day_id])
       teamScores[c.team_id].days[c.competition_day_id] = []
     teamScores[c.team_id].days[c.competition_day_id].push(c)
-    teamScores[c.team_id].totalFish++
+    if (c.species_name !== 'No Catch') teamScores[c.team_id].totalFish++
   })
   Object.keys(teamScores).forEach(teamId => {
     let total = 0
@@ -209,16 +210,17 @@ export function isAtTunaBagLimit(anglerDayCatches) {
 export function calcTunaTeamDayScore(catches) {
   if (!catches || catches.length === 0)
     return { totalScore: 0, catchCount: 0, scoringCatches: 0 }
+  const realCatches = catches.filter(c => c.species_name !== 'No Catch')
   let total = 0
   let scoring = 0
-  catches.forEach(c => {
+  realCatches.forEach(c => {
     if (!c.scoring) return
     total += calcTunaPoints(c.weight_kg || 0, c.line_class_kg || 10)
     scoring++
   })
   return {
     totalScore: Math.round(total * 100) / 100,
-    catchCount: catches.length,
+    catchCount: realCatches.length,
     scoringCatches: scoring
   }
 }
@@ -230,7 +232,7 @@ export function buildTunaLeaderboard(catches, teams) {
     if (!teamScores[c.team_id].days[c.competition_day_id])
       teamScores[c.team_id].days[c.competition_day_id] = []
     teamScores[c.team_id].days[c.competition_day_id].push(c)
-    teamScores[c.team_id].totalFish++
+    if (c.species_name !== 'No Catch') teamScores[c.team_id].totalFish++
   })
   Object.keys(teamScores).forEach(teamId => {
     let total = 0

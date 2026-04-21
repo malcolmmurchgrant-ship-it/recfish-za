@@ -207,7 +207,7 @@ export default function CompetitionCatchLogger() {
   const activeDayRecord = days.find(d => d.day_number === activeDay)
   const isDayHidden = activeDayRecord?.session_status === 'hidden'
   const teamParticipants = participants.filter(p => p.team_id === form.team_id)
-  const anglerDayCatches = dayCatches.filter(c => c.angler_id === form.angler_id)
+  const anglerDayCatches = dayCatches.filter(c => c.angler_id === form.angler_id && c.species_name !== 'No Catch')
   const currentLineClass = teamLineClass[`${form.team_id}_${activeDay}`] || 10
 
   // Get boat for a team
@@ -540,7 +540,7 @@ export default function CompetitionCatchLogger() {
                   style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: bagLimitReached ? '2px solid #ef4444' : '1px solid #d1d5db', fontSize: '0.9rem', background: !form.team_id ? '#f9fafb' : 'white' }}>
                   <option value="">— Select angler —</option>
                   {teamParticipants.map(p => {
-                    const cnt = dayCatches.filter(c => c.angler_id === p.id).length
+                    const cnt = dayCatches.filter(c => c.angler_id === p.id && c.species_name !== 'No Catch').length
                     return <option key={p.id} value={p.id}>{p.full_name} ({p.category}) — {cnt}/{isTuna ? TUNA_BAG_LIMIT : GAMEFISH_BAG_LIMIT}</option>
                   })}
                 </select>
@@ -688,7 +688,7 @@ export default function CompetitionCatchLogger() {
 
             {/* Day catches list */}
             <h3 style={{ fontWeight: '700', color: '#1f2937', fontSize: '0.9rem', marginBottom: '0.6rem' }}>
-              Day {activeDay} Catches ({dayCatches.length})
+              Day {activeDay} Catches ({dayCatches.filter(c => c.species_name !== 'No Catch').length})
             </h3>
             {dayCatches.length === 0 ? (
               <div style={{ background: 'white', borderRadius: '8px', padding: '2rem', textAlign: 'center', color: '#9ca3af', fontSize: '0.875rem' }}>
