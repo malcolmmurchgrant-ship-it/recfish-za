@@ -388,7 +388,7 @@ function addNationalsPage1(doc, natStandings, topCatches, skippers,
 
 // ── INTERNATIONAL PAGE 1 ──────────────────────────────────────
 function addInternationalPage1(doc, intStandings, intAngScores, topCatches,
-                                dayLabel, fishingDate, dateStr, compName, venue, isFinal, linesIn, linesUp, hrs, dayStatus) {
+                                dayLabel, fishingDate, dateStr, compName, venue, isFinal, linesIn, linesUp, hrs, dayStatus, days) {
   addHeader(doc, compName, venue, dayLabel, fishingDate, isFinal, linesIn, linesUp, hrs, dayStatus)
   let y = 40
 
@@ -483,6 +483,25 @@ function addInternationalPage1(doc, intStandings, intAngScores, topCatches,
     margin: { left: 10, right: 10 },
   })
 
+  // Cancelled days footnote — positioned after last table, new page if needed
+  const cancelledNotes = getCancelledDaySummary(days || [])
+  if (cancelledNotes.length > 0) {
+    let fy = doc.lastAutoTable.finalY + 6
+    const neededH = 5 + (cancelledNotes.length * 4.5)
+    const pageH = doc.internal.pageSize.height
+    if (fy + neededH > pageH - 14) {
+      addFooter(doc, compName, dayLabel, dateStr)
+      doc.addPage()
+      addHeader(doc, compName, venue, dayLabel, fishingDate, isFinal, linesIn, linesUp, hrs, dayStatus)
+      fy = 44
+    }
+    doc.setFontSize(7.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(...RED_TXT)
+    doc.text('Note — Non-fishing days:', 10, fy)
+    doc.setFont('helvetica', 'normal')
+    cancelledNotes.forEach((note, i) => {
+      doc.text(note, 10, fy + 5 + (i * 4.5))
+    })
+  }
   addFooter(doc, compName, dayLabel, dateStr)
 }
 
@@ -693,7 +712,7 @@ export async function generateIntResultsPDF(supabase, dayNumber = null) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
 
   // Page 1 — International only
-  addInternationalPage1(doc, intStandings, intAngScores, topCatches, dayLabel, fishingDate, dateStr, compName, venue, isFinal, linesIn, linesUp, fishingHours, dayStatus)
+  addInternationalPage1(doc, intStandings, intAngScores, topCatches, dayLabel, fishingDate, dateStr, compName, venue, isFinal, linesIn, linesUp, fishingHours, dayStatus, d.days)
 
   // Page 2+ — International angler detail
   addAnglerDetailPage(doc, intCatchDetail, 'International — Individual Angler Catches',
