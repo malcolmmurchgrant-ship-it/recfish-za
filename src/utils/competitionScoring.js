@@ -52,7 +52,7 @@ const GAMEFISH_FAMILY_GROUPS = {
 
 // ── TUNA CONSTANTS ──────────────────────────────────────────
 const TUNA_BAG_LIMIT = 10
-const TUNA_LINE_CLASS_FACTORS = { 10: 0.32, 15: 0.142 }
+const TUNA_LINE_CLASS_FACTORS = { 10: 32/100, 15: 32/225 }
 const TUNA_MIN_WEIGHTS = {
   'Longfin Tuna': 10,
   'Yellowfin Tuna': 20,
