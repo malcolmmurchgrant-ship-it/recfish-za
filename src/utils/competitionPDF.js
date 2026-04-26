@@ -94,8 +94,8 @@ const TEAM_LOGOS = {
 
 // ── SCORING ───────────────────────────────────────────────────
 function tunaPoints(weightKg, lineClassKg) {
-  const factors = { 10: 0.32, 15: 0.142 }
-  const f = factors[parseInt(lineClassKg || 10)] || 0.32
+  const factors = { 10: 32/100, 15: 32/225 }
+  const f = factors[parseInt(lineClassKg || 10)] || 32/100
   return parseFloat((Math.pow(weightKg, 2) * f).toFixed(2))
 }
 
