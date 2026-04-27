@@ -518,7 +518,8 @@ function addAnglerDetailPage(doc, catchDetail, sectionTitle,
   const W = doc.internal.pageSize.width
 
   catchDetail.forEach(ang => {
-    const neededH = 8 + (ang.catches.length * 6) + (ang.fish > 0 ? 7 : 0) + 5
+    const uniqueDays = new Set(ang.catches.map(c => c.day)).size
+    const neededH = 8 + (ang.catches.length * 6) + (ang.fish > 0 ? 7 : 0) + 5 + (uniqueDays * 5)
     if (y + neededH > doc.internal.pageSize.height - 20) {
       addFooter(doc, compName, dayLabel, dateStr)
       doc.addPage()
@@ -563,11 +564,33 @@ function addAnglerDetailPage(doc, catchDetail, sectionTitle,
         if (a.day !== b.day) return (a.day || 999) - (b.day || 999)
         return b.pts - a.pts
       })
+      // Group catches by day for subtotals
+      const catchesByDay = {}
+      sorted.forEach(c => {
+        const dk = c.day || 0
+        if (!catchesByDay[dk]) catchesByDay[dk] = []
+        catchesByDay[dk].push(c)
+      })
+
       let lastDay = null
+      let catchIndex = 0
       sorted.forEach((c, i) => {  // days available via closure
         // Day group header
         if (c.day && c.day !== lastDay) {
+          // Draw subtotal for previous day before starting new day header
+          if (lastDay !== null) {
+            const prevDayCatches = catchesByDay[lastDay] || []
+            const dayPts = prevDayCatches.filter(x => x.scoring).reduce((s, x) => s + x.pts, 0)
+            const dayFish = prevDayCatches.filter(x => x.scoring).length
+            const dayKg = prevDayCatches.filter(x => x.scoring).reduce((s, x) => s + x.weight, 0)
+            doc.setFillColor(...[226, 232, 240])
+            doc.rect(10, y, W - 20, 5, 'F')
+            doc.setTextColor(...NAVY); doc.setFontSize(7); doc.setFont('helvetica', 'bold')
+            doc.text(`Day ${lastDay} total:  ${dayFish} fish  •  ${dayKg.toFixed(2)} kg  •  ${dayPts.toLocaleString('en-ZA', { minimumFractionDigits: 2 })} pts`, W - 12, y + 3.5, { align: 'right' })
+            y += 5
+          }
           lastDay = c.day
+          catchIndex = 0
           const dayRecord = (days || []).find(d => d.day_number === c.day)
           const isCancelledDay = dayRecord?.day_status === 'cancelled_before' || dayRecord?.day_status === 'cancelled_during'
           const isRestDay = dayRecord?.day_status === 'rest_day'
@@ -582,7 +605,8 @@ function addAnglerDetailPage(doc, catchDetail, sectionTitle,
           doc.text(dayHeaderLabel + cancelSuffix, 20, y + 3.5)
           y += 5
         }
-        const bg = i % 2 === 0 ? [248, 250, 252] : WHITE
+        const bg = catchIndex % 2 === 0 ? [248, 250, 252] : WHITE
+        catchIndex++
         doc.setFillColor(...bg)
         doc.rect(10, y, W - 20, 6, 'F')
         doc.setDrawColor(...[229, 231, 235]); doc.setLineWidth(0.1)
@@ -603,6 +627,18 @@ function addAnglerDetailPage(doc, catchDetail, sectionTitle,
         }
         y += 6
       })
+      // Draw subtotal for the final day
+      if (lastDay !== null) {
+        const lastDayCatches = catchesByDay[lastDay] || []
+        const dayPts = lastDayCatches.filter(x => x.scoring).reduce((s, x) => s + x.pts, 0)
+        const dayFish = lastDayCatches.filter(x => x.scoring).length
+        const dayKg = lastDayCatches.filter(x => x.scoring).reduce((s, x) => s + x.weight, 0)
+        doc.setFillColor(...[226, 232, 240])
+        doc.rect(10, y, W - 20, 5, 'F')
+        doc.setTextColor(...NAVY); doc.setFontSize(7); doc.setFont('helvetica', 'bold')
+        doc.text(`Day ${lastDay} total:  ${dayFish} fish  •  ${dayKg.toFixed(2)} kg  •  ${dayPts.toLocaleString('en-ZA', { minimumFractionDigits: 2 })} pts`, W - 12, y + 3.5, { align: 'right' })
+        y += 5
+      }
     } else {
       doc.setFillColor(...[249, 250, 251])
       doc.rect(10, y, W - 20, 6, 'F')

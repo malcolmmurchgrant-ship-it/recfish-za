@@ -54,6 +54,71 @@ export default function MyCatches() {
     }
   }
 
+  const downloadCSV = () => {
+    const headers = ['Date', 'Species', 'Scientific Name', 'Weight (kg)', 'Length (cm)', 'Released', 'Notes']
+    const rows = catches.map(c => [
+      new Date(c.caught_at).toLocaleDateString('en-ZA'),
+      c.species?.catalogue_name || c.species?.common_name || 'Unknown',
+      c.species?.scientific_name || '',
+      c.weight_kg || '',
+      c.length_cm || '',
+      c.released ? 'Yes' : 'No',
+      c.notes || ''
+    ])
+    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `RecFishZA_MyCatches_${new Date().toISOString().slice(0,10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const downloadPDF = () => {
+    // Build printable HTML and open in new window for browser print-to-PDF
+    const rows = catches.map((c, i) => `
+      <tr style="background:${i % 2 === 0 ? '#f8fafc' : '#ffffff'}">
+        <td>${new Date(c.caught_at).toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric' })}</td>
+        <td><strong>${c.species?.catalogue_name || c.species?.common_name || 'Unknown'}</strong><br/><em style="color:#6b7280;font-size:0.8em">${c.species?.scientific_name || ''}</em></td>
+        <td>${c.weight_kg ? c.weight_kg + ' kg' : '—'}</td>
+        <td>${c.length_cm ? c.length_cm + ' cm' : '—'}</td>
+        <td>${c.released ? '<span style="color:#065f46;background:#d1fae5;padding:2px 6px;border-radius:4px;font-size:0.8em">Released</span>' : '—'}</td>
+        <td style="color:#6b7280;font-size:0.85em">${c.notes || ''}</td>
+      </tr>`).join('')
+    const html = `<!DOCTYPE html><html><head><title>My Catches — RecFish ZA</title>
+    <style>
+      body { font-family: Arial, sans-serif; font-size: 13px; color: #1f2937; margin: 24px; }
+      h1 { color: #1e3a8a; font-size: 22px; margin-bottom: 4px; }
+      .subtitle { color: #6b7280; font-size: 13px; margin-bottom: 16px; }
+      .stats { display: flex; gap: 24px; margin-bottom: 20px; padding: 12px 16px; background: #eff6ff; border-radius: 8px; }
+      .stat label { font-size: 11px; color: #6b7280; display: block; }
+      .stat span { font-size: 18px; font-weight: bold; color: #1e3a8a; }
+      table { width: 100%; border-collapse: collapse; }
+      th { background: #1e3a8a; color: white; padding: 8px 10px; text-align: left; font-size: 12px; }
+      td { padding: 7px 10px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+      .footer { margin-top: 20px; color: #9ca3af; font-size: 11px; text-align: center; }
+      @media print { body { margin: 12px; } }
+    </style></head><body>
+    <h1>My Catches — RecFish ZA</h1>
+    <div class="subtitle">Generated ${new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+    <div class="stats">
+      <div class="stat"><label>Total Catches</label><span>${stats.total}</span></div>
+      <div class="stat"><label>Released</label><span>${stats.released}</span></div>
+      <div class="stat"><label>Total Weight</label><span>${stats.totalWeight.toFixed(1)} kg</span></div>
+    </div>
+    <table>
+      <thead><tr><th>Date</th><th>Species</th><th>Weight</th><th>Length</th><th>Status</th><th>Notes</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="footer">RecFish ZA • recfish-za.netlify.app</div>
+    <script>window.onload = () => window.print()</script>
+    </body></html>`
+    const w = window.open('', '_blank')
+    w.document.write(html)
+    w.document.close()
+  }
+
   const deleteCatch = async (catchId) => {
     if (!confirm('Are you sure you want to delete this catch?')) return
 
@@ -78,12 +143,22 @@ export default function MyCatches() {
 
   return (
     <div>
-      <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '1rem' }}>
-        My Catches
-      </h1>
-      <p style={{ color: '#6b7280', marginBottom: '2rem' }}>
-        Your personal fishing log
-      </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+        <div>
+          <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '0.25rem' }}>My Catches</h1>
+          <p style={{ color: '#6b7280', margin: 0 }}>Your personal fishing log</p>
+        </div>
+        {catches.length > 0 && (
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button onClick={downloadCSV} style={{ padding: '0.5rem 1rem', background: '#166534', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' }}>
+              ⬇ CSV
+            </button>
+            <button onClick={downloadPDF} style={{ padding: '0.5rem 1rem', background: '#1e3a8a', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' }}>
+              ⬇ PDF
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Stats */}
       <div style={{
