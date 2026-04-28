@@ -1,13 +1,20 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { supabase } from '../lib/supabase'
 import { useSession } from '../contexts/SessionContext'
-import GridInput from './GridInput'
 
 export default function StartSessionModal({ isOpen, onClose }) {
   const { startSession } = useSession()
   const [loading, setLoading] = useState(false)
+  const [launchSites, setLaunchSites] = useState([])
+  const [launchSearch, setLaunchSearch] = useState('')
+  const [showLaunchDropdown, setShowLaunchDropdown] = useState(false)
+  const [selectedLaunchSite, setSelectedLaunchSite] = useState(null)
   const [formData, setFormData] = useState({
     location_description: '',
     grid_reference: '',
+    launch_site_id: null,
+    fine_grid_id: null,
+    coarse_grid_id: null,
     weather_conditions: '',
     sea_state: '',
     water_temp_c: '',
@@ -18,6 +25,49 @@ export default function StartSessionModal({ isOpen, onClose }) {
     notes: ''
   })
 
+  useEffect(() => {
+    loadLaunchSites()
+  }, [])
+
+  const loadLaunchSites = async () => {
+    const { data } = await supabase
+      .from('launch_sites')
+      .select('id, name, coastal_area, fine_grid_id, coarse_grid_id')
+      .order('coastal_area', { ascending: true })
+      .order('name', { ascending: true })
+    setLaunchSites(data || [])
+  }
+
+  const filteredSites = launchSites.filter(s =>
+    s.name.toLowerCase().includes(launchSearch.toLowerCase()) ||
+    (s.coastal_area || '').toLowerCase().includes(launchSearch.toLowerCase())
+  ).slice(0, 10)
+
+  const selectLaunchSite = (site) => {
+    setSelectedLaunchSite(site)
+    setLaunchSearch(site.name)
+    setShowLaunchDropdown(false)
+    setFormData(f => ({
+      ...f,
+      launch_site_id: site.id,
+      fine_grid_id: site.fine_grid_id,
+      coarse_grid_id: site.coarse_grid_id,
+      location_description: site.name,
+      grid_reference: site.fine_grid_id ? String(site.fine_grid_id) : f.grid_reference
+    }))
+  }
+
+  const clearLaunchSite = () => {
+    setSelectedLaunchSite(null)
+    setLaunchSearch('')
+    setFormData(f => ({
+      ...f,
+      launch_site_id: null,
+      fine_grid_id: null,
+      coarse_grid_id: null
+    }))
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
@@ -26,7 +76,10 @@ export default function StartSessionModal({ isOpen, onClose }) {
       ...formData,
       water_temp_c: formData.water_temp_c ? parseFloat(formData.water_temp_c) : null,
       wind_speed_knots: formData.wind_speed_knots ? parseInt(formData.wind_speed_knots) : null,
-      grid_reference: formData.grid_reference || null
+      grid_reference: formData.grid_reference || null,
+      launch_site_id: formData.launch_site_id || null,
+      fine_grid_id: formData.fine_grid_id || null,
+      coarse_grid_id: formData.coarse_grid_id || null
     }
 
     const result = await startSession(sessionData)
@@ -100,12 +153,72 @@ export default function StartSessionModal({ isOpen, onClose }) {
             />
           </div>
 
-          {/* Grid Reference */}
-          <GridInput
-            value={formData.grid_reference}
-            onChange={(value) => setFormData({ ...formData, grid_reference: value })}
-            label="Grid Reference (5-digit, Optional)"
-          />
+          {/* Launch Site Selector */}
+          <div style={{ marginBottom: '1.25rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+              Launch Site <span style={{ color: '#6b7280', fontWeight: '400', fontSize: '0.85rem' }}>— auto-assigns grid reference</span>
+            </label>
+            <div style={{ position: 'relative' }}>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input
+                  type="text"
+                  value={launchSearch}
+                  onChange={(e) => { setLaunchSearch(e.target.value); setShowLaunchDropdown(true) }}
+                  onFocus={() => setShowLaunchDropdown(true)}
+                  placeholder="Search launch site or coastal area..."
+                  style={{ flex: 1, padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '1rem' }}
+                />
+                {selectedLaunchSite && (
+                  <button type="button" onClick={clearLaunchSite}
+                    style={{ padding: '0.75rem', background: '#fee2e2', color: '#991b1b', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '600' }}>
+                    ✕
+                  </button>
+                )}
+              </div>
+              {showLaunchDropdown && launchSearch.length > 1 && filteredSites.length > 0 && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'white',
+                  border: '1px solid #d1d5db', borderRadius: '4px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                  zIndex: 100, maxHeight: '220px', overflow: 'auto' }}>
+                  {filteredSites.map(site => (
+                    <div key={site.id} onClick={() => selectLaunchSite(site)}
+                      style={{ padding: '0.6rem 0.75rem', cursor: 'pointer', borderBottom: '1px solid #f3f4f6' }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = '#eff6ff'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'white'}>
+                      <div style={{ fontWeight: '600', fontSize: '0.9rem' }}>{site.name}</div>
+                      <div style={{ fontSize: '0.78rem', color: '#6b7280' }}>
+                        {site.coastal_area}
+                        {site.fine_grid_id && <span style={{ marginLeft: '0.5rem', color: '#1e3a8a', fontFamily: 'monospace' }}>Grid {site.fine_grid_id}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            {selectedLaunchSite && (
+              <div style={{ marginTop: '0.4rem', fontSize: '0.8rem', color: '#166534', background: '#dcfce7',
+                padding: '0.4rem 0.6rem', borderRadius: '4px', display: 'flex', gap: '1rem' }}>
+                <span>✓ {selectedLaunchSite.coastal_area}</span>
+                {selectedLaunchSite.fine_grid_id && <span>Fine grid: <strong>{selectedLaunchSite.fine_grid_id}</strong></span>}
+                {selectedLaunchSite.coarse_grid_id && <span>Coarse grid: <strong>{selectedLaunchSite.coarse_grid_id}</strong></span>}
+              </div>
+            )}
+          </div>
+
+          {/* Manual Grid Reference — shown if no launch site selected */}
+          {!selectedLaunchSite && (
+            <div style={{ marginBottom: '1.25rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                Grid Reference <span style={{ color: '#6b7280', fontWeight: '400', fontSize: '0.85rem' }}>(manual entry if launch site not listed)</span>
+              </label>
+              <input
+                type="text"
+                value={formData.grid_reference}
+                onChange={(e) => setFormData({ ...formData, grid_reference: e.target.value })}
+                placeholder="e.g. 23456"
+                style={{ width: '100%', padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '4px', fontSize: '1rem', fontFamily: 'monospace' }}
+              />
+            </div>
+          )}
 
           {/* Weather & Sea State */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
