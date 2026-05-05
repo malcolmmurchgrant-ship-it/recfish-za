@@ -112,11 +112,15 @@ export default function CompetitionAdminPanel({ onClose }) {
   const [editingDay, setEditingDay] = useState(null)
   const [compSignOff, setCompSignOff] = useState({ td_name: '', td_verified: false })
   const [signOffLoaded, setSignOffLoaded] = useState(false)
+  const [roles, setRoles] = useState([])
+  const [roleEmail, setRoleEmail] = useState('')
+  const [roleValue, setRoleValue] = useState('tournament_director')
+  const [rolesLoading, setRolesLoading] = useState(false)
 
   const userEmail = (user?.email || user?.user_metadata?.email || '').toLowerCase()
   const isAuthorised = AUTHORISED_ADMINS.includes(userEmail)
 
-  useEffect(() => { if (isAuthorised) { loadData(); loadSignOff() } }, [selectedComp])
+  useEffect(() => { if (isAuthorised) { loadData(); loadSignOff(); loadRoles() } }, [selectedComp])
 
   const loadData = async () => {
     setLoading(true)
@@ -299,6 +303,47 @@ export default function CompetitionAdminPanel({ onClose }) {
     setSaving(false)
   }
 
+  // ── ROLES ──────────────────────────────────────────────────────
+  const loadRoles = async () => {
+    const { data } = await supabase
+      .from('competition_user_roles')
+      .select('id, role, user_id')
+      .eq('competition_id', selectedComp)
+    setRoles(data || [])
+  }
+
+  const addRole = async () => {
+    if (!roleEmail.trim()) return showMessage('Email is required', 'error')
+    setRolesLoading(true)
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', roleEmail.trim().toLowerCase())
+      .single()
+    if (userError || !userData) {
+      showMessage('User not found — they must register in the app first.', 'error')
+      setRolesLoading(false)
+      return
+    }
+    const { error } = await supabase.from('competition_user_roles').insert([{
+      competition_id: selectedComp,
+      user_id: userData.id,
+      role: roleValue,
+    }])
+    if (error) showMessage('Error: ' + error.message, 'error')
+    else { showMessage('Role assigned successfully'); setRoleEmail(''); loadRoles() }
+    setRolesLoading(false)
+  }
+
+  const removeRole = async (roleId) => {
+    if (!confirm('Remove this role?')) return
+    setSaving(true)
+    const { error } = await supabase.from('competition_user_roles').delete().eq('id', roleId)
+    if (error) showMessage('Error: ' + error.message, 'error')
+    else { showMessage('Role removed'); loadRoles() }
+    setSaving(false)
+  }
+
   const toggleBlackout = async (dayId, current) => {
     setSaving(true)
     const newStatus = current === 'hidden' ? 'pending' : 'hidden'
@@ -367,7 +412,7 @@ export default function CompetitionAdminPanel({ onClose }) {
 
       {/* Tabs */}
       <div style={{ display: 'flex', background: 'white', borderBottom: '2px solid #e5e7eb' }}>
-        {[['boats','Boats & Skippers'],['teams','Teams & Anglers'],['catches','Catches'],['days','Days']].map(([v, label]) => (
+        {[['boats','Boats & Skippers'],['teams','Teams & Anglers'],['catches','Catches'],['days','Days'],['roles','Roles']].map(([v, label]) => (
           <button key={v} onClick={() => setTab(v)} style={{
             flex: 1, padding: '0.7rem 0.25rem', border: 'none', cursor: 'pointer',
             fontWeight: '600', fontSize: '0.72rem', background: 'none',
@@ -812,6 +857,99 @@ export default function CompetitionAdminPanel({ onClose }) {
               </button>
             </div>
 
+          </div>
+        )}
+
+        {/* ── ROLES TAB ── */}
+        {tab === 'roles' && (
+          <div>
+            <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '1rem' }}>
+              Assign roles to registered users for this competition. The user must have signed up
+              at recfish-za.netlify.app before they can be assigned a role.
+            </p>
+
+            {/* Assign new role */}
+            <div style={{ background: 'white', borderRadius: '8px', padding: '1rem', marginBottom: '1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+              <div style={{ fontWeight: '700', fontSize: '0.875rem', color: NAVY, marginBottom: '0.75rem' }}>
+                Assign a Role
+              </div>
+              <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.25rem' }}>
+                User Email
+              </label>
+              <input
+                style={iStyle}
+                type="email"
+                placeholder="e.g. mark.rode@example.com"
+                value={roleEmail}
+                onChange={e => setRoleEmail(e.target.value)}
+              />
+              <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.25rem' }}>
+                Role
+              </label>
+              <select style={iStyle} value={roleValue} onChange={e => setRoleValue(e.target.value)}>
+                <option value="tournament_director">Tournament Director</option>
+                <option value="admin">Admin</option>
+                <option value="skipper">Skipper</option>
+                <option value="angler">Angler</option>
+                <option value="viewer">Viewer</option>
+              </select>
+              <button
+                onClick={addRole}
+                disabled={rolesLoading || !roleEmail.trim()}
+                style={btn('#166534')}
+              >
+                {rolesLoading ? 'Looking up user...' : 'Assign Role'}
+              </button>
+            </div>
+
+            {/* Current roles list */}
+            <div style={{ background: 'white', borderRadius: '8px', padding: '1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+              <div style={{ fontWeight: '700', fontSize: '0.875rem', color: NAVY, marginBottom: '0.75rem' }}>
+                Current Roles ({roles.length})
+              </div>
+              {roles.length === 0 ? (
+                <p style={{ fontSize: '0.85rem', color: '#6b7280', fontStyle: 'italic' }}>
+                  No roles assigned yet for this competition.
+                </p>
+              ) : (
+                roles.map(r => {
+                  const roleColors = {
+                    tournament_director: '#1e40af',
+                    admin: '#7c3aed',
+                    skipper: '#b45309',
+                    angler: '#166534',
+                    viewer: '#6b7280',
+                  }
+                  const roleLabels = {
+                    tournament_director: 'Tournament Director',
+                    admin: 'Admin',
+                    skipper: 'Skipper',
+                    angler: 'Angler',
+                    viewer: 'Viewer',
+                  }
+                  return (
+                    <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.6rem 0', borderBottom: '1px solid #f3f4f6' }}>
+                      <div>
+                        <span style={{ display: 'inline-block', background: roleColors[r.role] || '#6b7280', color: 'white', borderRadius: '4px', padding: '0.15rem 0.5rem', fontSize: '0.75rem', fontWeight: '700', marginRight: '0.5rem' }}>
+                          {roleLabels[r.role] || r.role}
+                        </span>
+                        <span style={{ fontSize: '0.8rem', color: '#374151' }}>
+                          user_id: {r.user_id.slice(0, 8)}…
+                        </span>
+                      </div>
+                      <button onClick={() => removeRole(r.id)} style={smallBtn('#dc2626')}>Remove</button>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+
+            {/* Note about profiles table */}
+            <div style={{ marginTop: '1rem', padding: '0.75rem', background: '#fefce8', border: '1px solid #fde047', borderRadius: '6px', fontSize: '0.8rem', color: '#713f12' }}>
+              <strong>Note:</strong> Role lookup uses the <code>users</code> table. If "User not found" appears
+              for a registered user, run this query in Supabase to check their record exists:<br />
+              <code style={{ fontSize: '0.75rem' }}>SELECT id, email FROM users WHERE email = 'their@email.com';</code>
+            </div>
           </div>
         )}
 
