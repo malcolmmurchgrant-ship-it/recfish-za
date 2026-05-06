@@ -179,7 +179,7 @@ export default function Profile() {
   const [error, setError] = useState('')
   const [clubMemberships, setClubMemberships] = useState([])
   const [addingClub, setAddingClub] = useState(false)
-  const [newClub, setNewClub] = useState({ provincial_body: '', club_name: '', member_since: '' })
+  const [newClub, setNewClub] = useState({ provincial_body: '', club_name: '', member_since: '', angling_number: '' })
 
   const [profile, setProfile] = useState({
     full_name: '',
@@ -202,6 +202,7 @@ export default function Profile() {
     postal_code: '',
     facets: [],
     medical_notes: '',
+    wpdsaa_number: '',
   })
 
   useEffect(() => {
@@ -242,6 +243,7 @@ export default function Profile() {
           postal_code: data.postal_code || '',
           facets: data.facets || [],
           medical_notes: data.medical_notes || '',
+          wpdsaa_number: data.wpdsaa_number || '',
         })
       } else {
         setProfile(prev => ({ ...prev, email: user.email || '' }))
@@ -289,6 +291,7 @@ export default function Profile() {
           postal_code: profile.postal_code.trim() || null,
           facets: profile.facets.length > 0 ? profile.facets : null,
           medical_notes: profile.medical_notes.trim() || null,
+          wpdsaa_number: profile.wpdsaa_number.trim() || null,
           updated_at: new Date().toISOString()
         }, { onConflict: 'id' })
 
@@ -331,11 +334,12 @@ export default function Profile() {
       club_name: newClub.club_name,
       provincial_body: newClub.provincial_body,
       member_since: newClub.member_since || null,
+      angling_number: newClub.angling_number.trim() || null,
       is_primary: isFirst  // first club added is automatically primary
     })
     if (error) { setError('Could not add club: ' + error.message) }
     else {
-      setNewClub({ provincial_body: '', club_name: '', member_since: '' })
+      setNewClub({ provincial_body: '', club_name: '', member_since: '', angling_number: '' })
       const { data } = await supabase.from('angler_club_memberships')
         .select('*').eq('user_id', user.id).order('is_primary', { ascending: false })
       setClubMemberships(data || [])
@@ -612,6 +616,26 @@ export default function Profile() {
             SADSAA is establishing a central membership database. Your number will be assigned shortly.
           </p>
         </div>
+
+        {/* WPDSAA number — shown if member of Western Province */}
+        {(profile.province === 'Western Province Deep Sea Angling Association' ||
+          clubMemberships.some(m => m.provincial_body === 'Western Province Deep Sea Angling Association')) && (
+          <div style={fieldGroupStyle}>
+            <label style={labelStyle}>
+              WPDSAA Angling Number
+              <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', color: '#1e40af', fontWeight: '400' }}>
+                unique to Western Province members
+              </span>
+            </label>
+            <input
+              type="text"
+              value={profile.wpdsaa_number}
+              onChange={e => handleChange('wpdsaa_number', e.target.value)}
+              style={inputStyle}
+              placeholder="e.g. WP-1234"
+            />
+          </div>
+        )}
       </div>
 
       {/* ── SECTION 4: Contact Details ── */}
@@ -755,6 +779,11 @@ export default function Profile() {
                   <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '0.15rem' }}>
                     {m.provincial_body}
                     {m.member_since && ` · Member since ${new Date(m.member_since).getFullYear()} (${Math.floor((new Date() - new Date(m.member_since)) / (1000 * 60 * 60 * 24 * 365.25))} yrs)`}
+                    {m.angling_number && (
+                      <span style={{ marginLeft: '0.5rem', color: '#1e40af', fontWeight: '600' }}>
+                        · #{m.angling_number}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
@@ -803,18 +832,33 @@ export default function Profile() {
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '0.75rem', alignItems: 'flex-end' }}>
-            <div>
-              <label style={{ ...labelStyle, fontSize: '0.78rem' }}>Member Since (optional)</label>
-              <input type="date" value={newClub.member_since}
-                onChange={e => setNewClub(prev => ({ ...prev, member_since: e.target.value }))}
-                style={inputStyle} max={new Date().toISOString().split('T')[0]} />
+            <div style={{ display: 'grid', gridTemplateColumns: newClub.provincial_body === 'Western Province Deep Sea Angling Association' ? '1fr 1fr' : '1fr', gap: '0.75rem' }}>
+              <div>
+                <label style={{ ...labelStyle, fontSize: '0.78rem' }}>Member Since (optional)</label>
+                <input type="date" value={newClub.member_since}
+                  onChange={e => setNewClub(prev => ({ ...prev, member_since: e.target.value }))}
+                  style={inputStyle} max={new Date().toISOString().split('T')[0]} />
+              </div>
+              {newClub.provincial_body === 'Western Province Deep Sea Angling Association' && (
+                <div>
+                  <label style={{ ...labelStyle, fontSize: '0.78rem' }}>
+                    WPDSAA Angling Number
+                    <span style={{ marginLeft: '0.4rem', fontSize: '0.72rem', color: '#1e40af', fontWeight: '400' }}>
+                      (unique to WPDSAA)
+                    </span>
+                  </label>
+                  <input type="text" value={newClub.angling_number}
+                    onChange={e => setNewClub(prev => ({ ...prev, angling_number: e.target.value }))}
+                    style={inputStyle} placeholder="e.g. WP-1234" />
+                </div>
+              )}
             </div>
             <button onClick={addClubMembership} disabled={addingClub || !newClub.club_name}
               style={{
                 padding: '0.75rem 1.25rem', background: addingClub || !newClub.club_name ? '#9ca3af' : '#1e3a8a',
                 color: 'white', border: 'none', borderRadius: '6px', fontWeight: '600',
                 fontSize: '0.875rem', cursor: addingClub || !newClub.club_name ? 'not-allowed' : 'pointer',
-                whiteSpace: 'nowrap'
+                whiteSpace: 'nowrap', alignSelf: 'flex-end'
               }}>
               {addingClub ? 'Adding...' : 'Add Club'}
             </button>
