@@ -177,6 +177,9 @@ export default function Profile() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
+  const [clubMemberships, setClubMemberships] = useState([])
+  const [addingClub, setAddingClub] = useState(false)
+  const [newClub, setNewClub] = useState({ provincial_body: '', club_name: '', member_since: '' })
 
   const [profile, setProfile] = useState({
     full_name: '',
@@ -210,11 +213,11 @@ export default function Profile() {
   const loadProfile = async () => {
     try {
       setLoading(true)
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', user.id)
-        .single()
+      const [{ data, error }, { data: clubs }] = await Promise.all([
+        supabase.from('users').select('*').eq('id', user.id).single(),
+        supabase.from('angler_club_memberships')
+          .select('*').eq('user_id', user.id).order('is_primary', { ascending: false })
+      ])
 
       if (error && error.code !== 'PGRST116') throw error
 
@@ -228,7 +231,6 @@ export default function Profile() {
           club_name: data.club_name || '',
           sadsaa_number: data.angler_number || '',
           email: user.email || '',
-          // Nomination form fields
           id_number: data.id_number || '',
           sa_citizen: data.sa_citizen !== false,
           nationality: data.nationality || '',
@@ -242,9 +244,9 @@ export default function Profile() {
           medical_notes: data.medical_notes || '',
         })
       } else {
-        // New user - pre-fill email
         setProfile(prev => ({ ...prev, email: user.email || '' }))
       }
+      setClubMemberships(clubs || [])
     } catch (err) {
       setError('Failed to load profile: ' + err.message)
     } finally {
@@ -315,6 +317,53 @@ export default function Profile() {
       return { ...prev, facets }
     })
     setSaved(false)
+  }
+
+  const addClubMembership = async () => {
+    if (!newClub.provincial_body || !newClub.club_name) {
+      setError('Please select a province and club')
+      return
+    }
+    setAddingClub(true)
+    const isFirst = clubMemberships.length === 0
+    const { error } = await supabase.from('angler_club_memberships').insert({
+      user_id: user.id,
+      club_name: newClub.club_name,
+      provincial_body: newClub.provincial_body,
+      member_since: newClub.member_since || null,
+      is_primary: isFirst  // first club added is automatically primary
+    })
+    if (error) { setError('Could not add club: ' + error.message) }
+    else {
+      setNewClub({ provincial_body: '', club_name: '', member_since: '' })
+      const { data } = await supabase.from('angler_club_memberships')
+        .select('*').eq('user_id', user.id).order('is_primary', { ascending: false })
+      setClubMemberships(data || [])
+    }
+    setAddingClub(false)
+  }
+
+  const setPrimaryClub = async (membershipId) => {
+    // Clear all primaries for this user, then set the chosen one
+    await supabase.from('angler_club_memberships')
+      .update({ is_primary: false }).eq('user_id', user.id)
+    await supabase.from('angler_club_memberships')
+      .update({ is_primary: true }).eq('id', membershipId)
+    const { data } = await supabase.from('angler_club_memberships')
+      .select('*').eq('user_id', user.id).order('is_primary', { ascending: false })
+    setClubMemberships(data || [])
+  }
+
+  const removeClubMembership = async (membershipId, isPrimary) => {
+    if (isPrimary && clubMemberships.length > 1) {
+      setError('Set another club as primary before removing your primary club.')
+      return
+    }
+    if (!confirm('Remove this club membership?')) return
+    await supabase.from('angler_club_memberships').delete().eq('id', membershipId)
+    const { data } = await supabase.from('angler_club_memberships')
+      .select('*').eq('user_id', user.id).order('is_primary', { ascending: false })
+    setClubMemberships(data || [])
   }
 
   // Calculate age category for display
@@ -676,22 +725,100 @@ export default function Profile() {
         )}
       </div>
 
-      {/* ── SECTION 7: Club Membership ── */}
+      {/* ── SECTION 7: Club Memberships ── */}
       <div style={sectionStyle}>
-        <h2 style={sectionHeaderStyle}>📅 Club Membership</h2>
+        <h2 style={sectionHeaderStyle}>🏅 Club Memberships</h2>
         <p style={{ fontSize: '0.8rem', color: '#9ca3af', marginBottom: '1.25rem', marginTop: '-0.75rem' }}>
-          Nomination form Section 5 — period of membership
+          Nomination form Section 5 — you may belong to multiple clubs. Mark the one through which
+          you are domiciled and will nominate as <strong>Primary</strong>.
         </p>
-        <div style={fieldGroupStyle}>
-          <label style={labelStyle}>Club Member Since</label>
-          <input type="date" value={profile.club_member_since}
-            onChange={e => handleChange('club_member_since', e.target.value)}
-            style={inputStyle} max={new Date().toISOString().split('T')[0]} />
-          {profile.club_member_since && (
-            <p style={{ fontSize: '0.78rem', color: '#6b7280', marginTop: '0.25rem' }}>
-              {Math.floor((new Date() - new Date(profile.club_member_since)) / (1000 * 60 * 60 * 24 * 365.25))} years of membership
-            </p>
-          )}
+
+        {/* Current memberships list */}
+        {clubMemberships.length > 0 && (
+          <div style={{ marginBottom: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+            {clubMemberships.map(m => (
+              <div key={m.id} style={{
+                display: 'flex', alignItems: 'center', gap: '0.75rem',
+                padding: '0.75rem 1rem', borderRadius: '6px', flexWrap: 'wrap',
+                background: m.is_primary ? '#eff6ff' : '#f9fafb',
+                border: `1px solid ${m.is_primary ? '#bfdbfe' : '#e5e7eb'}`
+              }}>
+                <div style={{ flex: 1, minWidth: '200px' }}>
+                  <div style={{ fontWeight: '700', fontSize: '0.9rem', color: '#1e3a8a' }}>
+                    {m.club_name}
+                    {m.is_primary && (
+                      <span style={{ marginLeft: '0.5rem', fontSize: '0.72rem', background: '#1e3a8a', color: 'white', borderRadius: '10px', padding: '0.1rem 0.5rem', fontWeight: '600' }}>
+                        PRIMARY
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '0.15rem' }}>
+                    {m.provincial_body}
+                    {m.member_since && ` · Member since ${new Date(m.member_since).getFullYear()} (${Math.floor((new Date() - new Date(m.member_since)) / (1000 * 60 * 60 * 24 * 365.25))} yrs)`}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
+                  {!m.is_primary && (
+                    <button onClick={() => setPrimaryClub(m.id)}
+                      style={{ padding: '0.3rem 0.7rem', fontSize: '0.78rem', fontWeight: '600', border: '1px solid #bfdbfe', background: 'white', color: '#1e40af', borderRadius: '4px', cursor: 'pointer' }}>
+                      Set Primary
+                    </button>
+                  )}
+                  <button onClick={() => removeClubMembership(m.id, m.is_primary)}
+                    style={{ padding: '0.3rem 0.7rem', fontSize: '0.78rem', fontWeight: '600', border: '1px solid #fecaca', background: '#fee2e2', color: '#991b1b', borderRadius: '4px', cursor: 'pointer' }}>
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Add new club form */}
+        <div style={{ background: '#f9fafb', border: '1px dashed #d1d5db', borderRadius: '6px', padding: '1rem' }}>
+          <p style={{ fontSize: '0.82rem', fontWeight: '600', color: '#374151', marginBottom: '0.75rem' }}>
+            + Add a club membership
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+            <div>
+              <label style={{ ...labelStyle, fontSize: '0.78rem' }}>Provincial Association</label>
+              <select value={newClub.provincial_body}
+                onChange={e => setNewClub(prev => ({ ...prev, provincial_body: e.target.value, club_name: '' }))}
+                style={inputStyle}>
+                <option value="">Select province...</option>
+                {SA_PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ ...labelStyle, fontSize: '0.78rem' }}>Club</label>
+              <select value={newClub.club_name}
+                onChange={e => setNewClub(prev => ({ ...prev, club_name: e.target.value }))}
+                style={{ ...inputStyle, background: newClub.provincial_body ? 'white' : '#f9fafb' }}
+                disabled={!newClub.provincial_body}>
+                <option value="">{newClub.provincial_body ? 'Select club...' : 'Select province first'}</option>
+                {newClub.provincial_body && (SADSAA_PROVINCES_AND_CLUBS[newClub.provincial_body] || []).map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '0.75rem', alignItems: 'flex-end' }}>
+            <div>
+              <label style={{ ...labelStyle, fontSize: '0.78rem' }}>Member Since (optional)</label>
+              <input type="date" value={newClub.member_since}
+                onChange={e => setNewClub(prev => ({ ...prev, member_since: e.target.value }))}
+                style={inputStyle} max={new Date().toISOString().split('T')[0]} />
+            </div>
+            <button onClick={addClubMembership} disabled={addingClub || !newClub.club_name}
+              style={{
+                padding: '0.75rem 1.25rem', background: addingClub || !newClub.club_name ? '#9ca3af' : '#1e3a8a',
+                color: 'white', border: 'none', borderRadius: '6px', fontWeight: '600',
+                fontSize: '0.875rem', cursor: addingClub || !newClub.club_name ? 'not-allowed' : 'pointer',
+                whiteSpace: 'nowrap'
+              }}>
+              {addingClub ? 'Adding...' : 'Add Club'}
+            </button>
+          </div>
         </div>
       </div>
 
