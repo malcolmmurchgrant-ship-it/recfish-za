@@ -412,7 +412,7 @@ export default function CompetitionAdminPanel({ onClose }) {
 
       {/* Tabs */}
       <div style={{ display: 'flex', background: 'white', borderBottom: '2px solid #e5e7eb' }}>
-        {[['boats','Boats & Skippers'],['teams','Teams & Anglers'],['catches','Catches'],['days','Days'],['roles','Roles']].map(([v, label]) => (
+        {[['boats','Boats & Skippers'],['teams','Teams & Anglers'],['catches','Catches'],['days','Days'],['roles','Roles'],['linking','Angler Linking']].map(([v, label]) => (
           <button key={v} onClick={() => setTab(v)} style={{
             flex: 1, padding: '0.7rem 0.25rem', border: 'none', cursor: 'pointer',
             fontWeight: '600', fontSize: '0.72rem', background: 'none',
@@ -953,6 +953,214 @@ export default function CompetitionAdminPanel({ onClose }) {
           </div>
         )}
 
+        {/* ── ANGLER LINKING TAB ── */}
+        {tab === 'linking' && (
+          <AnglerLinkingTab
+            competitionId={selectedComp}
+            supabase={supabase}
+            showMessage={showMessage}
+          />
+        )}
+
+      </div>
+    </div>
+  )
+}
+
+// ── Angler Linking Tab Component ─────────────────────────────────────────────
+function AnglerLinkingTab({ competitionId, supabase, showMessage }) {
+  const [participants, setParticipants] = useState([])
+  const [registeredUsers, setRegisteredUsers] = useState([])
+  const [searchName, setSearchName] = useState('')
+  const [selectedParticipant, setSelectedParticipant] = useState(null)
+  const [selectedUser, setSelectedUser] = useState(null)
+  const [linking, setLinking] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => { if (competitionId) loadData() }, [competitionId])
+
+  const loadData = async () => {
+    setLoading(true)
+    const [{ data: parts }, { data: users }] = await Promise.all([
+      supabase.from('competition_participants')
+        .select(`
+          id, full_name, user_id, category,
+          competition:competition_id ( name )
+        `)
+        .eq('competition_id', competitionId)
+        .order('full_name'),
+      supabase.from('users')
+        .select('id, full_name, email')
+        .order('full_name')
+    ])
+
+    // Get catch counts for each participant
+    const withCounts = await Promise.all((parts || []).map(async (p) => {
+      const { count } = await supabase
+        .from('competition_catches')
+        .select('id', { count: 'exact', head: true })
+        .eq('angler_id', p.user_id)
+        .eq('competition_id', competitionId)
+      return { ...p, catch_count: count || 0 }
+    }))
+
+    // Check which user_ids match real auth accounts
+    const { data: authMatches } = await supabase
+      .from('users')
+      .select('id')
+      .in('id', (parts || []).map(p => p.user_id).filter(Boolean))
+
+    const authIds = new Set((authMatches || []).map(a => a.id))
+    const withStatus = withCounts.map(p => ({
+      ...p,
+      is_linked: authIds.has(p.user_id)
+    }))
+
+    setParticipants(withStatus)
+    setRegisteredUsers(users || [])
+    setLoading(false)
+  }
+
+  const filteredUsers = registeredUsers.filter(u =>
+    !searchName || u.full_name?.toLowerCase().includes(searchName.toLowerCase()) ||
+    u.email?.toLowerCase().includes(searchName.toLowerCase())
+  )
+
+  const linkAngler = async () => {
+    if (!selectedParticipant || !selectedUser) return
+    if (!confirm(
+      `Link ${selectedParticipant.full_name}'s competition record to app user ${selectedUser.full_name} (${selectedUser.email})?\n\n` +
+      `This will update ${selectedParticipant.catch_count} catches.`
+    )) return
+
+    setLinking(true)
+    try {
+      // Update catches
+      const { error: e1 } = await supabase
+        .from('competition_catches')
+        .update({ angler_id: selectedUser.id })
+        .eq('angler_id', selectedParticipant.user_id)
+        .eq('competition_id', competitionId)
+      if (e1) throw e1
+
+      // Update participant
+      const { error: e2 } = await supabase
+        .from('competition_participants')
+        .update({ user_id: selectedUser.id })
+        .eq('id', selectedParticipant.id)
+      if (e2) throw e2
+
+      showMessage(`✅ Linked ${selectedParticipant.full_name} → ${selectedUser.full_name}`)
+      setSelectedParticipant(null)
+      setSelectedUser(null)
+      setSearchName('')
+      loadData()
+    } catch (err) {
+      showMessage('Error: ' + err.message, 'error')
+    }
+    setLinking(false)
+  }
+
+  if (loading) return <p style={{ color: '#6b7280', fontSize: '0.875rem' }}>Loading participants...</p>
+
+  const NAVY = '#1e3a8a'
+
+  return (
+    <div>
+      <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '1rem' }}>
+        Link competition participants to their app accounts. Use this when an angler's name
+        in the competition doesn't exactly match their profile name, so the self-service
+        claim on My Catches didn't trigger automatically.
+      </p>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+
+        {/* Left: Participants */}
+        <div>
+          <div style={{ fontWeight: '700', fontSize: '0.875rem', color: NAVY, marginBottom: '0.5rem' }}>
+            Competition Participants
+          </div>
+          <div style={{ background: 'white', borderRadius: '8px', border: '1px solid #e5e7eb', overflow: 'hidden', maxHeight: '420px', overflowY: 'auto' }}>
+            {participants.map(p => (
+              <div key={p.id}
+                onClick={() => setSelectedParticipant(selectedParticipant?.id === p.id ? null : p)}
+                style={{
+                  padding: '0.65rem 0.85rem', cursor: 'pointer', fontSize: '0.85rem',
+                  borderBottom: '1px solid #f3f4f6',
+                  background: selectedParticipant?.id === p.id ? '#eff6ff' : 'white',
+                  borderLeft: selectedParticipant?.id === p.id ? '3px solid #1e3a8a' : '3px solid transparent'
+                }}>
+                <div style={{ fontWeight: '600', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>{p.full_name}</span>
+                  <span style={{
+                    fontSize: '0.72rem', padding: '0.1rem 0.45rem', borderRadius: '10px',
+                    background: p.is_linked ? '#dcfce7' : '#fef3c7',
+                    color: p.is_linked ? '#166534' : '#92400e', fontWeight: '700'
+                  }}>
+                    {p.is_linked ? '✓ Linked' : '⚠ Unlinked'}
+                  </span>
+                </div>
+                <div style={{ color: '#6b7280', fontSize: '0.78rem', marginTop: '0.15rem' }}>
+                  {p.category} · {p.catch_count} catches
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Right: App users */}
+        <div>
+          <div style={{ fontWeight: '700', fontSize: '0.875rem', color: NAVY, marginBottom: '0.5rem' }}>
+            Registered App Users
+          </div>
+          <input
+            style={{ width: '100%', padding: '0.5rem 0.75rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem', marginBottom: '0.5rem', boxSizing: 'border-box' }}
+            placeholder="Search by name or email..."
+            value={searchName}
+            onChange={e => setSearchName(e.target.value)}
+          />
+          <div style={{ background: 'white', borderRadius: '8px', border: '1px solid #e5e7eb', overflow: 'hidden', maxHeight: '370px', overflowY: 'auto' }}>
+            {filteredUsers.map(u => (
+              <div key={u.id}
+                onClick={() => setSelectedUser(selectedUser?.id === u.id ? null : u)}
+                style={{
+                  padding: '0.65rem 0.85rem', cursor: 'pointer', fontSize: '0.85rem',
+                  borderBottom: '1px solid #f3f4f6',
+                  background: selectedUser?.id === u.id ? '#eff6ff' : 'white',
+                  borderLeft: selectedUser?.id === u.id ? '3px solid #1e3a8a' : '3px solid transparent'
+                }}>
+                <div style={{ fontWeight: '600' }}>{u.full_name || '(no name)'}</div>
+                <div style={{ color: '#6b7280', fontSize: '0.78rem' }}>{u.email}</div>
+              </div>
+            ))}
+            {filteredUsers.length === 0 && (
+              <div style={{ padding: '1rem', color: '#9ca3af', fontSize: '0.85rem', textAlign: 'center' }}>
+                No users found
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Link button */}
+      {selectedParticipant && selectedUser && (
+        <div style={{ marginTop: '1rem', padding: '1rem', background: '#eff6ff', borderRadius: '8px', border: '1px solid #bfdbfe', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div style={{ fontSize: '0.875rem', color: '#1e3a8a' }}>
+            Link <strong>{selectedParticipant.full_name}</strong> ({selectedParticipant.catch_count} catches)
+            → <strong>{selectedUser.full_name}</strong> ({selectedUser.email})
+          </div>
+          <button onClick={linkAngler} disabled={linking}
+            style={{ padding: '0.6rem 1.5rem', background: linking ? '#9ca3af' : NAVY, color: 'white', border: 'none', borderRadius: '6px', fontWeight: '700', fontSize: '0.875rem', cursor: linking ? 'not-allowed' : 'pointer' }}>
+            {linking ? 'Linking...' : 'Confirm Link'}
+          </button>
+        </div>
+      )}
+
+      {/* Status summary */}
+      <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', background: '#f9fafb', borderRadius: '6px', fontSize: '0.8rem', color: '#6b7280', display: 'flex', gap: '1.5rem' }}>
+        <span>✓ Linked: <strong style={{ color: '#166534' }}>{participants.filter(p => p.is_linked).length}</strong></span>
+        <span>⚠ Unlinked: <strong style={{ color: '#92400e' }}>{participants.filter(p => !p.is_linked).length}</strong></span>
+        <span>Total: <strong>{participants.length}</strong></span>
       </div>
     </div>
   )

@@ -46,6 +46,9 @@ export default function MyCatches() {
   const [activeTab, setActiveTab] = useState('social')
   const [socialCatches, setSocialCatches] = useState([])
   const [competitionCatches, setCompetitionCatches] = useState([])
+  const [claimableRecords, setClaimableRecords] = useState([])
+  const [claiming, setClaiming] = useState(false)
+  const [claimMessage, setClaimMessage] = useState('')
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({ total: 0, released: 0, totalWeight: 0, competitions: 0 })
 
@@ -53,7 +56,7 @@ export default function MyCatches() {
 
   const loadAll = async () => {
     setLoading(true)
-    await Promise.all([loadSocialCatches(), loadCompetitionCatches()])
+    await Promise.all([loadSocialCatches(), loadCompetitionCatches(), loadClaimableRecords()])
     setLoading(false)
   }
 
@@ -104,6 +107,81 @@ export default function MyCatches() {
       data_.map(c => c.competition?.id).filter(Boolean)
     ).size
     setStats(prev => ({ ...prev, competitions }))
+  }
+
+  // ── Claimable records ─────────────────────────────────────────────────────
+  // Find competition_participants rows whose full_name matches this user's
+  // profile name but whose user_id is not yet this user's auth.uid()
+  const loadClaimableRecords = async () => {
+    // Get the angler's full name from their profile
+    const { data: profile } = await supabase
+      .from('users')
+      .select('full_name')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile?.full_name) return
+
+    // Find participant records with matching name not yet claimed by this user
+    const { data: matches } = await supabase
+      .from('competition_participants')
+      .select(`
+        id, full_name, user_id, category,
+        competition:competition_id ( id, name, venue, start_date )
+      `)
+      .ilike('full_name', profile.full_name.trim())
+      .neq('user_id', user.id)
+
+    if (!matches || matches.length === 0) return
+
+    // For each match get the catch count
+    const withCounts = await Promise.all(matches.map(async (m) => {
+      const { count } = await supabase
+        .from('competition_catches')
+        .select('id', { count: 'exact', head: true })
+        .eq('angler_id', m.user_id)
+        .eq('competition_id', m.competition.id)
+      return { ...m, catch_count: count || 0 }
+    }))
+
+    setClaimableRecords(withCounts.filter(m => m.catch_count > 0))
+  }
+
+  const claimRecord = async (participant) => {
+    if (!confirm(
+      `Claim ${participant.catch_count} catches from ${participant.competition.name} as ${participant.full_name}?\n\n` +
+      `This links your account to this competition record permanently.`
+    )) return
+
+    setClaiming(true)
+    setClaimMessage('')
+
+    try {
+      // 1. Update competition_catches: swap old placeholder UUID for real auth.uid()
+      const { error: catchError } = await supabase
+        .from('competition_catches')
+        .update({ angler_id: user.id })
+        .eq('angler_id', participant.user_id)
+        .eq('competition_id', participant.competition.id)
+
+      if (catchError) throw catchError
+
+      // 2. Update competition_participants: link participant row to real auth.uid()
+      const { error: partError } = await supabase
+        .from('competition_participants')
+        .update({ user_id: user.id })
+        .eq('id', participant.id)
+
+      if (partError) throw partError
+
+      setClaimMessage(`✅ Successfully claimed ${participant.catch_count} catches from ${participant.competition.name}!`)
+      // Reload everything so Competition History tab populates immediately
+      await loadAll()
+    } catch (err) {
+      setClaimMessage('❌ Error: ' + err.message)
+    } finally {
+      setClaiming(false)
+    }
   }
 
   // ── Delete social catch ────────────────────────────────────────────────────
@@ -374,6 +452,61 @@ export default function MyCatches() {
               for SADSAA nomination forms (Sections 15, 17 &amp; 18).
             </span>
           </div>
+
+          {/* Claim message feedback */}
+          {claimMessage && (
+            <div style={{
+              padding: '0.85rem 1.1rem', borderRadius: '8px', marginBottom: '1.25rem',
+              fontSize: '0.875rem', fontWeight: '600',
+              background: claimMessage.startsWith('✅') ? '#dcfce7' : '#fee2e2',
+              color: claimMessage.startsWith('✅') ? '#166534' : '#991b1b',
+              border: `1px solid ${claimMessage.startsWith('✅') ? '#86efac' : '#fecaca'}`
+            }}>
+              {claimMessage}
+            </div>
+          )}
+
+          {/* Claimable records — shown when name matches exist */}
+          {claimableRecords.length > 0 && (
+            <div style={{ marginBottom: '1.5rem' }}>
+              <div style={{ fontWeight: '700', fontSize: '0.9rem', color: '#1e3a8a', marginBottom: '0.6rem' }}>
+                🔗 Competition records found matching your name
+              </div>
+              {claimableRecords.map(record => (
+                <div key={record.id} style={{
+                  background: 'white', border: '2px solid #fcd34d', borderRadius: '8px',
+                  padding: '1rem 1.25rem', marginBottom: '0.75rem',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  flexWrap: 'wrap', gap: '0.75rem'
+                }}>
+                  <div>
+                    <div style={{ fontWeight: '700', color: '#1e3a8a', fontSize: '0.95rem' }}>
+                      {record.competition?.name}
+                    </div>
+                    <div style={{ fontSize: '0.82rem', color: '#6b7280', marginTop: '0.2rem' }}>
+                      📍 {record.competition?.venue}
+                      {record.competition?.start_date && ` · ${new Date(record.competition.start_date).toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' })}`}
+                      {record.category && ` · ${record.category}`}
+                    </div>
+                    <div style={{ fontSize: '0.82rem', color: '#92400e', fontWeight: '600', marginTop: '0.3rem' }}>
+                      🥇 {record.catch_count} verified catch{record.catch_count !== 1 ? 'es' : ''} waiting to be claimed
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => claimRecord(record)}
+                    disabled={claiming}
+                    style={{
+                      padding: '0.6rem 1.25rem', background: claiming ? '#9ca3af' : '#1e3a8a',
+                      color: 'white', border: 'none', borderRadius: '6px',
+                      fontWeight: '700', fontSize: '0.875rem',
+                      cursor: claiming ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap'
+                    }}>
+                    {claiming ? 'Claiming...' : 'Claim My Record'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
 
           {competitionCatches.length === 0 ? (
             <div style={{ background: 'white', padding: '3rem', borderRadius: '8px', textAlign: 'center' }}>
