@@ -186,7 +186,19 @@ export default function Profile() {
     province: '',
     club_name: '',
     sadsaa_number: '',
-    email: ''
+    email: '',
+    // Nomination form fields (Point 3)
+    id_number: '',
+    sa_citizen: true,
+    nationality: '',
+    passport_number: '',
+    passport_expiry: '',
+    club_member_since: '',
+    cell_phone: '',
+    postal_address: '',
+    postal_code: '',
+    facets: [],
+    medical_notes: '',
   })
 
   useEffect(() => {
@@ -215,7 +227,19 @@ export default function Profile() {
           province: data.province || '',
           club_name: data.club_name || '',
           sadsaa_number: data.angler_number || '',
-          email: user.email || ''
+          email: user.email || '',
+          // Nomination form fields
+          id_number: data.id_number || '',
+          sa_citizen: data.sa_citizen !== false,
+          nationality: data.nationality || '',
+          passport_number: data.passport_number || '',
+          passport_expiry: data.passport_expiry || '',
+          club_member_since: data.club_member_since || '',
+          cell_phone: data.cell_phone || '',
+          postal_address: data.postal_address || '',
+          postal_code: data.postal_code || '',
+          facets: data.facets || [],
+          medical_notes: data.medical_notes || '',
         })
       } else {
         // New user - pre-fill email
@@ -251,6 +275,18 @@ export default function Profile() {
           province: profile.province || null,
           club_name: profile.club_name.trim() || null,
           angler_number: profile.sadsaa_number.trim() || null,
+          // Nomination form fields
+          id_number: profile.id_number.trim() || null,
+          sa_citizen: profile.sa_citizen,
+          nationality: profile.sa_citizen ? null : (profile.nationality.trim() || null),
+          passport_number: profile.passport_number.trim() || null,
+          passport_expiry: profile.passport_expiry || null,
+          club_member_since: profile.club_member_since || null,
+          cell_phone: profile.cell_phone.trim() || null,
+          postal_address: profile.postal_address.trim() || null,
+          postal_code: profile.postal_code.trim() || null,
+          facets: profile.facets.length > 0 ? profile.facets : null,
+          medical_notes: profile.medical_notes.trim() || null,
           updated_at: new Date().toISOString()
         }, { onConflict: 'id' })
 
@@ -268,6 +304,16 @@ export default function Profile() {
 
   const handleChange = (field, value) => {
     setProfile(prev => ({ ...prev, [field]: value }))
+    setSaved(false)
+  }
+
+  const toggleFacet = (facet) => {
+    setProfile(prev => {
+      const facets = prev.facets.includes(facet)
+        ? prev.facets.filter(f => f !== facet)
+        : [...prev.facets, facet]
+      return { ...prev, facets }
+    })
     setSaved(false)
   }
 
@@ -516,6 +562,152 @@ export default function Profile() {
           <p style={{ fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.25rem' }}>
             SADSAA is establishing a central membership database. Your number will be assigned shortly.
           </p>
+        </div>
+      </div>
+
+      {/* ── SECTION 4: Contact Details ── */}
+      <div style={sectionStyle}>
+        <h2 style={sectionHeaderStyle}>📬 Contact Details</h2>
+        <p style={{ fontSize: '0.8rem', color: '#9ca3af', marginBottom: '1.25rem', marginTop: '-0.75rem' }}>
+          Nomination form Sections 3 &amp; 4 — kept private, shared with SADSAA selectors only
+        </p>
+
+        <div style={fieldGroupStyle}>
+          <label style={labelStyle}>Cell Phone</label>
+          <input type="tel" value={profile.cell_phone}
+            onChange={e => handleChange('cell_phone', e.target.value)}
+            style={inputStyle} placeholder="e.g. 082 123 4567" />
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: '1rem' }}>
+          <div style={fieldGroupStyle}>
+            <label style={labelStyle}>Postal Address</label>
+            <input type="text" value={profile.postal_address}
+              onChange={e => handleChange('postal_address', e.target.value)}
+              style={inputStyle} placeholder="Street address or PO Box" />
+          </div>
+          <div style={fieldGroupStyle}>
+            <label style={labelStyle}>Postal Code</label>
+            <input type="text" value={profile.postal_code}
+              onChange={e => handleChange('postal_code', e.target.value)}
+              style={inputStyle} placeholder="e.g. 7925" maxLength={10} />
+          </div>
+        </div>
+      </div>
+
+      {/* ── SECTION 5: Identity & Citizenship ── */}
+      <div style={sectionStyle}>
+        <h2 style={sectionHeaderStyle}>🪪 Identity &amp; Citizenship</h2>
+        <p style={{ fontSize: '0.8rem', color: '#9ca3af', marginBottom: '1.25rem', marginTop: '-0.75rem' }}>
+          Nomination form Section 2 — required for Protea and SADSAA team selection
+        </p>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div style={fieldGroupStyle}>
+            <label style={labelStyle}>SA ID Number</label>
+            <input type="text" value={profile.id_number}
+              onChange={e => handleChange('id_number', e.target.value)}
+              style={inputStyle} placeholder="13-digit ID number" maxLength={13} />
+          </div>
+          <div style={fieldGroupStyle}>
+            <label style={labelStyle}>South African Citizen?</label>
+            <select value={profile.sa_citizen ? 'yes' : 'no'}
+              onChange={e => handleChange('sa_citizen', e.target.value === 'yes')}
+              style={inputStyle}>
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </select>
+          </div>
+        </div>
+
+        {!profile.sa_citizen && (
+          <div style={fieldGroupStyle}>
+            <label style={labelStyle}>Nationality (if not SA citizen)</label>
+            <input type="text" value={profile.nationality}
+              onChange={e => handleChange('nationality', e.target.value)}
+              style={inputStyle} placeholder="e.g. Zimbabwe" />
+          </div>
+        )}
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <div style={fieldGroupStyle}>
+            <label style={labelStyle}>Passport Number</label>
+            <input type="text" value={profile.passport_number}
+              onChange={e => handleChange('passport_number', e.target.value)}
+              style={inputStyle} placeholder="Optional — for international travel" />
+          </div>
+          <div style={fieldGroupStyle}>
+            <label style={labelStyle}>Passport Expiry Date</label>
+            <input type="date" value={profile.passport_expiry}
+              onChange={e => handleChange('passport_expiry', e.target.value)}
+              style={inputStyle} min={new Date().toISOString().split('T')[0]} />
+          </div>
+        </div>
+      </div>
+
+      {/* ── SECTION 6: Angling Facets ── */}
+      <div style={sectionStyle}>
+        <h2 style={sectionHeaderStyle}>🎯 Angling Facets</h2>
+        <p style={{ fontSize: '0.8rem', color: '#9ca3af', marginBottom: '1.25rem', marginTop: '-0.75rem' }}>
+          Nomination form — facet of nomination. Select all that apply.
+        </p>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          {['Tuna', 'Gamefish', 'Bottomfish', 'Heavy Tackle Billfish', 'Light Tackle Billfish'].map(facet => {
+            const active = profile.facets.includes(facet)
+            return (
+              <button key={facet} onClick={() => toggleFacet(facet)}
+                style={{
+                  padding: '0.5rem 1rem', borderRadius: '20px', cursor: 'pointer',
+                  fontSize: '0.875rem', fontWeight: '600', border: '2px solid',
+                  borderColor: active ? '#1e3a8a' : '#d1d5db',
+                  background: active ? '#1e3a8a' : 'white',
+                  color: active ? 'white' : '#374151',
+                  transition: 'all 0.15s'
+                }}>
+                {active ? '✓ ' : ''}{facet}
+              </button>
+            )
+          })}
+        </div>
+        {profile.facets.length > 0 && (
+          <p style={{ fontSize: '0.78rem', color: '#6b7280', marginTop: '0.75rem' }}>
+            Selected: {profile.facets.join(', ')}
+          </p>
+        )}
+      </div>
+
+      {/* ── SECTION 7: Club Membership ── */}
+      <div style={sectionStyle}>
+        <h2 style={sectionHeaderStyle}>📅 Club Membership</h2>
+        <p style={{ fontSize: '0.8rem', color: '#9ca3af', marginBottom: '1.25rem', marginTop: '-0.75rem' }}>
+          Nomination form Section 5 — period of membership
+        </p>
+        <div style={fieldGroupStyle}>
+          <label style={labelStyle}>Club Member Since</label>
+          <input type="date" value={profile.club_member_since}
+            onChange={e => handleChange('club_member_since', e.target.value)}
+            style={inputStyle} max={new Date().toISOString().split('T')[0]} />
+          {profile.club_member_since && (
+            <p style={{ fontSize: '0.78rem', color: '#6b7280', marginTop: '0.25rem' }}>
+              {Math.floor((new Date() - new Date(profile.club_member_since)) / (1000 * 60 * 60 * 24 * 365.25))} years of membership
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* ── SECTION 8: Medical (Nomination Form Section 8) ── */}
+      <div style={sectionStyle}>
+        <h2 style={sectionHeaderStyle}>🏥 Medical Information</h2>
+        <p style={{ fontSize: '0.8rem', color: '#9ca3af', marginBottom: '1.25rem', marginTop: '-0.75rem' }}>
+          Nomination form Section 8 — notable health conditions in the past 5 years.
+          Kept strictly private and shared only with SADSAA selectors if you nominate.
+        </p>
+        <div style={fieldGroupStyle}>
+          <label style={labelStyle}>Health Conditions (if any)</label>
+          <textarea value={profile.medical_notes}
+            onChange={e => handleChange('medical_notes', e.target.value)}
+            style={{ ...inputStyle, minHeight: '80px', resize: 'vertical', fontFamily: 'inherit' }}
+            placeholder="Leave blank if none. Only complete if you have notable or serious conditions to declare." />
         </div>
       </div>
 
