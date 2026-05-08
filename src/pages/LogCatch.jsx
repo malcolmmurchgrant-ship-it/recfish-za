@@ -42,6 +42,9 @@ export default function LogCatch() {
   const [gpsLat, setGpsLat] = useState('')
   const [gpsLon, setGpsLon] = useState('')
   const [gridReference, setGridReference] = useState('')
+  const [fineGridId, setFineGridId] = useState(null)
+  const [coarseGridId, setCoarseGridId] = useState(null)
+  const [gridLookupStatus, setGridLookupStatus] = useState('') // '', 'looking', 'found', 'error'
 
   // Weight auto-calculation state
   const [autoWeight, setAutoWeight] = useState(null)
@@ -260,9 +263,35 @@ export default function LogCatch() {
     }
   }
 
-  const handleGPSCaptured = (lat, lon) => {
+  const handleGPSCaptured = async (lat, lon) => {
     setGpsLat(lat.toFixed(6))
     setGpsLon(lon.toFixed(6))
+    setGridLookupStatus('looking')
+
+    // Coarse grid: simple formula, instant
+    const lonW = Math.floor(lon)
+    const latN = Math.abs(Math.floor(lat))
+    const coarse = lonW * 100 + latN
+    setCoarseGridId(coarse)
+
+    // Fine grid: PostGIS lookup via Supabase RPC
+    try {
+      const { data, error } = await supabase.rpc('get_fine_grid_id', {
+        p_lon: lon,
+        p_lat: lat
+      })
+      if (error) throw error
+      if (data) {
+        setFineGridId(data)
+        setGridReference(String(data))  // also populate the manual field
+        setGridLookupStatus('found')
+      } else {
+        setGridLookupStatus('error')
+      }
+    } catch (err) {
+      console.error('Fine grid lookup failed:', err)
+      setGridLookupStatus('error')
+    }
   }
 
   const getLengthTypeDescription = (type) => {
@@ -343,6 +372,8 @@ export default function LogCatch() {
             is_competition_entry: false,
             session_id: sessionId,
             grid_reference: gridReference || null,
+            fine_grid_id: fineGridId || null,
+            coarse_grid_id: coarseGridId || null,
             gps_lat: gpsLat ? parseFloat(gpsLat) : null,
             gps_lon: gpsLon ? parseFloat(gpsLon) : null,
             line_class_kg: formData.line_class_kg || null,
@@ -381,6 +412,9 @@ export default function LogCatch() {
       setPhoto(null)
       setGpsLat('')
       setGpsLon('')
+      setFineGridId(null)
+      setCoarseGridId(null)
+      setGridLookupStatus('')
       setAutoWeight(null)
       setWeightSource('manual')
       // Keep grid reference from session
@@ -411,6 +445,8 @@ export default function LogCatch() {
                 is_competition_entry: false,
                 session_id: null,
                 grid_reference: gridReference || null,
+                fine_grid_id: fineGridId || null,
+                coarse_grid_id: coarseGridId || null,
                 gps_lat: gpsLat ? parseFloat(gpsLat) : null,
                 gps_lon: gpsLon ? parseFloat(gpsLon) : null,
                 photo_url: photo?.photoUrl || null,
@@ -904,10 +940,25 @@ export default function LogCatch() {
                 fontSize: '0.875rem', 
                 color: '#6b7280',
                 background: '#f9fafb',
-                padding: '0.5rem',
+                padding: '0.5rem 0.75rem',
                 borderRadius: '4px'
               }}>
-                📍 Location captured: {gpsLat}, {gpsLon}
+                <div>📍 {gpsLat}, {gpsLon}</div>
+                {gridLookupStatus === 'looking' && (
+                  <div style={{ color: '#3b82f6', marginTop: '0.25rem', fontSize: '0.8rem' }}>
+                    🔍 Looking up grid reference...
+                  </div>
+                )}
+                {gridLookupStatus === 'found' && fineGridId && (
+                  <div style={{ color: '#059669', marginTop: '0.25rem', fontSize: '0.8rem' }}>
+                    ✓ Fine grid: <strong>{fineGridId}</strong> · Coarse grid: <strong>{coarseGridId}</strong>
+                  </div>
+                )}
+                {gridLookupStatus === 'error' && (
+                  <div style={{ color: '#d97706', marginTop: '0.25rem', fontSize: '0.8rem' }}>
+                    ⚠ Grid lookup unavailable — enter manually below
+                  </div>
+                )}
               </div>
             )}
           </div>
