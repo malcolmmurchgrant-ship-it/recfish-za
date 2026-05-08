@@ -93,8 +93,8 @@ function AppContent() {
             <Route path="/dashboard"        element={<Dashboard />} />
             <Route path="/log-catch"        element={<LogCatch />} />
             <Route path="/my-catches"       element={<MyCatches />} />
-            <Route path="catch-map"         element={<CatchMap />} />
             <Route path="/sessions"         element={<Sessions />} />
+            <Route path="/catch-map"         element={<CatchMap />} />
             <Route path="/species"          element={<SpeciesLookup />} />
             <Route path="/competition-admin" element={<CompetitionAdmin />} />
             <Route path="/competition"      element={<CompetitionCatchLogger />} />
