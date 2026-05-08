@@ -35,6 +35,7 @@ function Navigation() {
           { to: '/log-catch',   label: '🎣 Log' },
           { to: '/my-catches',  label: '📋 Catches' },
           { to: '/sessions',    label: '⏱ Sessions' },
+          { to: '/catch-map',   label: '🗺 Map' },  
           { to: '/species',     label: '🐟 Species' },
           { to: '/competition', label: '🏆 Competition' },
           { to: '/profile',     label: '👤 Profile' },
