@@ -71,6 +71,7 @@ export default function Layout() {
           <NavLink to="/species">Species Lookup</NavLink>
           <NavLink to="/log-catch">Log Catch</NavLink>
           <NavLink to="/my-catches">My Catches</NavLink>
+          <Link to="/catch-map">🗺 Map</Link>
         </div>
       </nav>
 

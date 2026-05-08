@@ -6,6 +6,7 @@ import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
 import LogCatch from './pages/LogCatch'
 import MyCatches from './pages/MyCatches'
+import CatchMap from './pages/CatchMap'
 import Sessions from './pages/Sessions'
 import SpeciesLookup from './pages/SpeciesLookup'
 import CompetitionAdmin from './pages/CompetitionAdmin'
@@ -92,6 +93,7 @@ function AppContent() {
             <Route path="/dashboard"        element={<Dashboard />} />
             <Route path="/log-catch"        element={<LogCatch />} />
             <Route path="/my-catches"       element={<MyCatches />} />
+            <Route path="catch-map"         element={<CatchMap />} />
             <Route path="/sessions"         element={<Sessions />} />
             <Route path="/species"          element={<SpeciesLookup />} />
             <Route path="/competition-admin" element={<CompetitionAdmin />} />
