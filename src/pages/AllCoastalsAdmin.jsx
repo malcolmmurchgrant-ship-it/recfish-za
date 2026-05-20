@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
-const ADMIN_EMAILS = ['malcolmmurchgrant@gmail.com']
+const ADMIN_EMAILS = ['malcolmmurchgrant@gmail.com', 'mpca99@telkomsa.net']
 
 const SKIPPERS = {
   'ELITE CAT':'André Olivier','FISHBONE':'Richard Fulford',
