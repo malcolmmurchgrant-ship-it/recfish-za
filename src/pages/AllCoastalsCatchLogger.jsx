@@ -529,7 +529,7 @@ export default function AllCoastalsCatchLogger() {
 
               {/* Record/PB claims */}
               <div style={S.card}>
-                <div style={{ fontWeight: 700, marginBottom: '0.5rem', color: '#1e3a8a' }}>Record / PB / CV Claims (optional)</div>
+                <div style={{ fontWeight: 700, marginBottom: '0.5rem', color: '#1e3a8a' }}>Record / PB / CV Claims — as declared by angler</div>
                 <textarea
                   placeholder="e.g. Geelbek 4.2kg 94cm Fork — Record claim&#10;Kob 3.1kg 88cm Total — PB"
                   value={recordClaims}
