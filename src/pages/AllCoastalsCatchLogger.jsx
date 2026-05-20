@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { supabase } from '../supabaseClient.js'
+import { supabase } from '../lib/supabase'
 
 // ─── COMPETITION DATA ────────────────────────────────────────────────────────
 
