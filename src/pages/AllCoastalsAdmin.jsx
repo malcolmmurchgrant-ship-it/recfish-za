@@ -280,18 +280,29 @@ export default function AllCoastalsAdmin() {
 
   // ── Access check ────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!user) return
+    if (!user) {
+      // Auth not yet loaded — wait, but set a timeout so we don't hang forever
+      const timer = setTimeout(() => setChecking(false), 5000)
+      return () => clearTimeout(timer)
+    }
+    // Check hardcoded admin list first — no DB query needed
     if (ADMIN_EMAILS.includes(user.email)) {
       setUserRole('admin')
       setChecking(false)
       return
     }
+    // Fall through to DB role check
     supabase.from('allcoastals_roles').select('role').eq('user_id', user.id).maybeSingle()
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) console.warn('Role check error:', error.message)
         setUserRole(data?.role || null)
         setChecking(false)
       })
-  }, [user])
+      .catch(err => {
+        console.warn('Role check failed:', err)
+        setChecking(false)
+      })
+  }, [user?.id, user?.email])
 
   const isAdmin  = userRole === 'admin'
   const isScorer = userRole === 'scorer' || isAdmin
