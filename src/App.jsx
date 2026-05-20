@@ -9,6 +9,7 @@ import MyCatches from './pages/MyCatches'
 import CatchMap from './pages/CatchMap'
 import Sessions from './pages/Sessions'
 import SpeciesLookup from './pages/SpeciesLookup'
+import Competitions from './pages/Competitions'
 import CompetitionAdmin from './pages/CompetitionAdmin'
 import CompetitionCatchLogger from './pages/CompetitionCatchLogger'
 import AllCoastalsCatchLogger from './pages/AllCoastalsCatchLogger'
@@ -40,10 +41,8 @@ function Navigation() {
           { to: '/sessions',         label: '⏱ Sessions' },
           { to: '/catch-map',        label: '🗺 Map' },
           { to: '/species',          label: '🐟 Species' },
-          { to: '/competition',      label: '🏆 Competition' },
-          { to: '/allcoastals',      label: '🎣 All Coastals' },
-          { to: '/allcoastals-scores', label: '📊 AC Scores' },
-          { to: '/allcoastals-admin',  label: '⚙️ AC Admin' },
+          { to: '/competitions',     label: '🏆 Competitions' },
+          { to: '/allcoastals-admin',label: '⚙️ AC Admin' },
           { to: '/profile',          label: '👤 Profile' },
         ].map(({ to, label }) => (
           <Link
@@ -103,6 +102,7 @@ function AppContent() {
             <Route path="/sessions"            element={<Sessions />} />
             <Route path="/catch-map"           element={<CatchMap />} />
             <Route path="/species"             element={<SpeciesLookup />} />
+            <Route path="/competitions"        element={<Competitions />} />
             <Route path="/competition-admin"   element={<CompetitionAdmin />} />
             <Route path="/competition"         element={<CompetitionCatchLogger />} />
             <Route path="/allcoastals"         element={<AllCoastalsCatchLogger />} />
