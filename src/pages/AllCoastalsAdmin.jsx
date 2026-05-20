@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
-const ADMIN_EMAILS = ['malcolmmurchgrant@gmail.com', 'mpca99@telkomsa.net']
+const ADMIN_EMAILS = ['malcolmmurchgrant@gmail.com']
 
 const SKIPPERS = {
   'ELITE CAT':'André Olivier','FISHBONE':'Richard Fulford',
@@ -69,7 +69,7 @@ const BOAT_DRAW = {
 }
 
 const SPECIES = [
-  { name:'BAARTMAN',              bag:5,  minSize:40,  pointsPerFish:3, overLineLength:null, lengthType:null },
+  { name:'BAARDMAN',              bag:5,  minSize:40,  pointsPerFish:3, overLineLength:null, lengthType:null },
   { name:'BANK STEENBRAS',        bag:5,  minSize:50,  pointsPerFish:3, overLineLength:null, lengthType:null },
   { name:'BLACKTAIL',             bag:5,  minSize:25,  pointsPerFish:3, overLineLength:null, lengthType:null },
   { name:'BLUE HOTTENTOT',        bag:5,  minSize:null,pointsPerFish:3, overLineLength:null, lengthType:null },
@@ -82,8 +82,8 @@ const SPECIES = [
   { name:'PANGA / DIKBEKKIE',     bag:10, minSize:null,pointsPerFish:3, overLineLength:null, lengthType:null },
   { name:'ROMAN',                 bag:2,  minSize:30,  pointsPerFish:3, overLineLength:null, lengthType:null },
   { name:'SHAD / ELF',            bag:5,  minSize:30,  pointsPerFish:3, overLineLength:null, lengthType:null },
-  { name:'SOLDIER / BASTERMAN',   bag:5,  minSize:30,  pointsPerFish:3, overLineLength:null, lengthType:null },
-  { name:'STOCKFISH',             bag:10, minSize:null,pointsPerFish:3, overLineLength:null, lengthType:null },
+  { name:'SANTER / SOLDIER / BASTERMAN',   bag:5,  minSize:30,  pointsPerFish:3, overLineLength:null, lengthType:null },
+  { name:'SHALLOW-WATER HAKE / STOCKFISH',             bag:10, minSize:null,pointsPerFish:3, overLineLength:null, lengthType:null },
   { name:'ZEBRA / WILDEPERD',     bag:5,  minSize:30,  pointsPerFish:3, overLineLength:null, lengthType:null },
   { name:'CATFACE ROCKCOD',       bag:5,  minSize:50,  pointsPerFish:4, overLineLength:null, lengthType:null },
   { name:'GRUNTER',               bag:5,  minSize:40,  pointsPerFish:4, overLineLength:null, lengthType:null },
@@ -91,11 +91,11 @@ const SPECIES = [
   { name:'SCOTSMAN',              bag:1,  minSize:40,  pointsPerFish:4, overLineLength:71,   lengthType:'F' },
   { name:'DAGERAAD',              bag:1,  minSize:40,  pointsPerFish:5, overLineLength:null, lengthType:null },
   { name:'ENGLISHMAN',            bag:1,  minSize:40,  pointsPerFish:5, overLineLength:null, lengthType:null },
-  { name:'GREATER YELLOWTAIL',    bag:10, minSize:null,pointsPerFish:5, overLineLength:79,   lengthType:'F' },
-  { name:'JAN BRUIN',             bag:1,  minSize:null,pointsPerFish:5, overLineLength:null, lengthType:null },
-  { name:'MISS LUCY / RED STUMP', bag:1,  minSize:30,  pointsPerFish:5, overLineLength:61,   lengthType:'F' },
+  { name:'GREATER YELLOWTAIL / AMBERJACK / TROPICAL TAIL',    bag:10, minSize:null,pointsPerFish:5, overLineLength:79,   lengthType:'F' },
+  { name:'JOHN BROWN / JAN BRUIN',             bag:1,  minSize:null,pointsPerFish:5, overLineLength:null, lengthType:null },
+  { name:'RED STUMPNOSE / MISS LUCY', bag:1,  minSize:30,  pointsPerFish:5, overLineLength:61,   lengthType:'F' },
   { name:'MOUSTACHE ROCKCOD',     bag:4,  minSize:50,  pointsPerFish:5, overLineLength:70,   lengthType:'T' },
-  { name:'MUSSELLCRACKER',        bag:1,  minSize:60,  pointsPerFish:5, overLineLength:65,   lengthType:'F' },
+  { name:'WHITE MUSSELCRACKER',        bag:1,  minSize:60,  pointsPerFish:5, overLineLength:65,   lengthType:'F' },
   { name:'RED STEENBRAS / COPPER',bag:1,  minSize:60,  pointsPerFish:5, overLineLength:68,   lengthType:'F' },
   { name:'WHITE STEENBRAS',       bag:1,  minSize:60,  pointsPerFish:5, overLineLength:65,   lengthType:'F' },
   { name:'YELLOWBELLY ROCKCOD',   bag:1,  minSize:60,  pointsPerFish:5, overLineLength:70,   lengthType:'T' },
