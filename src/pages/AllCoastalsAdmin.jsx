@@ -15,18 +15,18 @@ const SKIPPERS = {
 }
 
 const TEAMS_DATA = {
-  'EPDSAA B':               { captain:'Brenda Weyer',           anglers:['Madelein Fourie','Brenda Weyer','Joelene Lerm'] },
-  'WESTERN PROVINCE':       { captain:'Stephen Flemming',        anglers:['Ossie Sauermann','Stephen Flemming','Gareth Decker'] },
-  'BORDER WHITE':           { captain:'Andrew Sparg',            anglers:['Andrew Sparg','Tim Wood','Dennis Ford'] },
-  'SOUTHERN CAPE JNR WHITE':{ captain:'Joshua Du Plessis',       anglers:['Saxon Ansley','Joshua Du Plessis','Jaden De Villiers'] },
-  'SOUTHERN CAPE MEN':      { captain:'Kabous Oosthuizen',       anglers:['Wessel Havenga','Pieter Strobos','Kabous Oosthuizen'] },
-  'EPDSAA A':               { captain:'Brett Potgieter',         anglers:['Jacques Bekker','Deon Van Jaarsvelt','Brett Potgieter'] },
-  'FREE STATE':             { captain:'Riaz Hussain',            anglers:['Riaz Hussain','Sayed Cassiem','Brandon Hooke'] },
-  'BORDER BLUE':            { captain:'Michael Swanepoel',       anglers:['Peter Mansvelt','Michael Swanepoel','Wayne Vooght'] },
-  'NATAL':                  { captain:'Andrea Papachristoforou', anglers:['Andrea Papachristoforou','Xavier Truluck','Phillip Papachristoforou'] },
-  'EP LADIES B':            { captain:'Lisa Bekker',             anglers:['Sheena Gerber','Maggie Koleskie','Lisa Bekker'] },
-  'SOUTHERN CAPE JNR GREEN':{ captain:'Jack Magerla',            anglers:['Ben Groenewald','Jack Magerla','Owen Lineker'] },
-  'EP LADIES A':            { captain:'Wayne Gerber',            anglers:['Donald Brown','Wayne Gerber','Brian Gerber'] },
+  'EPDSAA A':               { captain:'Wayne Gerber',            anglers:['Wayne Gerber',   'Brian Gerber',   'Donald Brown'] },
+  'EPDSAA B':               { captain:'Brett Potgieter',         anglers:['Brett Potgieter','Jacques Bekker', 'Deon van Jaarsveld'] },
+  'EP LADIES A':            { captain:'Lisa Bekker',             anglers:['Lisa Bekker',    'Sheena Gerber',  'Maggie Kolesky'] },
+  'EP LADIES B':            { captain:'Brenda Weyer',            anglers:['Brenda Weyer',   'Madelein Fourie','Joelene Lerm'] },
+  'BORDER WHITE':           { captain:'Andrew Sparg',            anglers:['Andrew Sparg',   'Dennis Ford',    'Tim Wood'] },
+  'BORDER BLUE':            { captain:'Michael Swanepoel',       anglers:['Michael Swanepoel','Peter Mansvelt','Wayne Voogt'] },
+  'SOUTHERN CAPE MEN':      { captain:'Kobus Oosthuizen',        anglers:['Kobus Oosthuizen','Pieter Strobos', 'Wessel Havenga'] },
+  'SOUTHERN CAPE JNR WHITE':{ captain:'Joshua Du Plessis',       anglers:['Joshua Du Plessis','Jaden De Villiers','Saxon Ansley'] },
+  'SOUTHERN CAPE JNR GREEN':{ captain:'Jack Magerla',            anglers:['Jack Magerla',   'Owen Lineker',   'Ben Groenewald'] },
+  'WESTERN PROVINCE':       { captain:'Stephen Flemming',        anglers:['Stephen Flemming','Ossie Sauermann','Gareth Decker'] },
+  'NATAL':                  { captain:'Riaz Hussain',            anglers:['Riaz Hussain',   'Brandon Hooke',  'Sayed Cassiem'] },
+  'FREE STATE':             { captain:'Andrea Papachristoforou', anglers:['Andrea Papachristoforou','Xavier Truluck','Phillip Papachristoforou'] },
 }
 
 const BOAT_DRAW = {
@@ -44,21 +44,21 @@ const BOAT_DRAW = {
   'Jaden De Villiers':       ['MACUSHLA','FISHBONE','ELITE CAT'],
   'Wessel Havenga':          ['FISHBONE','ELITE CAT','SON OF JAMAICA'],
   'Pieter Strobos':          ['SON OF JAMAICA','SEA DOG','ELITE CAT'],
-  'Kabous Oosthuizen':       ['SEA DOG','NOTHING BUT BUTT','CAESAR'],
+  'Kobus Oosthuizen':         ['SEA DOG','NOTHING BUT BUTT','CAESAR'],
   'Jacques Bekker':          ['FISHBONE','NOTHING BUT BUTT','ELITE CAT'],
-  'Deon Van Jaarsvelt':      ['SON OF JAMAICA','LEIGHWAY','FISHBONE'],
+  'Deon van Jaarsveld':       ['SON OF JAMAICA','LEIGHWAY','FISHBONE'],
   'Brett Potgieter':         ['LEIGHWAY','REEL NAUTI','CAESAR'],
   'Riaz Hussain':            ['FISHBONE','CAESAR','NOTHING BUT BUTT'],
   'Sayed Cassiem':           ['SON OF JAMAICA','U GO GIRL','CAESAR'],
   'Brandon Hooke':           ['U GO GIRL','NOTHING BUT BUTT','SEA DOG'],
   'Peter Mansvelt':          ['FISHBONE','SON OF JAMAICA','CAESAR'],
   'Michael Swanepoel':       ['SON OF JAMAICA','MACUSHLA','NOTHING BUT BUTT'],
-  'Wayne Vooght':            ['MACUSHLA','REEL NAUTI','SEA DOG'],
+  'Wayne Voogt':              ['MACUSHLA','REEL NAUTI','SEA DOG'],
   'Andrea Papachristoforou': ['NOTHING BUT BUTT','ELITE CAT','SEA DOG'],
   'Xavier Truluck':          ['REEL NAUTI','SEA DOG','LEIGHWAY'],
   'Phillip Papachristoforou':['SEA DOG','CAESAR','U GO GIRL'],
   'Sheena Gerber':           ['NOTHING BUT BUTT','FISHBONE','LEIGHWAY'],
-  'Maggie Koleskie':         ['REEL NAUTI','LEIGHWAY','U GO GIRL'],
+  'Maggie Kolesky':           ['REEL NAUTI','LEIGHWAY','U GO GIRL'],
   'Lisa Bekker':             ['LEIGHWAY','CAESAR','MACUSHLA'],
   'Ben Groenewald':          ['NOTHING BUT BUTT','SON OF JAMAICA','U GO GIRL'],
   'Jack Magerla':            ['REEL NAUTI','U GO GIRL','MACUSHLA'],
@@ -672,7 +672,7 @@ export default function AllCoastalsAdmin() {
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'0.5rem', flexWrap:'wrap', gap:'0.5rem' }}>
                   <div>
                     <div style={{ fontWeight:700, color:NAVY }}>{team}</div>
-                    <div style={{ fontSize:'0.8rem', color:'#6b7280' }}>Captain: {data.captain}</div>
+
                   </div>
                   <div style={{ fontWeight:800, fontSize:'1.2rem', color:NAVY }}>{totalPct.toFixed(2)}%</div>
                 </div>
