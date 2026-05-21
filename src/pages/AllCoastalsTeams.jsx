@@ -11,22 +11,13 @@ import React from 'react'
 import { useNavigate } from 'react-router-dom'
 
 // ─── inline logo data (copy logos_b64.js to src/data/logos_b64.js) ──────────
-// Then replace this import with: import { PROVINCE_LOGOS } from '../data/logos_b64'
 // For now we pull logos from props/data below so the component is self-contained.
 
 const NAVY = '#1a3a5c'
 const GOLD = '#c9a84c'
 
 // ─── Province logo map ───────────────────────────────────────────────────────
-// After copying logos_b64.js, change to:
-//   import { PROVINCE_LOGOS } from '../data/logos_b64'
-// and remove PROVINCE_LOGOS below.
-// For initial rendering without the file, logos gracefully absent.
-let PROVINCE_LOGOS = {}
-try {
-  // eslint-disable-next-line
-  PROVINCE_LOGOS = require('../data/logos_b64').PROVINCE_LOGOS
-} catch (_) {}
+import { PROVINCE_LOGOS } from '../data/logos_b64'
 
 // ─── Team definitions ────────────────────────────────────────────────────────
 const TEAMS = [
