@@ -2,37 +2,41 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 
-// ─── COMPETITION DATA ────────────────────────────────────────────────────────
+// ─── COMPETITION ──────────────────────────────────────────────────────────────
+const COMPETITION_ID = 'c8332f15-ce44-4d0b-a3ab-009fc2a2c484'
 
+// ─── SKIPPERS ─────────────────────────────────────────────────────────────────
 const SKIPPERS = {
-  'ELITE CAT':       'André Olivier',
-  'FISHBONE':        'Richard Fulford',
-  'NOTHING BUT BUTT':'André Labuschagne',
-  'CAESAR':          'Louis Fouché',
-  'SON OF JAMAICA':  'Martin Gierz',
-  'REEL NAUTI':      'Ryno Nel',
-  'SEA DOG':         'Garth Webb',
-  'LEIGHWAY':        'Tim Gillitt',
-  'U GO GIRL':       'Johan Coetzer',
-  'MACUSHLA':        'Chris Gerber',
+  'ELITE CAT':        'André Olivier',
+  'FISHBONE':         'Richard Fulford',
+  'NOTHING BUT BUTT': 'André Labuschagne',
+  'CAESAR':           'Louis Fouché',
+  'SON OF JAMAICA':   'Martin Gierz',
+  'REEL NAUTI':       'Ryno Nel',
+  'SEA DOG':          'Garth Webb',
+  'LEIGHWAY':         'Tim Gillitt',
+  'U GO GIRL':        'Johan Coetzer',
+  'MACUSHLA':         'Chris Gerber',
 }
 
+// ─── TEAMS — captains first, correct names and spellings ─────────────────────
 const TEAMS = {
-  'EPDSAA B':               { captain: 'Brenda Weyer',             anglers: ['Madelein Fourie','Brenda Weyer','Joelene Lerm'] },
-  'WESTERN PROVINCE':       { captain: 'Stephen Flemming',          anglers: ['Ossie Sauermann','Stephen Flemming','Gareth Decker'] },
-  'BORDER WHITE':           { captain: 'Andrew Sparg',              anglers: ['Andrew Sparg','Tim Wood','Dennis Ford'] },
-  'SOUTHERN CAPE JNR WHITE':{ captain: 'Joshua Du Plessis',         anglers: ['Saxon Ansley','Joshua Du Plessis','Jaden De Villiers'] },
-  'SOUTHERN CAPE MEN':      { captain: 'Kabous Oosthuizen',         anglers: ['Wessel Havenga','Pieter Strobos','Kabous Oosthuizen'] },
-  'EPDSAA A':               { captain: 'Brett Potgieter',           anglers: ['Jacques Bekker','Deon Van Jaarsvelt','Brett Potgieter'] },
-  'FREE STATE':             { captain: 'Riaz Hussain',              anglers: ['Riaz Hussain','Sayed Cassiem','Brandon Hooke'] },
-  'BORDER BLUE':            { captain: 'Michael Swanepoel',         anglers: ['Peter Mansvelt','Michael Swanepoel','Wayne Vooght'] },
-  'NATAL':                  { captain: 'Andrea Papachristoforou',   anglers: ['Andrea Papachristoforou','Xavier Truluck','Phillip Papachristoforou'] },
-  'EP LADIES B':            { captain: 'Lisa Bekker',               anglers: ['Sheena Gerber','Maggie Koleskie','Lisa Bekker'] },
-  'SOUTHERN CAPE JNR GREEN':{ captain: 'Jack Magerla',              anglers: ['Ben Groenewald','Jack Magerla','Owen Lineker'] },
-  'EP LADIES A':            { captain: 'Wayne Gerber',              anglers: ['Donald Brown','Wayne Gerber','Brian Gerber'] },
+  'EPDSAA A':               { captain: 'Wayne Gerber',             anglers: ['Wayne Gerber',   'Brian Gerber',   'Donald Brown'] },
+  'EPDSAA B':               { captain: 'Brett Potgieter',          anglers: ['Brett Potgieter','Jacques Bekker', 'Deon van Jaarsveld'] },
+  'EP LADIES A':            { captain: 'Lisa Bekker',              anglers: ['Lisa Bekker',    'Sheena Gerber',  'Maggie Kolesky'] },
+  'EP LADIES B':            { captain: 'Brenda Weyer',             anglers: ['Brenda Weyer',   'Madelein Fourie','Joelene Lerm'] },
+  'BORDER WHITE':           { captain: 'Andrew Sparg',             anglers: ['Andrew Sparg',   'Dennis Ford',    'Tim Wood'] },
+  'BORDER BLUE':            { captain: 'Michael Swanepoel',        anglers: ['Michael Swanepoel','Peter Mansvelt','Wayne Voogt'] },
+  'SOUTHERN CAPE MEN':      { captain: 'Kobus Oosthuizen',         anglers: ['Kobus Oosthuizen','Pieter Strobos', 'Wessel Havenga'] },
+  'SOUTHERN CAPE JNR WHITE':{ captain: 'Joshua Du Plessis',        anglers: ['Joshua Du Plessis','Jaden De Villiers','Saxon Ansley'] },
+  'SOUTHERN CAPE JNR GREEN':{ captain: 'Jack Magerla',             anglers: ['Jack Magerla',   'Owen Lineker',   'Ben Groenewald'] },
+  'WESTERN PROVINCE':       { captain: 'Stephen Flemming',         anglers: ['Stephen Flemming','Ossie Sauermann','Gareth Decker'] },
+  'NATAL':                  { captain: 'Riaz Hussain',             anglers: ['Riaz Hussain',   'Brandon Hooke',  'Sayed Cassiem'] },
+  'FREE STATE':             { captain: 'Andrea Papachristoforou',  anglers: ['Andrea Papachristoforou','Xavier Truluck','Phillip Papachristoforou'] },
 }
 
-// Boat draw: angler -> [day1 boat, day2 boat, day3 boat]
+// ─── BOAT DRAW — angler -> [day1 boat, day2 boat, day3 boat] ─────────────────
+// Corrected angler name spellings to match TEAMS above
 const BOAT_DRAW = {
   'Madelein Fourie':           ['ELITE CAT','FISHBONE','SON OF JAMAICA'],
   'Brenda Weyer':              ['CAESAR','SEA DOG','REEL NAUTI'],
@@ -48,21 +52,21 @@ const BOAT_DRAW = {
   'Jaden De Villiers':         ['MACUSHLA','FISHBONE','ELITE CAT'],
   'Wessel Havenga':            ['FISHBONE','ELITE CAT','SON OF JAMAICA'],
   'Pieter Strobos':            ['SON OF JAMAICA','SEA DOG','ELITE CAT'],
-  'Kabous Oosthuizen':         ['SEA DOG','NOTHING BUT BUTT','CAESAR'],
+  'Kobus Oosthuizen':          ['SEA DOG','NOTHING BUT BUTT','CAESAR'],
   'Jacques Bekker':            ['FISHBONE','NOTHING BUT BUTT','ELITE CAT'],
-  'Deon Van Jaarsvelt':        ['SON OF JAMAICA','LEIGHWAY','FISHBONE'],
+  'Deon van Jaarsveld':        ['SON OF JAMAICA','LEIGHWAY','FISHBONE'],
   'Brett Potgieter':           ['LEIGHWAY','REEL NAUTI','CAESAR'],
   'Riaz Hussain':              ['FISHBONE','CAESAR','NOTHING BUT BUTT'],
   'Sayed Cassiem':             ['SON OF JAMAICA','U GO GIRL','CAESAR'],
   'Brandon Hooke':             ['U GO GIRL','NOTHING BUT BUTT','SEA DOG'],
   'Peter Mansvelt':            ['FISHBONE','SON OF JAMAICA','CAESAR'],
   'Michael Swanepoel':         ['SON OF JAMAICA','MACUSHLA','NOTHING BUT BUTT'],
-  'Wayne Vooght':              ['MACUSHLA','REEL NAUTI','SEA DOG'],
+  'Wayne Voogt':               ['MACUSHLA','REEL NAUTI','SEA DOG'],
   'Andrea Papachristoforou':   ['NOTHING BUT BUTT','ELITE CAT','SEA DOG'],
   'Xavier Truluck':            ['REEL NAUTI','SEA DOG','LEIGHWAY'],
   'Phillip Papachristoforou':  ['SEA DOG','CAESAR','U GO GIRL'],
   'Sheena Gerber':             ['NOTHING BUT BUTT','FISHBONE','LEIGHWAY'],
-  'Maggie Koleskie':           ['REEL NAUTI','LEIGHWAY','U GO GIRL'],
+  'Maggie Kolesky':            ['REEL NAUTI','LEIGHWAY','U GO GIRL'],
   'Lisa Bekker':               ['LEIGHWAY','CAESAR','MACUSHLA'],
   'Ben Groenewald':            ['NOTHING BUT BUTT','SON OF JAMAICA','U GO GIRL'],
   'Jack Magerla':              ['REEL NAUTI','U GO GIRL','MACUSHLA'],
@@ -72,54 +76,49 @@ const BOAT_DRAW = {
   'Brian Gerber':              ['MACUSHLA','SON OF JAMAICA','REEL NAUTI'],
 }
 
-// Species data from official scorecard
-// pointsPerFish: points for each fish after the first
-// speciesBonus: 3 pts for first fish of species (always 3)
-// overLineLength: cm threshold for +5 bonus | lengthType: F=fork, T=total
-// bagLimit: max fish per angler
-// minSize: minimum scoring length in cm (null = no minimum)
+// ─── SPECIES ──────────────────────────────────────────────────────────────────
 const SPECIES = [
-  // 10 per angler - 3 pts per fish
-  { name:'BAARDMAN',              bag:5,  minSize:40,  pointsPerFish:3, overLineLength:null,  lengthType:null },
-  { name:'BANK STEENBRAS',        bag:5,  minSize:50,  pointsPerFish:3, overLineLength:null,  lengthType:null },
-  { name:'BLACKTAIL',             bag:5,  minSize:25,  pointsPerFish:3, overLineLength:null,  lengthType:null },
-  { name:'BLUE HOTTENTOT',        bag:5,  minSize:null,pointsPerFish:3, overLineLength:null,  lengthType:null },
-  { name:'BRONZE BREAM',          bag:2,  minSize:30,  pointsPerFish:3, overLineLength:null,  lengthType:null },
-  { name:'CARPENTER',             bag:4,  minSize:35,  pointsPerFish:3, overLineLength:null,  lengthType:null },
-  { name:'DANE',                  bag:5,  minSize:null,pointsPerFish:3, overLineLength:null,  lengthType:null },
-  { name:'GURNARD',               bag:10, minSize:null,pointsPerFish:3, overLineLength:null,  lengthType:null },
-  { name:'KOB',                   bag:5,  minSize:50,  pointsPerFish:3, overLineLength:84,    lengthType:'T' },
-  { name:'KOB (>110cm)',          bag:1,  minSize:110, pointsPerFish:3, overLineLength:null,  lengthType:null },
-  { name:'PANGA / DIKBEKKIE',     bag:10, minSize:null,pointsPerFish:3, overLineLength:null,  lengthType:null },
-  { name:'ROMAN',                 bag:2,  minSize:30,  pointsPerFish:3, overLineLength:null,  lengthType:null },
-  { name:'SHAD / ELF',            bag:5,  minSize:30,  pointsPerFish:3, overLineLength:null,  lengthType:null },
-  { name:'SANTER / SOLDIER / BASTERMAN',   bag:5,  minSize:30,  pointsPerFish:3, overLineLength:null,  lengthType:null },
-  { name:'SHALLOW-WATER HAKE / STOCKFISH',             bag:10, minSize:null,pointsPerFish:3, overLineLength:null,  lengthType:null },
-  { name:'ZEBRA / WILDEPERD',     bag:5,  minSize:30,  pointsPerFish:3, overLineLength:null,  lengthType:null },
-  // 10 per angler - 4 pts per fish
-  { name:'CATFACE ROCKCOD',       bag:5,  minSize:50,  pointsPerFish:4, overLineLength:null,  lengthType:null },
-  { name:'GRUNTER',               bag:5,  minSize:40,  pointsPerFish:4, overLineLength:null,  lengthType:null },
-  { name:'GEELBEK / CAPE SALMON', bag:2,  minSize:60,  pointsPerFish:4, overLineLength:88,    lengthType:'F' },
-  { name:'SCOTSMAN',              bag:1,  minSize:40,  pointsPerFish:4, overLineLength:71,    lengthType:'F' },
-  // 10 per angler - 5 pts per fish
-  { name:'DAGERAAD',              bag:1,  minSize:40,  pointsPerFish:5, overLineLength:null,  lengthType:null },
-  { name:'ENGLISHMAN',            bag:1,  minSize:40,  pointsPerFish:5, overLineLength:null,  lengthType:null },
-  { name:'GREATER YELLOWTAIL / AMBERJACK / TROPICAL TAIL',    bag:10, minSize:null,pointsPerFish:5, overLineLength:79,    lengthType:'F' },
-  { name:'JOHN BROWN / JAN BRUIN',             bag:1,  minSize:null,pointsPerFish:5, overLineLength:null,  lengthType:null },
-  { name:'RED STUMPNOSE / MISS LUCY', bag:1,  minSize:30,  pointsPerFish:5, overLineLength:61,    lengthType:'F' },
-  { name:'MOUSTACHE ROCKCOD',     bag:4,  minSize:50,  pointsPerFish:5, overLineLength:70,    lengthType:'T' },
-  { name:'WHITE MUSSELCRACKER',        bag:1,  minSize:60,  pointsPerFish:5, overLineLength:65,    lengthType:'F' },
-  { name:'RED STEENBRAS / COPPER',bag:1,  minSize:60,  pointsPerFish:5, overLineLength:68,    lengthType:'F' },
-  { name:'WHITE STEENBRAS',       bag:1,  minSize:60,  pointsPerFish:5, overLineLength:65,    lengthType:'F' },
-  { name:'YELLOWBELLY ROCKCOD',   bag:1,  minSize:60,  pointsPerFish:5, overLineLength:70,    lengthType:'T' },
-  { name:'YELLOWTAIL',            bag:10, minSize:null,pointsPerFish:5, overLineLength:79,    lengthType:'F' },
-  { name:'BLACK MUSSELCRACKER',   bag:1,  minSize:50,  pointsPerFish:5, overLineLength:60,    lengthType:'F' },
+  // 3 pts per fish
+  { name:'BAARDMAN',              bag:5,  minSize:40,  pointsPerFish:3, overLineLength:null, lengthType:null },
+  { name:'BANK STEENBRAS',        bag:5,  minSize:50,  pointsPerFish:3, overLineLength:null, lengthType:null },
+  { name:'BLACKTAIL',             bag:5,  minSize:25,  pointsPerFish:3, overLineLength:null, lengthType:null },
+  { name:'BLUE HOTTENTOT',        bag:5,  minSize:null,pointsPerFish:3, overLineLength:null, lengthType:null },
+  { name:'BRONZE BREAM',          bag:2,  minSize:30,  pointsPerFish:3, overLineLength:null, lengthType:null },
+  { name:'CARPENTER',             bag:4,  minSize:35,  pointsPerFish:3, overLineLength:null, lengthType:null },
+  { name:'DANE',                  bag:5,  minSize:null,pointsPerFish:3, overLineLength:null, lengthType:null },
+  { name:'GURNARD',               bag:10, minSize:null,pointsPerFish:3, overLineLength:null, lengthType:null },
+  { name:'KOB',                   bag:5,  minSize:50,  pointsPerFish:3, overLineLength:84,   lengthType:'T' },
+  { name:'KOB (>110cm)',          bag:1,  minSize:110, pointsPerFish:3, overLineLength:null, lengthType:null },
+  { name:'PANGA / DIKBEKKIE',     bag:10, minSize:null,pointsPerFish:3, overLineLength:null, lengthType:null },
+  { name:'ROMAN',                 bag:2,  minSize:30,  pointsPerFish:3, overLineLength:null, lengthType:null },
+  { name:'SHAD / ELF',            bag:5,  minSize:30,  pointsPerFish:3, overLineLength:null, lengthType:null },
+  { name:'SANTER / SOLDIER / BASTERMAN', bag:5, minSize:30, pointsPerFish:3, overLineLength:null, lengthType:null },
+  { name:'SHALLOW-WATER HAKE / STOCKFISH', bag:10, minSize:null, pointsPerFish:3, overLineLength:null, lengthType:null },
+  { name:'ZEBRA / WILDEPERD',     bag:5,  minSize:30,  pointsPerFish:3, overLineLength:null, lengthType:null },
+  // 4 pts per fish
+  { name:'CATFACE ROCKCOD',       bag:5,  minSize:50,  pointsPerFish:4, overLineLength:null, lengthType:null },
+  { name:'GRUNTER',               bag:5,  minSize:40,  pointsPerFish:4, overLineLength:null, lengthType:null },
+  { name:'GEELBEK / CAPE SALMON', bag:2,  minSize:60,  pointsPerFish:4, overLineLength:88,   lengthType:'F' },
+  { name:'SCOTSMAN',              bag:1,  minSize:40,  pointsPerFish:4, overLineLength:71,   lengthType:'F' },
+  // 5 pts per fish
+  { name:'DAGERAAD',              bag:1,  minSize:40,  pointsPerFish:5, overLineLength:null, lengthType:null },
+  { name:'ENGLISHMAN',            bag:1,  minSize:40,  pointsPerFish:5, overLineLength:null, lengthType:null },
+  { name:'GREATER YELLOWTAIL / AMBERJACK / TROPICAL TAIL', bag:10, minSize:null, pointsPerFish:5, overLineLength:79, lengthType:'F' },
+  { name:'JOHN BROWN / JAN BRUIN',bag:1,  minSize:null,pointsPerFish:5, overLineLength:null, lengthType:null },
+  { name:'RED STUMPNOSE / MISS LUCY', bag:1, minSize:30, pointsPerFish:5, overLineLength:61, lengthType:'F' },
+  { name:'MOUSTACHE ROCKCOD',     bag:4,  minSize:50,  pointsPerFish:5, overLineLength:70,   lengthType:'T' },
+  { name:'WHITE MUSSELCRACKER',   bag:1,  minSize:60,  pointsPerFish:5, overLineLength:65,   lengthType:'F' },
+  { name:'RED STEENBRAS / COPPER',bag:1,  minSize:60,  pointsPerFish:5, overLineLength:68,   lengthType:'F' },
+  { name:'WHITE STEENBRAS',       bag:1,  minSize:60,  pointsPerFish:5, overLineLength:65,   lengthType:'F' },
+  { name:'YELLOWBELLY ROCKCOD',   bag:1,  minSize:60,  pointsPerFish:5, overLineLength:70,   lengthType:'T' },
+  { name:'YELLOWTAIL',            bag:10, minSize:null,pointsPerFish:5, overLineLength:79,   lengthType:'F' },
+  { name:'BLACK MUSSELCRACKER',   bag:1,  minSize:50,  pointsPerFish:5, overLineLength:60,   lengthType:'F' },
 ]
 
 const SPECIES_BONUS = 3
 const OVER_LINE_BONUS = 5
 
-// ─── HELPERS ─────────────────────────────────────────────────────────────────
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
 
 function getAnglerTeam(anglerName) {
   for (const [team, data] of Object.entries(TEAMS)) {
@@ -140,10 +139,8 @@ function calcAnglerPoints(catches) {
     if (c.fishCount === 0) continue
     const sp = SPECIES.find(s => s.name === c.species)
     if (!sp) continue
-    // First fish gets pointsPerFish + speciesBonus, rest get pointsPerFish
-    total += sp.pointsPerFish + SPECIES_BONUS  // first fish
+    total += sp.pointsPerFish + SPECIES_BONUS
     if (c.fishCount > 1) total += sp.pointsPerFish * (c.fishCount - 1)
-    // Over line class bonus
     total += c.overLineCount * OVER_LINE_BONUS
   }
   return total
@@ -153,7 +150,7 @@ function calcTotalFish(catches) {
   return catches.reduce((sum, c) => sum + c.fishCount, 0)
 }
 
-// ─── STYLES ──────────────────────────────────────────────────────────────────
+// ─── STYLES ───────────────────────────────────────────────────────────────────
 
 const S = {
   page: { maxWidth: 900, margin: '0 auto', padding: '1rem', fontFamily: 'system-ui, sans-serif' },
@@ -184,7 +181,7 @@ const S = {
   row: { display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' },
 }
 
-// ─── SPECIES ROW COMPONENT ───────────────────────────────────────────────────
+// ─── SPECIES ROW COMPONENT ────────────────────────────────────────────────────
 
 function SpeciesRow({ sp, entry, onChange, disabled }) {
   const maxReached = entry.fishCount >= sp.bag
@@ -208,7 +205,6 @@ function SpeciesRow({ sp, entry, onChange, disabled }) {
     onChange({ ...entry, overLineCount: entry.overLineCount - 1 })
   }
 
-  // Points preview
   let pts = 0
   if (entry.fishCount > 0) {
     pts = sp.pointsPerFish + SPECIES_BONUS + sp.pointsPerFish * (entry.fishCount - 1) + entry.overLineCount * OVER_LINE_BONUS
@@ -241,7 +237,7 @@ function SpeciesRow({ sp, entry, onChange, disabled }) {
             </div>
           </div>
 
-          {/* Over line counter - only show if species has threshold */}
+          {/* Over line counter */}
           {sp.overLineLength ? (
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: '0.7rem', color: '#6b7280', marginBottom: 2 }}>OVER LINE</div>
@@ -255,7 +251,7 @@ function SpeciesRow({ sp, entry, onChange, disabled }) {
             </div>
           ) : <div style={{ width: 80 }} />}
 
-          {/* Points earned */}
+          {/* Points */}
           <div style={{ minWidth: 44, textAlign: 'center' }}>
             <div style={{ fontSize: '0.7rem', color: '#6b7280', marginBottom: 2 }}>PTS</div>
             <div style={{ fontWeight: 700, fontSize: '1.1rem', color: pts > 0 ? '#1e3a8a' : '#9ca3af' }}>{pts}</div>
@@ -282,13 +278,13 @@ export default function AllCoastalsCatchLogger() {
   const [existingEntry, setExistingEntry] = useState(null)
   const [boatSummary, setBoatSummary] = useState([])
   const [loadingExisting, setLoadingExisting] = useState(false)
-  const [activeTab, setActiveTab] = useState('entry') // 'entry' | 'boat'
+  const [activeTab, setActiveTab] = useState('entry')
 
   const dayIndex = day ? parseInt(day) - 1 : null
   const boatAnglers = (day && boat) ? getBoatAnglers(boat, dayIndex) : []
   const anglerTeam = anglerName ? getAnglerTeam(anglerName) : ''
 
-  // Initialise catch entries when angler selected
+  // Load existing catch entry when angler selected
   useEffect(() => {
     if (!anglerName) return
     setLoadingExisting(true)
@@ -315,7 +311,7 @@ export default function AllCoastalsCatchLogger() {
       })
   }, [anglerName, day])
 
-  // Load boat summary whenever boat/day changes
+  // Load boat summary when boat/day changes
   useEffect(() => {
     if (!day || !boat) return
     supabase
@@ -338,9 +334,9 @@ export default function AllCoastalsCatchLogger() {
     setSaving(true)
     setError('')
 
-    // Calculate boat percentages after save
     const payload = {
       entered_by: user.id,
+      competition_id: COMPETITION_ID,
       day_number: parseInt(day),
       boat_name: boat,
       angler_name: anglerName,
@@ -370,7 +366,7 @@ export default function AllCoastalsCatchLogger() {
       return
     }
 
-    // Recalculate boat percentages for all anglers on this boat/day
+    // Recalculate boat percentages
     const { data: boatData } = await supabase
       .from('allcoastals_catches')
       .select('id, total_points')
@@ -390,7 +386,7 @@ export default function AllCoastalsCatchLogger() {
 
     setSaving(false)
     setSaved(true)
-    // Reload existing entry
+
     const { data: fresh } = await supabase
       .from('allcoastals_catches')
       .select('*')
@@ -399,7 +395,6 @@ export default function AllCoastalsCatchLogger() {
       .maybeSingle()
     setExistingEntry(fresh)
 
-    // Refresh boat summary
     const { data: bs } = await supabase
       .from('allcoastals_catches')
       .select('angler_name, team_name, total_fish, total_points, boat_percentage, catches')
@@ -415,7 +410,7 @@ export default function AllCoastalsCatchLogger() {
       {/* Header */}
       <div style={S.header}>
         <div style={{ fontSize: '1.1rem', fontWeight: 700 }}>🎣 SADSAA All Coastal Bottomfish 2026</div>
-        <div style={{ fontSize: '0.85rem', opacity: 0.85, marginTop: 2 }}>St Francis Bay · Catch Logger</div>
+        <div style={{ fontSize: '0.85rem', opacity: 0.85, marginTop: 2 }}>Cape St Francis · Catch Logger</div>
       </div>
 
       {/* Step 1: Day & Boat */}
@@ -460,7 +455,7 @@ export default function AllCoastalsCatchLogger() {
         </div>
       )}
 
-      {/* Tabs: Entry / Boat Summary */}
+      {/* Tabs */}
       {anglerName && !loadingExisting && (
         <>
           <div style={{ display: 'flex', gap: 0, marginBottom: '1rem', borderRadius: 8, overflow: 'hidden', border: '1px solid #e5e7eb' }}>
@@ -505,8 +500,6 @@ export default function AllCoastalsCatchLogger() {
                 <div style={{ fontSize: '0.78rem', color: '#6b7280', marginBottom: '0.75rem' }}>
                   Tap + for each fish landed. Toggle Over Line if fish exceeds the threshold length on the SADSAA mat.
                 </div>
-
-                {/* Group species by points tier */}
                 {[
                   { label: '3 pts / fish', filter: sp => sp.pointsPerFish === 3 },
                   { label: '4 pts / fish', filter: sp => sp.pointsPerFish === 4 },
@@ -565,7 +558,6 @@ export default function AllCoastalsCatchLogger() {
                 <div style={{ color: '#9ca3af', fontStyle: 'italic' }}>No catches recorded for this boat yet.</div>
               ) : (
                 <>
-                  {/* Sort by points desc */}
                   {[...boatSummary].sort((a,b) => b.total_points - a.total_points).map((row, i) => (
                     <div key={row.angler_name} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: '0.75rem', marginBottom: '0.5rem', background: i === 0 ? '#fefce8' : 'white' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -580,7 +572,6 @@ export default function AllCoastalsCatchLogger() {
                           <div style={{ fontSize: '0.78rem', color: '#6b7280' }}>{row.total_points} pts · {row.total_fish} fish</div>
                         </div>
                       </div>
-                      {/* Species breakdown */}
                       {row.catches?.filter(c => c.fishCount > 0).length > 0 && (
                         <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                           {row.catches.filter(c => c.fishCount > 0).map(c => (
@@ -592,7 +583,6 @@ export default function AllCoastalsCatchLogger() {
                       )}
                     </div>
                   ))}
-                  {/* Anglers not yet entered */}
                   {boatAnglers.filter(a => !boatSummary.find(r => r.angler_name === a)).map(a => (
                     <div key={a} style={{ border: '1px dashed #d1d5db', borderRadius: 8, padding: '0.75rem', marginBottom: '0.5rem', color: '#9ca3af' }}>
                       {a} ({getAnglerTeam(a)}) — not yet entered

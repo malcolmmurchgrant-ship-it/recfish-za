@@ -1,21 +1,23 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 
-// ─── COMPETITION DATA ─────────────────────────────────────────────────────────
+// ─── COMPETITION ──────────────────────────────────────────────────────────────
+const COMPETITION_ID = 'c8332f15-ce44-4d0b-a3ab-009fc2a2c484'
 
+// ─── TEAMS — corrected captains ───────────────────────────────────────────────
 const TEAMS = {
-  'EPDSAA B':                { captain: 'Brenda Weyer' },
-  'WESTERN PROVINCE':        { captain: 'Stephen Flemming' },
-  'BORDER WHITE':            { captain: 'Andrew Sparg' },
-  'SOUTHERN CAPE JNR WHITE': { captain: 'Joshua Du Plessis' },
-  'SOUTHERN CAPE MEN':       { captain: 'Kabous Oosthuizen' },
-  'EPDSAA A':                { captain: 'Brett Potgieter' },
-  'FREE STATE':              { captain: 'Riaz Hussain' },
-  'BORDER BLUE':             { captain: 'Michael Swanepoel' },
-  'NATAL':                   { captain: 'Andrea Papachristoforou' },
-  'EP LADIES B':             { captain: 'Lisa Bekker' },
-  'SOUTHERN CAPE JNR GREEN': { captain: 'Jack Magerla' },
-  'EP LADIES A':             { captain: 'Wayne Gerber' },
+  'EPDSAA A':               { captain: 'Wayne Gerber' },
+  'EPDSAA B':               { captain: 'Brett Potgieter' },
+  'EP LADIES A':            { captain: 'Lisa Bekker' },
+  'EP LADIES B':            { captain: 'Brenda Weyer' },
+  'BORDER WHITE':           { captain: 'Andrew Sparg' },
+  'BORDER BLUE':            { captain: 'Michael Swanepoel' },
+  'SOUTHERN CAPE MEN':      { captain: 'Kobus Oosthuizen' },
+  'SOUTHERN CAPE JNR WHITE':{ captain: 'Joshua Du Plessis' },
+  'SOUTHERN CAPE JNR GREEN':{ captain: 'Jack Magerla' },
+  'WESTERN PROVINCE':       { captain: 'Stephen Flemming' },
+  'NATAL':                  { captain: 'Riaz Hussain' },
+  'FREE STATE':             { captain: 'Andrea Papachristoforou' },
 }
 
 const SKIPPERS = {
@@ -31,64 +33,66 @@ const SKIPPERS = {
   'MACUSHLA':         'Chris Gerber',
 }
 
+// ─── BOAT DRAW — corrected spellings ─────────────────────────────────────────
 const BOAT_DRAW = {
-  'Madelein Fourie':          ['ELITE CAT','FISHBONE','SON OF JAMAICA'],
-  'Brenda Weyer':             ['CAESAR','SEA DOG','REEL NAUTI'],
-  'Joelene Lerm':             ['SEA DOG','ELITE CAT','FISHBONE'],
-  'Ossie Sauermann':          ['ELITE CAT','NOTHING BUT BUTT','REEL NAUTI'],
-  'Stephen Flemming':         ['CAESAR','LEIGHWAY','SON OF JAMAICA'],
-  'Gareth Decker':            ['LEIGHWAY','ELITE CAT','NOTHING BUT BUTT'],
-  'Andrew Sparg':             ['ELITE CAT','CAESAR','FISHBONE'],
-  'Tim Wood':                 ['CAESAR','U GO GIRL','ELITE CAT'],
-  'Dennis Ford':              ['U GO GIRL','FISHBONE','REEL NAUTI'],
-  'Saxon Ansley':             ['ELITE CAT','SON OF JAMAICA','NOTHING BUT BUTT'],
-  'Joshua Du Plessis':        ['CAESAR','MACUSHLA','FISHBONE'],
-  'Jaden De Villiers':        ['MACUSHLA','FISHBONE','ELITE CAT'],
-  'Wessel Havenga':           ['FISHBONE','ELITE CAT','SON OF JAMAICA'],
-  'Pieter Strobos':           ['SON OF JAMAICA','SEA DOG','ELITE CAT'],
-  'Kabous Oosthuizen':        ['SEA DOG','NOTHING BUT BUTT','CAESAR'],
-  'Jacques Bekker':           ['FISHBONE','NOTHING BUT BUTT','ELITE CAT'],
-  'Deon Van Jaarsvelt':       ['SON OF JAMAICA','LEIGHWAY','FISHBONE'],
-  'Brett Potgieter':          ['LEIGHWAY','REEL NAUTI','CAESAR'],
-  'Riaz Hussain':             ['FISHBONE','CAESAR','NOTHING BUT BUTT'],
-  'Sayed Cassiem':            ['SON OF JAMAICA','U GO GIRL','CAESAR'],
-  'Brandon Hooke':            ['U GO GIRL','NOTHING BUT BUTT','SEA DOG'],
-  'Peter Mansvelt':           ['FISHBONE','SON OF JAMAICA','CAESAR'],
-  'Michael Swanepoel':        ['SON OF JAMAICA','MACUSHLA','NOTHING BUT BUTT'],
-  'Wayne Vooght':             ['MACUSHLA','REEL NAUTI','SEA DOG'],
-  'Andrea Papachristoforou':  ['NOTHING BUT BUTT','ELITE CAT','SEA DOG'],
-  'Xavier Truluck':           ['REEL NAUTI','SEA DOG','LEIGHWAY'],
-  'Phillip Papachristoforou': ['SEA DOG','CAESAR','U GO GIRL'],
-  'Sheena Gerber':            ['NOTHING BUT BUTT','FISHBONE','LEIGHWAY'],
-  'Maggie Koleskie':          ['REEL NAUTI','LEIGHWAY','U GO GIRL'],
-  'Lisa Bekker':              ['LEIGHWAY','CAESAR','MACUSHLA'],
-  'Ben Groenewald':           ['NOTHING BUT BUTT','SON OF JAMAICA','U GO GIRL'],
-  'Jack Magerla':             ['REEL NAUTI','U GO GIRL','MACUSHLA'],
-  'Owen Lineker':             ['U GO GIRL','REEL NAUTI','LEIGHWAY'],
-  'Donald Brown':             ['NOTHING BUT BUTT','REEL NAUTI','MACUSHLA'],
-  'Wayne Gerber':             ['REEL NAUTI','MACUSHLA','SON OF JAMAICA'],
-  'Brian Gerber':             ['MACUSHLA','SON OF JAMAICA','REEL NAUTI'],
+  'Madelein Fourie':           ['ELITE CAT','FISHBONE','SON OF JAMAICA'],
+  'Brenda Weyer':              ['CAESAR','SEA DOG','REEL NAUTI'],
+  'Joelene Lerm':              ['SEA DOG','ELITE CAT','FISHBONE'],
+  'Ossie Sauermann':           ['ELITE CAT','NOTHING BUT BUTT','REEL NAUTI'],
+  'Stephen Flemming':          ['CAESAR','LEIGHWAY','SON OF JAMAICA'],
+  'Gareth Decker':             ['LEIGHWAY','ELITE CAT','NOTHING BUT BUTT'],
+  'Andrew Sparg':              ['ELITE CAT','CAESAR','FISHBONE'],
+  'Tim Wood':                  ['CAESAR','U GO GIRL','ELITE CAT'],
+  'Dennis Ford':               ['U GO GIRL','FISHBONE','REEL NAUTI'],
+  'Saxon Ansley':              ['ELITE CAT','SON OF JAMAICA','NOTHING BUT BUTT'],
+  'Joshua Du Plessis':         ['CAESAR','MACUSHLA','FISHBONE'],
+  'Jaden De Villiers':         ['MACUSHLA','FISHBONE','ELITE CAT'],
+  'Wessel Havenga':            ['FISHBONE','ELITE CAT','SON OF JAMAICA'],
+  'Pieter Strobos':            ['SON OF JAMAICA','SEA DOG','ELITE CAT'],
+  'Kobus Oosthuizen':          ['SEA DOG','NOTHING BUT BUTT','CAESAR'],
+  'Jacques Bekker':            ['FISHBONE','NOTHING BUT BUTT','ELITE CAT'],
+  'Deon van Jaarsveld':        ['SON OF JAMAICA','LEIGHWAY','FISHBONE'],
+  'Brett Potgieter':           ['LEIGHWAY','REEL NAUTI','CAESAR'],
+  'Riaz Hussain':              ['FISHBONE','CAESAR','NOTHING BUT BUTT'],
+  'Sayed Cassiem':             ['SON OF JAMAICA','U GO GIRL','CAESAR'],
+  'Brandon Hooke':             ['U GO GIRL','NOTHING BUT BUTT','SEA DOG'],
+  'Peter Mansvelt':            ['FISHBONE','SON OF JAMAICA','CAESAR'],
+  'Michael Swanepoel':         ['SON OF JAMAICA','MACUSHLA','NOTHING BUT BUTT'],
+  'Wayne Voogt':               ['MACUSHLA','REEL NAUTI','SEA DOG'],
+  'Andrea Papachristoforou':   ['NOTHING BUT BUTT','ELITE CAT','SEA DOG'],
+  'Xavier Truluck':            ['REEL NAUTI','SEA DOG','LEIGHWAY'],
+  'Phillip Papachristoforou':  ['SEA DOG','CAESAR','U GO GIRL'],
+  'Sheena Gerber':             ['NOTHING BUT BUTT','FISHBONE','LEIGHWAY'],
+  'Maggie Kolesky':            ['REEL NAUTI','LEIGHWAY','U GO GIRL'],
+  'Lisa Bekker':               ['LEIGHWAY','CAESAR','MACUSHLA'],
+  'Ben Groenewald':            ['NOTHING BUT BUTT','SON OF JAMAICA','U GO GIRL'],
+  'Jack Magerla':              ['REEL NAUTI','U GO GIRL','MACUSHLA'],
+  'Owen Lineker':              ['U GO GIRL','REEL NAUTI','LEIGHWAY'],
+  'Donald Brown':              ['NOTHING BUT BUTT','REEL NAUTI','MACUSHLA'],
+  'Wayne Gerber':              ['REEL NAUTI','MACUSHLA','SON OF JAMAICA'],
+  'Brian Gerber':              ['MACUSHLA','SON OF JAMAICA','REEL NAUTI'],
 }
 
+// ─── ANGLER → TEAM MAP — corrected ───────────────────────────────────────────
 function getAnglerTeam(name) {
   const teamMap = {
-    'Madelein Fourie':'EPDSAA B','Brenda Weyer':'EPDSAA B','Joelene Lerm':'EPDSAA B',
-    'Ossie Sauermann':'WESTERN PROVINCE','Stephen Flemming':'WESTERN PROVINCE','Gareth Decker':'WESTERN PROVINCE',
-    'Andrew Sparg':'BORDER WHITE','Tim Wood':'BORDER WHITE','Dennis Ford':'BORDER WHITE',
-    'Saxon Ansley':'SOUTHERN CAPE JNR WHITE','Joshua Du Plessis':'SOUTHERN CAPE JNR WHITE','Jaden De Villiers':'SOUTHERN CAPE JNR WHITE',
-    'Wessel Havenga':'SOUTHERN CAPE MEN','Pieter Strobos':'SOUTHERN CAPE MEN','Kabous Oosthuizen':'SOUTHERN CAPE MEN',
-    'Jacques Bekker':'EPDSAA A','Deon Van Jaarsvelt':'EPDSAA A','Brett Potgieter':'EPDSAA A',
-    'Riaz Hussain':'FREE STATE','Sayed Cassiem':'FREE STATE','Brandon Hooke':'FREE STATE',
-    'Peter Mansvelt':'BORDER BLUE','Michael Swanepoel':'BORDER BLUE','Wayne Vooght':'BORDER BLUE',
-    'Andrea Papachristoforou':'NATAL','Xavier Truluck':'NATAL','Phillip Papachristoforou':'NATAL',
-    'Sheena Gerber':'EP LADIES B','Maggie Koleskie':'EP LADIES B','Lisa Bekker':'EP LADIES B',
-    'Ben Groenewald':'SOUTHERN CAPE JNR GREEN','Jack Magerla':'SOUTHERN CAPE JNR GREEN','Owen Lineker':'SOUTHERN CAPE JNR GREEN',
-    'Donald Brown':'EP LADIES A','Wayne Gerber':'EP LADIES A','Brian Gerber':'EP LADIES A',
+    'Wayne Gerber':'EPDSAA A','Brian Gerber':'EPDSAA A','Donald Brown':'EPDSAA A',
+    'Brett Potgieter':'EPDSAA B','Jacques Bekker':'EPDSAA B','Deon van Jaarsveld':'EPDSAA B',
+    'Lisa Bekker':'EP LADIES A','Sheena Gerber':'EP LADIES A','Maggie Kolesky':'EP LADIES A',
+    'Brenda Weyer':'EP LADIES B','Madelein Fourie':'EP LADIES B','Joelene Lerm':'EP LADIES B',
+    'Andrew Sparg':'BORDER WHITE','Dennis Ford':'BORDER WHITE','Tim Wood':'BORDER WHITE',
+    'Michael Swanepoel':'BORDER BLUE','Peter Mansvelt':'BORDER BLUE','Wayne Voogt':'BORDER BLUE',
+    'Kobus Oosthuizen':'SOUTHERN CAPE MEN','Pieter Strobos':'SOUTHERN CAPE MEN','Wessel Havenga':'SOUTHERN CAPE MEN',
+    'Joshua Du Plessis':'SOUTHERN CAPE JNR WHITE','Jaden De Villiers':'SOUTHERN CAPE JNR WHITE','Saxon Ansley':'SOUTHERN CAPE JNR WHITE',
+    'Jack Magerla':'SOUTHERN CAPE JNR GREEN','Owen Lineker':'SOUTHERN CAPE JNR GREEN','Ben Groenewald':'SOUTHERN CAPE JNR GREEN',
+    'Stephen Flemming':'WESTERN PROVINCE','Ossie Sauermann':'WESTERN PROVINCE','Gareth Decker':'WESTERN PROVINCE',
+    'Riaz Hussain':'NATAL','Brandon Hooke':'NATAL','Sayed Cassiem':'NATAL',
+    'Andrea Papachristoforou':'FREE STATE','Xavier Truluck':'FREE STATE','Phillip Papachristoforou':'FREE STATE',
   }
   return teamMap[name] || 'Unknown'
 }
 
-// ─── STYLES ──────────────────────────────────────────────────────────────────
+// ─── STYLES ───────────────────────────────────────────────────────────────────
 
 const NAVY = '#1e3a8a'
 const GOLD = '#d97706'
@@ -113,13 +117,11 @@ const S = {
   medalIcon: (pos) => pos === 1 ? '🥇' : pos === 2 ? '🥈' : pos === 3 ? '🥉' : `${pos}.`,
 }
 
-// ─── MEDAL ICON ──────────────────────────────────────────────────────────────
-
 function MedalIcon({ pos }) {
   return <span style={{ fontWeight: 700, minWidth: 28, display: 'inline-block' }}>{S.medalIcon(pos)}</span>
 }
 
-// ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
+// ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
 export default function AllCoastalsScoreboard() {
   const [catches, setCatches] = useState([])
@@ -141,13 +143,12 @@ export default function AllCoastalsScoreboard() {
 
   useEffect(() => { load() }, [load])
 
-  // Auto-refresh every 60 seconds
   useEffect(() => {
     const interval = setInterval(load, 60000)
     return () => clearInterval(interval)
   }, [load])
 
-  // ── Derive angler standings ───────────────────────────────────────────────
+  // ── Angler standings ──────────────────────────────────────────────────────
 
   const anglerStandings = Object.keys(BOAT_DRAW).map(name => {
     const rows = catches.filter(r => r.angler_name === name)
@@ -162,7 +163,7 @@ export default function AllCoastalsScoreboard() {
     return b.totalRawPts - a.totalRawPts
   })
 
-  // ── Derive team standings ─────────────────────────────────────────────────
+  // ── Team standings ────────────────────────────────────────────────────────
 
   const teamStandings = Object.keys(TEAMS).map(team => {
     const members = Object.entries(BOAT_DRAW)
@@ -179,9 +180,7 @@ export default function AllCoastalsScoreboard() {
     return b.totalRawPts - a.totalRawPts
   })
 
-  // ── Derive skipper standings (grand prix — lowest wins) ───────────────────
-  // Skipper avg points = average of anglers' raw points on their boat each day
-  // Then grand prix position awarded per day (1st=1pt, 2nd=2pt, etc.)
+  // ── Skipper standings (grand prix — lowest wins) ──────────────────────────
 
   const skipperDailyAvg = {}
   for (const [boat] of Object.entries(SKIPPERS)) {
@@ -194,13 +193,11 @@ export default function AllCoastalsScoreboard() {
     }
   }
 
-  // For each day, rank skippers by avg and assign grand prix positions
   const skipperGPPoints = {}
   for (let day = 1; day <= 3; day++) {
     const boatsThisDay = Object.entries(skipperDailyAvg)
       .filter(([, days]) => days[day] !== undefined)
       .sort((a, b) => b[1][day] - a[1][day])
-
     boatsThisDay.forEach(([boat], idx) => {
       if (!skipperGPPoints[boat]) skipperGPPoints[boat] = { gp: 0, days: {}, avgByDay: {} }
       skipperGPPoints[boat].gp += (idx + 1)
@@ -208,9 +205,6 @@ export default function AllCoastalsScoreboard() {
       skipperGPPoints[boat].avgByDay[day] = skipperDailyAvg[boat][day]
     })
   }
-
-  // Skippers who didn't fish a day get (boats_that_day + 1) points — handle missing days
-  // For simplicity, if no entry, they simply don't appear in standings yet
 
   const skipperStandings = Object.entries(skipperGPPoints).map(([boat, data]) => ({
     boat,
@@ -221,21 +215,17 @@ export default function AllCoastalsScoreboard() {
     totalFish: catches.filter(r => r.boat_name === boat).reduce((s, r) => s + (r.total_fish ?? 0), 0),
     totalRawPts: catches.filter(r => r.boat_name === boat).reduce((s, r) => s + (r.total_points ?? 0), 0),
   })).sort((a, b) => {
-    // Lower GP total = better
     if (a.gpTotal !== b.gpTotal) return a.gpTotal - b.gpTotal
     if (b.totalFish !== a.totalFish) return b.totalFish - a.totalFish
     return b.totalRawPts - a.totalRawPts
   })
 
-  // ── Daily boat results ────────────────────────────────────────────────────
+  // ── Stats ─────────────────────────────────────────────────────────────────
 
   const daysWithData = [1, 2, 3].filter(d => catches.some(r => r.day_number === d))
-
-  // ── Stats summary ─────────────────────────────────────────────────────────
   const totalEntries = catches.length
   const totalFishAll = catches.reduce((s, r) => s + (r.total_fish ?? 0), 0)
 
-  // Species frequency
   const speciesCounts = {}
   catches.forEach(r => {
     r.catches?.forEach(c => {
@@ -251,7 +241,7 @@ export default function AllCoastalsScoreboard() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
           <div>
             <div style={{ fontSize: '1.1rem', fontWeight: 700 }}>🏆 SADSAA All Coastal Bottomfish 2026</div>
-            <div style={{ fontSize: '0.85rem', opacity: 0.85, marginTop: 2 }}>St Francis Bay · Live Scoreboard</div>
+            <div style={{ fontSize: '0.85rem', opacity: 0.85, marginTop: 2 }}>Cape St Francis · Live Scoreboard</div>
           </div>
           <div style={{ textAlign: 'right' }}>
             <button onClick={load} disabled={loading}
@@ -265,7 +255,6 @@ export default function AllCoastalsScoreboard() {
             )}
           </div>
         </div>
-        {/* Stats bar */}
         <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
           {[
             { label: 'Scorecards', value: totalEntries },
@@ -284,11 +273,11 @@ export default function AllCoastalsScoreboard() {
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 0, marginBottom: '1rem', borderRadius: 8, overflow: 'hidden', border: '1px solid #e5e7eb' }}>
         {[
-          { id: 'angler', label: '🎣 Anglers' },
-          { id: 'team',   label: '🏅 Teams' },
-          { id: 'skipper',label: '⚓ Skippers' },
-          { id: 'daily',  label: '📋 Daily' },
-          { id: 'stats',  label: '📊 Stats' },
+          { id: 'angler',  label: '🎣 Anglers' },
+          { id: 'team',    label: '🏅 Teams' },
+          { id: 'skipper', label: '⚓ Skippers' },
+          { id: 'daily',   label: '📋 Daily' },
+          { id: 'stats',   label: '📊 Stats' },
         ].map(t => (
           <button key={t.id} onClick={() => setActiveTab(t.id)} style={S.tab(activeTab === t.id)}>
             {t.label}
@@ -313,7 +302,7 @@ export default function AllCoastalsScoreboard() {
               <div key={a.name} style={{ ...S.medal(pos), borderRadius: 8, padding: '0.75rem 1rem', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <MedalIcon pos={pos} />
                 <div style={{ flex: 1, minWidth: 140 }}>
-                  <div style={{ fontWeight: 700 }}>{a.name}</div>
+                  <div style={{ fontWeight: 700 }}>{a.name}{TEAMS[a.team]?.captain === a.name ? ' ⚓' : ''}</div>
                   <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>{a.team}</div>
                 </div>
                 <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap' }}>
@@ -334,7 +323,6 @@ export default function AllCoastalsScoreboard() {
                     <div style={{ fontWeight: 700, fontSize: '1.1rem', color: '#374151' }}>{a.daysEntered}/3</div>
                   </div>
                 </div>
-                {/* Day breakdown */}
                 <div style={{ width: '100%', display: 'flex', gap: '0.4rem', marginTop: '0.25rem' }}>
                   {a.rows.map(r => (
                     <span key={r.day_number} style={{ fontSize: '0.75rem', background: '#eff6ff', color: NAVY, padding: '0.2rem 0.5rem', borderRadius: 4 }}>
@@ -345,7 +333,6 @@ export default function AllCoastalsScoreboard() {
               </div>
             )
           })}
-          {/* Not yet entered */}
           {anglerStandings.filter(a => a.daysEntered === 0).length > 0 && (
             <details style={{ marginTop: '0.75rem' }}>
               <summary style={{ fontSize: '0.82rem', color: '#9ca3af', cursor: 'pointer' }}>
@@ -382,7 +369,7 @@ export default function AllCoastalsScoreboard() {
                   <MedalIcon pos={pos} />
                   <div style={{ flex: 1, minWidth: 160 }}>
                     <div style={{ fontWeight: 700 }}>{t.team}</div>
-                    <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>Cpt: {t.captain}</div>
+                    <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>⚓ {t.captain}</div>
                   </div>
                   <div style={{ display: 'flex', gap: '1.25rem' }}>
                     <div style={{ textAlign: 'center' }}>
@@ -399,14 +386,13 @@ export default function AllCoastalsScoreboard() {
                     </div>
                   </div>
                 </div>
-                {/* Member breakdown */}
                 <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                   {t.members.map(m => {
                     const mRows = catches.filter(r => r.angler_name === m)
                     const mPct = mRows.reduce((s, r) => s + (r.boat_percentage ?? 0), 0)
                     return (
                       <span key={m} style={{ fontSize: '0.75rem', background: 'rgba(0,0,0,0.06)', padding: '0.2rem 0.5rem', borderRadius: 4 }}>
-                        {m.split(' ')[0]}: {mPct.toFixed(1)}%
+                        {m === t.captain ? '⚓ ' : ''}{m.split(' ')[0]}: {mPct.toFixed(1)}%
                       </span>
                     )
                   })}
@@ -467,7 +453,6 @@ export default function AllCoastalsScoreboard() {
                     </div>
                   </div>
                 </div>
-                {/* Daily GP positions */}
                 <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                   {[1,2,3].map(d => sk.days[d] !== undefined ? (
                     <span key={d} style={{ fontSize: '0.75rem', background: '#eff6ff', color: NAVY, padding: '0.2rem 0.5rem', borderRadius: 4 }}>
@@ -482,7 +467,6 @@ export default function AllCoastalsScoreboard() {
               </div>
             )
           })}
-          {/* Skippers with no data */}
           {Object.entries(SKIPPERS).filter(([boat]) => !skipperGPPoints[boat]).map(([boat, skipper]) => (
             <div key={boat} style={{ border: '1px dashed #d1d5db', borderRadius: 8, padding: '0.6rem 1rem', marginBottom: '0.3rem', color: '#9ca3af', fontSize: '0.85rem' }}>
               {skipper} ({boat}) — no data yet
@@ -551,7 +535,6 @@ export default function AllCoastalsScoreboard() {
             <div style={{ fontWeight: 700, color: NAVY, marginBottom: '0.75rem' }}>Top Species by Fish Count</div>
             {topSpecies.length === 0 && <div style={{ color: '#9ca3af', fontStyle: 'italic' }}>No data yet.</div>}
             {Object.entries(speciesCounts).sort((a,b) => b[1]-a[1]).map(([sp, count], i) => {
-              const maxCount = Object.values(speciesCounts)[0] || 1
               const pct = (count / Math.max(...Object.values(speciesCounts))) * 100
               return (
                 <div key={sp} style={{ marginBottom: '0.5rem' }}>
