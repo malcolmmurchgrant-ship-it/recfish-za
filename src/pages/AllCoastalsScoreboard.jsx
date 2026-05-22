@@ -186,7 +186,8 @@ export default function AllCoastalsScoreboard() {
   const skipperDailyAvg = {}
   for (const [boat] of Object.entries(SKIPPERS)) {
     for (let day = 1; day <= 3; day++) {
-      const boatRows = catches.filter(r => r.boat_name === boat && r.day_number === day && !r.disqualified)
+      // Include ALL anglers (incl. DQ) — DQ points still count toward skipper score
+      const boatRows = catches.filter(r => r.boat_name === boat && r.day_number === day)
       if (boatRows.length === 0) continue
       const avg = boatRows.reduce((s, r) => s + (r.total_points ?? 0), 0) / boatRows.length
       if (!skipperDailyAvg[boat]) skipperDailyAvg[boat] = {}
@@ -214,7 +215,7 @@ export default function AllCoastalsScoreboard() {
     days: data.days,
     avgByDay: data.avgByDay,
     totalFish: catches.filter(r => r.boat_name === boat).reduce((s, r) => s + (r.total_fish ?? 0), 0),
-    totalRawPts: catches.filter(r => r.boat_name === boat).reduce((s, r) => s + (r.total_points ?? 0), 0),
+    totalRawPts: catches.filter(r => r.boat_name === boat).reduce((s, r) => s + (r.total_points ?? 0), 0), // DQ points included
   })).sort((a, b) => {
     if (a.gpTotal !== b.gpTotal) return a.gpTotal - b.gpTotal
     if (b.totalFish !== a.totalFish) return b.totalFish - a.totalFish
