@@ -303,7 +303,13 @@ export default function AllCoastalsCatchLogger() {
       .then(({ data }) => {
         if (data) {
           setExistingEntry(data)
-          setCatches(data.catches)
+          // Merge saved catches into current SPECIES list so renamed/added species show correctly
+          const savedMap = {}
+          ;(data.catches || []).forEach(c => { savedMap[c.species] = c })
+          setCatches(SPECIES.map(sp => savedMap[sp.name]
+            ? { species: sp.name, fishCount: savedMap[sp.name].fishCount, overLineCount: savedMap[sp.name].overLineCount }
+            : { species: sp.name, fishCount: 0, overLineCount: 0 }
+          ))
           setRecordClaims(data.record_claims?.join('\n') || '')
         } else {
           setExistingEntry(null)
