@@ -8,7 +8,8 @@ const COMPETITION_ID = 'c8332f15-ce44-4d0b-a3ab-009fc2a2c484'
 // ─── SKIPPERS ─────────────────────────────────────────────────────────────────
 const SKIPPERS = {
   'ELITE CAT':        'André Olivier',
-  'FISHBONE':         'Richard Fulford',
+  'FISHBONE':         'Richard Fulford',  // Day 1 only
+  'SAHARA':           'John Robson',       // Day 2 & 3 (replaced FISHBONE)
   'NOTHING BUT BUTT': 'André Labuschagne',
   'CAESAR':           'Louis Fouché',
   'SON OF JAMAICA':   'Martin Gierz',
