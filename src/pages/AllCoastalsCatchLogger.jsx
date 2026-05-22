@@ -510,7 +510,9 @@ export default function AllCoastalsCatchLogger() {
                   Tap + for each fish landed. Toggle Over Line if fish exceeds the threshold length on the SADSAA mat.
                 </div>
                 {[
-                  { label: 'All Species — 3 pts per fish', filter: sp => sp.pointsPerFish === 3 },
+                  { label: '3 pts / fish', filter: sp => sp.pointsPerFish === 3 },
+                  { label: '4 pts / fish', filter: sp => sp.pointsPerFish === 4 },
+                  { label: '5 pts / fish', filter: sp => sp.pointsPerFish === 5 },
                 ].map(group => (
                   <div key={group.label} style={{ marginBottom: '1rem' }}>
                     <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.4rem', paddingLeft: 2 }}>
