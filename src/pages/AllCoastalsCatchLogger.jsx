@@ -77,41 +77,41 @@ const BOAT_DRAW = {
 }
 
 // ─── SPECIES — ST FRANCIS ANGLER INFO CARD ───────────────────────────────────
-// pointsPerFish: always 3 for all species
-// speciesBonus:  3, 4 or 5 pts — awarded ONCE on first fish of that species
-// overLineBonus: pts per over-line fish (Kob = 3, all others with OL = 5)
+// pointsPerFish: 3, 4 or 5 per species (from FISH POINTS PER FISH column)
+// speciesBonus:  always 3 — awarded ONCE on first fish of that species
+// overLineBonus: per over-line fish — Kob = 3, all others with OL threshold = 5
 const SPECIES = [
-  { name:'BAARDMAN',                       bag:10, minSize:40,   pointsPerFish:3, speciesBonus:5, overLineLength:null, lengthType:null, overLineBonus:0 },
-  { name:'BANK STEENBRAS',                 bag:10, minSize:50,   pointsPerFish:3, speciesBonus:5, overLineLength:null, lengthType:null, overLineBonus:0 },
-  { name:'BLACK MUSSELCRACKER / POENSKOP', bag:2,  minSize:50,   pointsPerFish:3, speciesBonus:5, overLineLength:60,   lengthType:'F',  overLineBonus:5 },
+  { name:'BAARDMAN',                       bag:10, minSize:40,   pointsPerFish:3, speciesBonus:3, overLineLength:null, lengthType:null, overLineBonus:0 },
+  { name:'BANK STEENBRAS',                 bag:10, minSize:50,   pointsPerFish:3, speciesBonus:3, overLineLength:null, lengthType:null, overLineBonus:0 },
+  { name:'BLACK MUSSELCRACKER / POENSKOP', bag:2,  minSize:50,   pointsPerFish:5, speciesBonus:3, overLineLength:60,   lengthType:'F',  overLineBonus:5 },
   { name:'BLACKTAIL',                      bag:10, minSize:25,   pointsPerFish:3, speciesBonus:3, overLineLength:null, lengthType:null, overLineBonus:0 },
   { name:'BLUE HOTTENTOT',                 bag:10, minSize:null, pointsPerFish:3, speciesBonus:3, overLineLength:null, lengthType:null, overLineBonus:0 },
   { name:'BRONZE BREAM',                   bag:10, minSize:30,   pointsPerFish:3, speciesBonus:3, overLineLength:null, lengthType:null, overLineBonus:0 },
   { name:'CARPENTER / SILVER',             bag:10, minSize:35,   pointsPerFish:3, speciesBonus:3, overLineLength:null, lengthType:null, overLineBonus:0 },
-  { name:'CATFACE ROCKCOD',                bag:5,  minSize:50,   pointsPerFish:3, speciesBonus:4, overLineLength:null, lengthType:null, overLineBonus:0 },
-  { name:'DAGERAAD',                       bag:5,  minSize:40,   pointsPerFish:3, speciesBonus:4, overLineLength:null, lengthType:null, overLineBonus:0 },
+  { name:'CATFACE ROCKCOD',                bag:5,  minSize:50,   pointsPerFish:4, speciesBonus:3, overLineLength:null, lengthType:null, overLineBonus:0 },
+  { name:'DAGERAAD',                       bag:5,  minSize:40,   pointsPerFish:4, speciesBonus:3, overLineLength:null, lengthType:null, overLineBonus:0 },
   { name:'DANE',                           bag:10, minSize:null, pointsPerFish:3, speciesBonus:3, overLineLength:null, lengthType:null, overLineBonus:0 },
-  { name:'ENGLISHMAN',                     bag:1,  minSize:40,   pointsPerFish:3, speciesBonus:5, overLineLength:null, lengthType:null, overLineBonus:0 },
-  { name:'GEELBEK / CAPE SALMON',          bag:10, minSize:60,   pointsPerFish:3, speciesBonus:4, overLineLength:88,   lengthType:'F',  overLineBonus:5 },
-  { name:'GRUNTER',                        bag:5,  minSize:40,   pointsPerFish:3, speciesBonus:4, overLineLength:null, lengthType:null, overLineBonus:0 },
+  { name:'ENGLISHMAN',                     bag:1,  minSize:40,   pointsPerFish:5, speciesBonus:3, overLineLength:null, lengthType:null, overLineBonus:0 },
+  { name:'GEELBEK / CAPE SALMON',          bag:10, minSize:60,   pointsPerFish:4, speciesBonus:3, overLineLength:88,   lengthType:'F',  overLineBonus:5 },
+  { name:'GRUNTER',                        bag:5,  minSize:40,   pointsPerFish:4, speciesBonus:3, overLineLength:null, lengthType:null, overLineBonus:0 },
   { name:'GURNARD',                        bag:10, minSize:null, pointsPerFish:3, speciesBonus:3, overLineLength:null, lengthType:null, overLineBonus:0 },
-  { name:'JAN BRUIN / JOHN BROWN',         bag:1,  minSize:null, pointsPerFish:3, speciesBonus:5, overLineLength:null, lengthType:null, overLineBonus:0 },
+  { name:'JAN BRUIN / JOHN BROWN',         bag:1,  minSize:null, pointsPerFish:5, speciesBonus:3, overLineLength:null, lengthType:null, overLineBonus:0 },
   { name:'KOB',                            bag:10, minSize:50,   pointsPerFish:3, speciesBonus:3, overLineLength:84,   lengthType:'T',  overLineBonus:3 },
   { name:'KOB (>110cm)',                   bag:1,  minSize:110,  pointsPerFish:3, speciesBonus:3, overLineLength:null, lengthType:null, overLineBonus:0 },
-  { name:'MISS LUCY / RED STUMPNOSE',      bag:1,  minSize:30,   pointsPerFish:3, speciesBonus:5, overLineLength:61,   lengthType:'F',  overLineBonus:5 },
-  { name:'MOUSTACHE ROCKCOD',              bag:5,  minSize:50,   pointsPerFish:3, speciesBonus:4, overLineLength:70,   lengthType:'T',  overLineBonus:5 },
-  { name:'WHITE MUSSELCRACKER',            bag:1,  minSize:60,   pointsPerFish:3, speciesBonus:5, overLineLength:65,   lengthType:'F',  overLineBonus:5 },
+  { name:'MISS LUCY / RED STUMPNOSE',      bag:1,  minSize:30,   pointsPerFish:5, speciesBonus:3, overLineLength:61,   lengthType:'F',  overLineBonus:5 },
+  { name:'MOUSTACHE ROCKCOD',              bag:5,  minSize:50,   pointsPerFish:4, speciesBonus:3, overLineLength:70,   lengthType:'T',  overLineBonus:5 },
+  { name:'WHITE MUSSELCRACKER',            bag:1,  minSize:60,   pointsPerFish:5, speciesBonus:3, overLineLength:65,   lengthType:'F',  overLineBonus:5 },
   { name:'PANGA / DIKBEKKIE',              bag:10, minSize:null, pointsPerFish:3, speciesBonus:3, overLineLength:null, lengthType:null, overLineBonus:0 },
-  { name:'RED STEENBRAS / COPPER',         bag:1,  minSize:60,   pointsPerFish:3, speciesBonus:5, overLineLength:68,   lengthType:'F',  overLineBonus:5 },
+  { name:'RED STEENBRAS / COPPER',         bag:1,  minSize:60,   pointsPerFish:5, speciesBonus:3, overLineLength:68,   lengthType:'F',  overLineBonus:5 },
   { name:'ROMAN',                          bag:10, minSize:30,   pointsPerFish:3, speciesBonus:3, overLineLength:null, lengthType:null, overLineBonus:0 },
-  { name:'SCOTSMAN',                       bag:5,  minSize:40,   pointsPerFish:3, speciesBonus:4, overLineLength:71,   lengthType:'F',  overLineBonus:5 },
+  { name:'SCOTSMAN',                       bag:5,  minSize:40,   pointsPerFish:4, speciesBonus:3, overLineLength:71,   lengthType:'F',  overLineBonus:5 },
   { name:'SHAD / ELF',                     bag:10, minSize:30,   pointsPerFish:3, speciesBonus:3, overLineLength:null, lengthType:null, overLineBonus:0 },
   { name:'SOLDIER / BASTERMAN / SANTER',   bag:10, minSize:30,   pointsPerFish:3, speciesBonus:3, overLineLength:null, lengthType:null, overLineBonus:0 },
   { name:'SHALLOW-WATER HAKE / STOCKFISH', bag:10, minSize:null, pointsPerFish:3, speciesBonus:3, overLineLength:null, lengthType:null, overLineBonus:0 },
-  { name:'TROPICAL TAIL / AMBERJACK',      bag:10, minSize:null, pointsPerFish:3, speciesBonus:5, overLineLength:79,   lengthType:'F',  overLineBonus:5 },
-  { name:'WHITE STEENBRAS / PIGNOSE',      bag:1,  minSize:60,   pointsPerFish:3, speciesBonus:5, overLineLength:65,   lengthType:'F',  overLineBonus:5 },
-  { name:'YELLOWBELLY ROCKCOD',            bag:2,  minSize:60,   pointsPerFish:3, speciesBonus:5, overLineLength:70,   lengthType:'T',  overLineBonus:5 },
-  { name:'YELLOWTAIL',                     bag:10, minSize:null, pointsPerFish:3, speciesBonus:5, overLineLength:79,   lengthType:'F',  overLineBonus:5 },
+  { name:'TROPICAL TAIL / AMBERJACK',      bag:10, minSize:null, pointsPerFish:5, speciesBonus:3, overLineLength:79,   lengthType:'F',  overLineBonus:5 },
+  { name:'WHITE STEENBRAS / PIGNOSE',      bag:1,  minSize:60,   pointsPerFish:5, speciesBonus:3, overLineLength:65,   lengthType:'F',  overLineBonus:5 },
+  { name:'YELLOWBELLY ROCKCOD',            bag:2,  minSize:60,   pointsPerFish:5, speciesBonus:3, overLineLength:70,   lengthType:'T',  overLineBonus:5 },
+  { name:'YELLOWTAIL',                     bag:10, minSize:null, pointsPerFish:5, speciesBonus:3, overLineLength:79,   lengthType:'F',  overLineBonus:5 },
   { name:'ZEBRA / WILDEPERD',              bag:10, minSize:30,   pointsPerFish:3, speciesBonus:3, overLineLength:null, lengthType:null, overLineBonus:0 },
 ]
 
