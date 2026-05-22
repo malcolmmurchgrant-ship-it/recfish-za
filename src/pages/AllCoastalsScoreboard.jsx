@@ -156,7 +156,8 @@ export default function AllCoastalsScoreboard() {
     const totalFish = rows.reduce((s, r) => s + (r.total_fish ?? 0), 0)
     const totalRawPts = rows.reduce((s, r) => s + (r.total_points ?? 0), 0)
     const daysEntered = rows.length
-    return { name, team: getAnglerTeam(name), totalPct, totalFish, totalRawPts, daysEntered, rows }
+    const hasDQ = rows.some(r => r.disqualified)
+    return { name, team: getAnglerTeam(name), totalPct, totalFish, totalRawPts, daysEntered, rows, hasDQ }
   }).sort((a, b) => {
     if (b.totalPct !== a.totalPct) return b.totalPct - a.totalPct
     if (b.totalFish !== a.totalFish) return b.totalFish - a.totalFish
@@ -185,7 +186,7 @@ export default function AllCoastalsScoreboard() {
   const skipperDailyAvg = {}
   for (const [boat] of Object.entries(SKIPPERS)) {
     for (let day = 1; day <= 3; day++) {
-      const boatRows = catches.filter(r => r.boat_name === boat && r.day_number === day)
+      const boatRows = catches.filter(r => r.boat_name === boat && r.day_number === day && !r.disqualified)
       if (boatRows.length === 0) continue
       const avg = boatRows.reduce((s, r) => s + (r.total_points ?? 0), 0) / boatRows.length
       if (!skipperDailyAvg[boat]) skipperDailyAvg[boat] = {}
@@ -302,7 +303,10 @@ export default function AllCoastalsScoreboard() {
               <div key={a.name} style={{ ...S.medal(pos), borderRadius: 8, padding: '0.75rem 1rem', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <MedalIcon pos={pos} />
                 <div style={{ flex: 1, minWidth: 140 }}>
-                  <div style={{ fontWeight: 700 }}>{a.name}{TEAMS[a.team]?.captain === a.name ? ' ⚓' : ''}</div>
+                  <div style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                    {a.name}{TEAMS[a.team]?.captain === a.name ? ' ⚓' : ''}
+                    {a.hasDQ && <span style={{ fontSize: '0.7rem', fontWeight: 700, background: '#dc2626', color: 'white', padding: '1px 6px', borderRadius: 3, letterSpacing: 0.5 }}>DQ</span>}
+                  </div>
                   <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>{a.team}</div>
                 </div>
                 <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap' }}>
@@ -325,8 +329,8 @@ export default function AllCoastalsScoreboard() {
                 </div>
                 <div style={{ width: '100%', display: 'flex', gap: '0.4rem', marginTop: '0.25rem' }}>
                   {a.rows.map(r => (
-                    <span key={r.day_number} style={{ fontSize: '0.75rem', background: '#eff6ff', color: NAVY, padding: '0.2rem 0.5rem', borderRadius: 4 }}>
-                      Day {r.day_number}: {r.boat_percentage?.toFixed(1)}% ({r.total_fish}🐟)
+                    <span key={r.day_number} style={{ fontSize: '0.75rem', background: r.disqualified ? '#fef2f2' : '#eff6ff', color: r.disqualified ? '#dc2626' : NAVY, padding: '0.2rem 0.5rem', borderRadius: 4, fontWeight: r.disqualified ? 700 : 400 }}>
+                      Day {r.day_number}: {r.disqualified ? '🚫 DQ' : `${r.boat_percentage?.toFixed(1)}% (${r.total_fish}🐟)`}
                     </span>
                   ))}
                 </div>
@@ -498,22 +502,25 @@ export default function AllCoastalsScoreboard() {
                 {days.map(d => {
                   const dayRows = boatRows.filter(r => r.day_number === d)
                   if (dayRows.length === 0) return null
-                  const maxPts = Math.max(...dayRows.map(r => r.total_points))
+                  const qualifiedRows = dayRows.filter(r => !r.disqualified)
+                  const maxPts = qualifiedRows.length > 0 ? Math.max(...qualifiedRows.map(r => r.total_points)) : 0
                   return (
                     <div key={d} style={{ marginBottom: '0.75rem' }}>
                       <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', marginBottom: '0.35rem' }}>Day {d}</div>
                       {[...dayRows].sort((a,b) => b.total_points - a.total_points).map((r, idx) => (
-                        <div key={r.angler_name} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.4rem 0.6rem', borderRadius: 6, background: idx === 0 ? '#fefce8' : '#f9fafb', marginBottom: '0.25rem', flexWrap: 'wrap' }}>
+                        <div key={r.angler_name} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.4rem 0.6rem', borderRadius: 6, background: r.disqualified ? '#fef2f2' : idx === 0 ? '#fefce8' : '#f9fafb', marginBottom: '0.25rem', flexWrap: 'wrap' }}>
                           <span style={{ minWidth: 20, fontWeight: 700, color: '#6b7280' }}>{idx+1}.</span>
                           <div style={{ flex: 1 }}>
                             <span style={{ fontWeight: 600 }}>{r.angler_name}</span>
+                            {r.disqualified && <span style={{ fontSize: '0.7rem', fontWeight: 700, background: '#dc2626', color: 'white', padding: '1px 6px', borderRadius: 3, marginLeft: 6 }}>DQ</span>}
                             <span style={{ fontSize: '0.78rem', color: '#6b7280', marginLeft: 6 }}>{r.team_name}</span>
+                            {r.disqualified && r.disqualified_reason && <span style={{ fontSize: '0.75rem', color: '#dc2626', marginLeft: 6 }}>— {r.disqualified_reason}</span>}
                           </div>
-                          <span style={{ fontWeight: 800, color: NAVY, minWidth: 52, textAlign: 'right' }}>
-                            {r.boat_percentage != null ? `${r.boat_percentage}%` : `${r.total_points}pts`}
+                          <span style={{ fontWeight: 800, color: r.disqualified ? '#dc2626' : NAVY, minWidth: 52, textAlign: 'right' }}>
+                            {r.disqualified ? '🚫 DQ' : r.boat_percentage != null ? `${r.boat_percentage}%` : `${r.total_points}pts`}
                           </span>
-                          <span style={{ fontSize: '0.78rem', color: '#6b7280' }}>{r.total_points}pts · {r.total_fish}🐟</span>
-                          {r.total_points === maxPts && <span style={{ fontSize: '0.78rem', background: '#fef9c3', padding: '0.1rem 0.4rem', borderRadius: 4 }}>Boat winner</span>}
+                          <span style={{ fontSize: '0.78rem', color: '#6b7280' }}>{r.total_fish}🐟 · {r.total_points}pts</span>
+                          {!r.disqualified && r.total_points === maxPts && <span style={{ fontSize: '0.78rem', background: '#fef9c3', padding: '0.1rem 0.4rem', borderRadius: 4 }}>Boat winner</span>}
                         </div>
                       ))}
                     </div>
