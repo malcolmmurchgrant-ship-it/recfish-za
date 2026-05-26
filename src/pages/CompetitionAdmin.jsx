@@ -837,6 +837,7 @@ export default function CompetitionAdmin() {
   // Load recent competitions for the picker
   useEffect(() => {
     supabase.from('competitions').select('id,name,discipline,level,start_date,status')
+      .in('status', ['active','upcoming','registration_open','completed'])
       .order('created_at', { ascending: false }).limit(20)
       .then(({ data }) => setRecentComps(data || []))
   }, [])
