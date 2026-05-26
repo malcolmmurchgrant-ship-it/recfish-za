@@ -16,6 +16,7 @@ import AllCoastalsCatchLogger from './pages/AllCoastalsCatchLogger'
 import AllCoastalsScoreboard from './pages/AllCoastalsScoreboard'
 import AllCoastalsAdmin from './pages/AllCoastalsAdmin'
 import AllCoastalsTeams from './pages/AllCoastalsTeams'
+import CompetitionAdminUniversal from './pages/CompetitionAdmin'
 import Profile from './pages/Profile'
 import SessionEndSummaryModal from './components/SessionEndSummaryModal'
 
@@ -44,7 +45,8 @@ function Navigation() {
           { to: '/species',          label: '🐟 Species' },
           { to: '/competitions',     label: '🏆 Competitions' },
           { to: '/allcoastals-admin',label: '⚙️ AC Admin' },
-          { to: '/allcoastals-teams',label: '🏅 AC Teams' },
+          { to: '/allcoastals-teams',  label: '🏅 AC Teams' },
+          { to: '/competition-admin-v2', label: '🏆 Comp Admin' },
           { to: '/profile',          label: '👤 Profile' },
         ].map(({ to, label }) => (
           <Link
@@ -111,6 +113,8 @@ function AppContent() {
             <Route path="/allcoastals-scores"  element={<AllCoastalsScoreboard />} />
             <Route path="/allcoastals-admin"   element={<AllCoastalsAdmin />} />
             <Route path="/allcoastals-teams"   element={<AllCoastalsTeams />} />
+            <Route path="/competition-admin-v2" element={<CompetitionAdminUniversal />} />
+            <Route path="/competition-admin-v2/:competitionId" element={<CompetitionAdminUniversal />} />
             <Route path="/profile"             element={<Profile />} />
             <Route path="/"                    element={<Navigate to="/dashboard" replace />} />
           </Routes>

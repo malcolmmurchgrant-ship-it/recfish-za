@@ -1,1167 +1,932 @@
-import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
+// ═══════════════════════════════════════════════════════════════════════════
+// CompetitionAdmin.jsx — Universal Competition Administration
+// Supports all SADSAA disciplines, associations and formats
+// Route: /competition-admin-v2
+// Route with ID: /competition-admin-v2/:competitionId
+// ═══════════════════════════════════════════════════════════════════════════
+
+import { useState, useEffect, useCallback } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../lib/supabase'
 
-const AUTHORISED_ADMINS = [
-  'mpca99@telkomsa.net',
-  'malcolmmurchgrant@gmail.com',
-  'wpdsaa@mweb.co.za',
-]
+// ─── CONSTANTS ────────────────────────────────────────────────────────────────
+const NAVY   = '#1e3a8a'
+const GOLD   = '#d97706'
+const GREEN  = '#16a34a'
+const RED    = '#dc2626'
+const GREY   = '#6b7280'
 
-const NAT_COMP_ID = 'ff6e95a9-4f9e-4b54-ad47-a913831d336c'
-const INT_COMP_ID = '4a905558-8a94-4dc2-8305-bce37bfc1fe4'
-const GAMEFISH_ID = 'ec9c5e41-a41a-4f2f-b8f6-75843b3b4f77'
-const NAVY = '#1e3a8a'
-
-// ── CATCH EDIT FORM ────────────────────────────────────────────
-function CatchEditForm({ editingCatch, setEditingCatch, teams, participants, boats, saving, onSave, onCancel }) {
-  const iStyle = { width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '0.9rem', marginBottom: '0.5rem' }
-  const btn = (color) => ({ padding: '0.5rem 1rem', background: color, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' })
-  return (
-    <div style={{ padding: '1rem', background: '#eff6ff', border: '2px solid #1e40af', borderRadius: '8px', marginTop: '0.5rem' }}>
-      <div style={{ fontWeight: '600', fontSize: '0.85rem', color: NAVY, marginBottom: '0.75rem' }}>Editing catch</div>
-      <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Team</label>
-      <select style={iStyle} value={editingCatch.team_id}
-        onChange={e => setEditingCatch(c => ({ ...c, team_id: e.target.value, angler_id: '' }))}>
-        {teams.map(t => <option key={t.id} value={t.id}>{t.team_name}</option>)}
-      </select>
-      <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Angler</label>
-      <select style={iStyle} value={editingCatch.angler_id}
-        onChange={e => setEditingCatch(c => ({ ...c, angler_id: e.target.value }))}>
-        <option value="">— Select angler —</option>
-        {participants.filter(p => p.team_id === editingCatch.team_id).map(p =>
-          <option key={p.id} value={p.id}>{p.full_name}{p.status === 'reserve' ? ' (Reserve)' : ''}</option>
-        )}
-      </select>
-      <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Boat</label>
-      <select style={iStyle} value={editingCatch.boat_id || ''}
-        onChange={e => setEditingCatch(c => ({ ...c, boat_id: e.target.value }))}>
-        <option value="">— Select boat —</option>
-        {boats.map(b => <option key={b.id} value={b.id}>{b.boat_name} — {b.skipper_name}</option>)}
-      </select>
-      <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Species</label>
-      <input style={iStyle} value={editingCatch.species_name}
-        onChange={e => setEditingCatch(c => ({ ...c, species_name: e.target.value }))} />
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-        <div>
-          <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Weight (kg)</label>
-          <input type="number" step="0.01" style={iStyle} value={editingCatch.weight_kg || ''}
-            onChange={e => setEditingCatch(c => ({ ...c, weight_kg: e.target.value }))} />
-        </div>
-        <div>
-          <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Line Class</label>
-          <select style={iStyle} value={editingCatch.line_class_kg || 10}
-            onChange={e => setEditingCatch(c => ({ ...c, line_class_kg: e.target.value }))}>
-            <option value={10}>10 kg</option>
-            <option value={15}>15 kg</option>
-          </select>
-        </div>
-      </div>
-      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', cursor: 'pointer' }}>
-        <input type="checkbox" checked={editingCatch.scoring === false}
-          onChange={e => setEditingCatch(c => ({ ...c, scoring: !e.target.checked }))} />
-        <span style={{ fontSize: '0.85rem', fontWeight: '500' }}>Non-scoring (mutilated/predated)</span>
-      </label>
-      <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Notes</label>
-      <input style={iStyle} value={editingCatch.notes || ''}
-        onChange={e => setEditingCatch(c => ({ ...c, notes: e.target.value }))} />
-      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-        <button onClick={onSave} disabled={saving} style={btn('#166534')}>{saving ? 'Saving...' : 'Save Changes'}</button>
-        <button onClick={onCancel} style={btn('#6b7280')}>Cancel</button>
-      </div>
-    </div>
-  )
+const DISCIPLINE_LABELS = {
+  bottomfish:     '🐟 Bottomfish',
+  tuna:           '🐟 Tuna',
+  gamefish:       '🐟 Gamefish',
+  billfish_light: '🐟 Light Tackle Billfish',
+  billfish_heavy: '🐟 Heavy Tackle Billfish',
+  mixed:          '🐟 Mixed',
+  shore:          '🏖 Shore',
+  spearfishing:   '🤿 Spearfishing',
 }
 
-// ── ADD DAY FORM ───────────────────────────────────────────────
-function AddDayForm({ days, onAdd, saving, iStyle, btn }) {
-  const nextDay = (days.length > 0 ? Math.max(...days.map(d => d.day_number)) : 0) + 1
-  const [dayNum, setDayNum] = useState(nextDay)
-  const [date, setDate] = useState('')
+const LEVEL_LABELS = {
+  international:   '🌍 International',
+  national:        '🏆 National',
+  interprovincial: '🏅 Interprovincial',
+  provincial:      '📍 Provincial',
+  regional:        '📍 Regional',
+  club:            '🎣 Club',
+  special:         '⭐ Special',
+}
+
+const CATEGORY_LABELS = {
+  open:       'Open',
+  junior:     'Junior',
+  junior_u16: 'Junior U16',
+  junior_u19: 'Junior U19',
+  junior_u21: 'Junior U21',
+  ladies:     'Ladies',
+  special:    'Special',
+}
+
+const S = {
+  page:    { maxWidth: 1000, margin: '0 auto', padding: '1rem', fontFamily: 'system-ui, sans-serif' },
+  card:    { background: 'white', borderRadius: 8, padding: '1.25rem', boxShadow: '0 1px 4px rgba(0,0,0,0.10)', marginBottom: '1rem' },
+  label:   { fontSize: '0.78rem', fontWeight: 700, color: GREY, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4, display: 'block' },
+  input:   { width: '100%', padding: '0.6rem 0.75rem', borderRadius: 6, border: '1px solid #d1d5db', fontSize: '0.95rem', boxSizing: 'border-box' },
+  select:  { width: '100%', padding: '0.6rem 0.75rem', borderRadius: 6, border: '1px solid #d1d5db', fontSize: '0.95rem', background: 'white', boxSizing: 'border-box' },
+  btn:     (bg=NAVY, color='white') => ({ background: bg, color, border: 'none', padding: '0.55rem 1.1rem', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: '0.9rem' }),
+  btnSm:   (bg=NAVY, color='white') => ({ background: bg, color, border: 'none', padding: '0.35rem 0.75rem', borderRadius: 5, cursor: 'pointer', fontWeight: 600, fontSize: '0.8rem' }),
+  grid2:   { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' },
+  grid3:   { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' },
+  row:     { display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' },
+  tab:     (active) => ({ flex: 1, padding: '0.65rem', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem', background: active ? NAVY : 'white', color: active ? 'white' : '#374151' }),
+  badge:   (color) => ({ background: color, color: 'white', padding: '0.2rem 0.6rem', borderRadius: 20, fontSize: '0.75rem', fontWeight: 700 }),
+}
+
+// ─── SETUP TAB ────────────────────────────────────────────────────────────────
+function SetupTab({ competition, onSaved }) {
+  const [federations, setFederations]   = useState([])
+  const [associations, setAssociations] = useState([])
+  const [templates, setTemplates]       = useState([])
+  const [form, setForm] = useState({
+    name: '', short_name: '', federation_id: '', association_id: '',
+    template_id: '', discipline: '', level: '', category: 'open',
+    venue: '', hosting_province: '', start_date: '', end_date: '',
+    team_format: 'split_boat', team_size: 3, num_fishing_days: 3,
+    default_line_class_kg: 6, fine_grid_number: '', coarse_grid_number: '',
+    results_visible: true, catch_release_enabled: false,
+    description: '', td_name: '',
+  })
+  const [saving, setSaving] = useState(false)
+  const [saved,  setSaved]  = useState(false)
+  const [error,  setError]  = useState('')
+
+  // Pre-fill from existing competition
+  useEffect(() => {
+    if (competition) {
+      setForm(f => ({ ...f,
+        name:                  competition.name || '',
+        short_name:            competition.short_name || '',
+        federation_id:         competition.federation_id || '',
+        association_id:        competition.association_id || '',
+        template_id:           competition.template_id || '',
+        discipline:            competition.discipline || '',
+        level:                 competition.level || '',
+        category:              competition.category || 'open',
+        venue:                 competition.venue || '',
+        hosting_province:      competition.hosting_province || '',
+        start_date:            competition.start_date || '',
+        end_date:              competition.end_date || '',
+        team_format:           competition.team_format || 'split_boat',
+        team_size:             competition.team_size || 3,
+        default_line_class_kg: competition.default_line_class_kg || 6,
+        fine_grid_number:      competition.fine_grid_number || '',
+        coarse_grid_number:    competition.coarse_grid_number || '',
+        results_visible:       competition.results_visible ?? true,
+        catch_release_enabled: competition.catch_release_enabled ?? false,
+        description:           competition.description || '',
+        td_name:               competition.td_name || '',
+      }))
+    }
+  }, [competition])
+
+  // Load federations
+  useEffect(() => {
+    supabase.from('federations').select('*').eq('status','active').order('short_name')
+      .then(({ data }) => setFederations(data || []))
+  }, [])
+
+  // Load associations when federation changes
+  useEffect(() => {
+    if (!form.federation_id) { setAssociations([]); return }
+    supabase.from('associations').select('*')
+      .eq('federation_id', form.federation_id)
+      .eq('status','active')
+      .order('short_name')
+      .then(({ data }) => setAssociations(data || []))
+  }, [form.federation_id])
+
+  // Load templates when federation changes
+  useEffect(() => {
+    if (!form.federation_id) { setTemplates([]); return }
+    supabase.from('competition_templates').select('*')
+      .eq('federation_id', form.federation_id)
+      .eq('is_active', true)
+      .order('discipline').order('level').order('category')
+      .then(({ data }) => setTemplates(data || []))
+  }, [form.federation_id])
+
+  // Auto-fill from template
+  const handleTemplateChange = (templateId) => {
+    const tpl = templates.find(t => t.id === templateId)
+    if (!tpl) { setForm(f => ({ ...f, template_id: templateId })); return }
+    setForm(f => ({
+      ...f,
+      template_id:           tpl.id,
+      discipline:            tpl.discipline,
+      level:                 tpl.level || f.level,
+      category:              tpl.category,
+      team_format:           tpl.team_format,
+      team_size:             tpl.team_size,
+      default_line_class_kg: tpl.default_line_class_kg || f.default_line_class_kg,
+      catch_release_enabled: tpl.catch_release_enabled,
+    }))
+  }
+
+  const set = (key, val) => setForm(f => ({ ...f, [key]: val }))
+
+  const handleSave = async () => {
+    if (!form.name || !form.federation_id || !form.start_date) {
+      setError('Competition name, federation and start date are required.')
+      return
+    }
+    setSaving(true); setError('')
+
+    const payload = {
+      name:                  form.name,
+      short_name:            form.short_name || form.name.slice(0,20),
+      federation_id:         form.federation_id || null,
+      association_id:        form.association_id || null,
+      template_id:           form.template_id || null,
+      discipline:            form.discipline || null,
+      level:                 form.level || null,
+      category:              form.category || 'open',
+      venue:                 form.venue || null,
+      hosting_province:      form.hosting_province || null,
+      start_date:            form.start_date || null,
+      end_date:              form.end_date || null,
+      team_format:           form.team_format || null,
+      team_size:             parseInt(form.team_size) || 3,
+      default_line_class_kg: parseInt(form.default_line_class_kg) || 6,
+      fine_grid_number:      form.fine_grid_number ? parseInt(form.fine_grid_number) : null,
+      coarse_grid_number:    form.coarse_grid_number ? parseInt(form.coarse_grid_number) : null,
+      results_visible:       form.results_visible,
+      catch_release_enabled: form.catch_release_enabled,
+      description:           form.description || null,
+      td_name:               form.td_name || null,
+      status:                'active',
+      updated_at:            new Date().toISOString(),
+    }
+
+    let result
+    if (competition?.id) {
+      result = await supabase.from('competitions').update(payload).eq('id', competition.id).select().single()
+    } else {
+      result = await supabase.from('competitions').insert(payload).select().single()
+    }
+
+    if (result.error) { setError(result.error.message); setSaving(false); return }
+    setSaving(false); setSaved(true)
+    setTimeout(() => setSaved(false), 3000)
+    onSaved(result.data)
+  }
+
+  const selectedFed  = federations.find(f => f.id === form.federation_id)
+  const selectedTpl  = templates.find(t => t.id === form.template_id)
+
   return (
     <div>
-      <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Day Number</label>
-      <input type="number" style={iStyle} value={dayNum} onChange={e => setDayNum(parseInt(e.target.value))} />
-      <label style={{ fontSize: '0.8rem', fontWeight: '600', color: '#374151' }}>Date</label>
-      <input type="date" style={iStyle} value={date} onChange={e => setDate(e.target.value)} />
-      <button onClick={() => { if (date) onAdd(dayNum, date) }} disabled={saving || !date} style={btn('#166534')}>
-        {saving ? 'Adding...' : 'Add Day'}
+      {/* Federation & Association */}
+      <div style={S.card}>
+        <div style={{ fontWeight: 700, color: NAVY, marginBottom: '1rem' }}>
+          1 — Organisation
+        </div>
+        <div style={S.grid2}>
+          <div>
+            <label style={S.label}>Federation *</label>
+            <select style={S.select} value={form.federation_id}
+              onChange={e => set('federation_id', e.target.value)}>
+              <option value=''>Select federation…</option>
+              {federations.map(f => (
+                <option key={f.id} value={f.id}>{f.short_name} — {f.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label style={S.label}>Hosting Association</label>
+            <select style={S.select} value={form.association_id}
+              onChange={e => set('association_id', e.target.value)}
+              disabled={!form.federation_id}>
+              <option value=''>Select association…</option>
+              {associations.map(a => (
+                <option key={a.id} value={a.id}>{a.short_name} — {a.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Template */}
+      <div style={S.card}>
+        <div style={{ fontWeight: 700, color: NAVY, marginBottom: '1rem' }}>
+          2 — Competition Template
+        </div>
+        <div>
+          <label style={S.label}>Template (auto-fills format & scoring rules)</label>
+          <select style={S.select} value={form.template_id}
+            onChange={e => handleTemplateChange(e.target.value)}
+            disabled={!form.federation_id}>
+            <option value=''>Select template…</option>
+            {templates.map(t => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </select>
+        </div>
+        {selectedTpl && (
+          <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: '#eff6ff', borderRadius: 6, fontSize: '0.85rem' }}>
+            <div style={S.row}>
+              <span style={S.badge(NAVY)}>{DISCIPLINE_LABELS[selectedTpl.discipline]}</span>
+              <span style={S.badge('#6b7280')}>{LEVEL_LABELS[selectedTpl.level]}</span>
+              <span style={S.badge(GREEN)}>{CATEGORY_LABELS[selectedTpl.category]}</span>
+              <span style={S.badge(GOLD)}>Team: {selectedTpl.team_size} anglers</span>
+            </div>
+            {selectedTpl.description && (
+              <div style={{ marginTop: '0.5rem', color: '#374151' }}>{selectedTpl.description}</div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Competition Details */}
+      <div style={S.card}>
+        <div style={{ fontWeight: 700, color: NAVY, marginBottom: '1rem' }}>
+          3 — Competition Details
+        </div>
+        <div style={{ marginBottom: '0.75rem' }}>
+          <label style={S.label}>Competition Name *</label>
+          <input style={S.input} value={form.name}
+            onChange={e => set('name', e.target.value)}
+            placeholder='e.g. SADSAA Gamefish Nationals 2026' />
+        </div>
+        <div style={{ ...S.grid2, marginBottom: '0.75rem' }}>
+          <div>
+            <label style={S.label}>Short Name</label>
+            <input style={S.input} value={form.short_name}
+              onChange={e => set('short_name', e.target.value)}
+              placeholder='e.g. Gamefish Nationals 2026' />
+          </div>
+          <div>
+            <label style={S.label}>Tournament Director</label>
+            <input style={S.input} value={form.td_name}
+              onChange={e => set('td_name', e.target.value)}
+              placeholder='Full name' />
+          </div>
+        </div>
+        <div style={{ ...S.grid2, marginBottom: '0.75rem' }}>
+          <div>
+            <label style={S.label}>Venue</label>
+            <input style={S.input} value={form.venue}
+              onChange={e => set('venue', e.target.value)}
+              placeholder='e.g. Meerensee Boat Club' />
+          </div>
+          <div>
+            <label style={S.label}>Hosting Province</label>
+            <input style={S.input} value={form.hosting_province}
+              onChange={e => set('hosting_province', e.target.value)}
+              placeholder='e.g. KwaZulu-Natal' />
+          </div>
+        </div>
+        <div style={{ ...S.grid3, marginBottom: '0.75rem' }}>
+          <div>
+            <label style={S.label}>Start Date *</label>
+            <input style={S.input} type='date' value={form.start_date}
+              onChange={e => set('start_date', e.target.value)} />
+          </div>
+          <div>
+            <label style={S.label}>End Date</label>
+            <input style={S.input} type='date' value={form.end_date}
+              onChange={e => set('end_date', e.target.value)} />
+          </div>
+          <div>
+            <label style={S.label}>Fishing Days</label>
+            <input style={S.input} type='number' min='1' max='10'
+              value={form.num_fishing_days}
+              onChange={e => set('num_fishing_days', e.target.value)} />
+          </div>
+        </div>
+        <div style={{ ...S.grid3, marginBottom: '0.75rem' }}>
+          <div>
+            <label style={S.label}>Team Size (anglers)</label>
+            <input style={S.input} type='number' min='1' max='6'
+              value={form.team_size}
+              onChange={e => set('team_size', e.target.value)} />
+          </div>
+          <div>
+            <label style={S.label}>Default Line Class (kg)</label>
+            <select style={S.select} value={form.default_line_class_kg}
+              onChange={e => set('default_line_class_kg', e.target.value)}>
+              {[6,8,10,15,24,37].map(lc => (
+                <option key={lc} value={lc}>{lc}kg</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label style={S.label}>Team Format</label>
+            <select style={S.select} value={form.team_format}
+              onChange={e => set('team_format', e.target.value)}>
+              <option value='split_boat'>Split Boat Draw</option>
+              <option value='full_boat'>Full Boat</option>
+              <option value='individual'>Individual</option>
+              <option value='pairs'>Pairs</option>
+            </select>
+          </div>
+        </div>
+        <div style={{ ...S.grid2, marginBottom: '0.75rem' }}>
+          <div>
+            <label style={S.label}>Fine Grid Number (SAN)</label>
+            <input style={S.input} type='number' value={form.fine_grid_number}
+              onChange={e => set('fine_grid_number', e.target.value)}
+              placeholder='e.g. 21548' />
+          </div>
+          <div>
+            <label style={S.label}>Coarse Grid Number (SAN)</label>
+            <input style={S.input} type='number' value={form.coarse_grid_number}
+              onChange={e => set('coarse_grid_number', e.target.value)}
+              placeholder='e.g. 2434' />
+          </div>
+        </div>
+        <div>
+          <label style={S.label}>Description / Notes</label>
+          <textarea style={{ ...S.input, resize: 'vertical' }} rows={3}
+            value={form.description}
+            onChange={e => set('description', e.target.value)}
+            placeholder='Any additional notes about this competition…' />
+        </div>
+      </div>
+
+      {/* Settings */}
+      <div style={S.card}>
+        <div style={{ fontWeight: 700, color: NAVY, marginBottom: '1rem' }}>
+          4 — Settings
+        </div>
+        <div style={S.row}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+            <input type='checkbox' checked={form.results_visible}
+              onChange={e => set('results_visible', e.target.checked)} />
+            <span style={{ fontWeight: 600 }}>Results visible to all users</span>
+          </label>
+          <span style={{ fontSize: '0.8rem', color: GREY }}>
+            Uncheck to hide live standings from competitors during the competition
+          </span>
+        </div>
+        <div style={{ ...S.row, marginTop: '0.75rem' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+            <input type='checkbox' checked={form.catch_release_enabled}
+              onChange={e => set('catch_release_enabled', e.target.checked)} />
+            <span style={{ fontWeight: 600 }}>Catch & Release enabled</span>
+          </label>
+          <span style={{ fontSize: '0.8rem', color: GREY }}>
+            Allows recording of released fish with configurable points
+          </span>
+        </div>
+      </div>
+
+      {/* Save */}
+      {error && <div style={{ background: '#fef2f2', color: RED, padding: '0.75rem', borderRadius: 6, marginBottom: '0.75rem' }}>{error}</div>}
+      {saved && <div style={{ background: '#f0fdf4', color: GREEN, padding: '0.75rem', borderRadius: 6, marginBottom: '0.75rem', fontWeight: 600 }}>✅ Competition saved successfully!</div>}
+      <button onClick={handleSave} disabled={saving}
+        style={{ ...S.btn(), padding: '0.75rem 2rem', fontSize: '1rem', opacity: saving ? 0.6 : 1 }}>
+        {saving ? 'Saving…' : competition?.id ? '💾 Update Competition' : '🚀 Create Competition'}
       </button>
     </div>
   )
 }
 
-// ── MAIN COMPONENT ─────────────────────────────────────────────
-export default function CompetitionAdminPanel({ onClose }) {
-  const { user } = useAuth()
-  const [tab, setTab] = useState('boats')
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [message, setMessage] = useState(null)
-  const [boats, setBoats] = useState([])
-  const [teams, setTeams] = useState([])
-  const [catches, setCatches] = useState([])
+// ─── TEAMS TAB ────────────────────────────────────────────────────────────────
+function TeamsTab({ competition }) {
+  const [teams, setTeams]           = useState([])
   const [participants, setParticipants] = useState([])
-  const [days, setDays] = useState([])
-  const [editingBoat, setEditingBoat] = useState(null)
-  const [editingCatch, setEditingCatch] = useState(null)
-  const [editingTeam, setEditingTeam] = useState(null)
-  const [selectedComp, setSelectedComp] = useState(NAT_COMP_ID)
-  const [addAngler, setAddAngler] = useState({ teamId: null, name: '', category: 'Crew', status: 'active' })
-  const [showBlackout, setShowBlackout] = useState({})
-  const [editingDay, setEditingDay] = useState(null)
-  const [compSignOff, setCompSignOff] = useState({ td_name: '', td_verified: false })
-  const [signOffLoaded, setSignOffLoaded] = useState(false)
-  const [roles, setRoles] = useState([])
-  const [roleEmail, setRoleEmail] = useState('')
-  const [roleValue, setRoleValue] = useState('tournament_director')
-  const [rolesLoading, setRolesLoading] = useState(false)
+  const [loading, setLoading]       = useState(true)
+  const [newTeam, setNewTeam]       = useState({ team_name: '', province: '' })
+  const [newAngler, setNewAngler]   = useState({ full_name: '', is_captain: false, team_id: '' })
+  const [addingTeam, setAddingTeam] = useState(false)
+  const [addingAngler, setAddingAngler] = useState(null) // team_id
+  const [error, setError]           = useState('')
 
-  const userEmail = (user?.email || user?.user_metadata?.email || '').toLowerCase()
-  const isAuthorised = AUTHORISED_ADMINS.includes(userEmail)
-
-  useEffect(() => { if (isAuthorised) { loadData(); loadSignOff(); loadRoles() } }, [selectedComp])
-
-  const loadData = async () => {
+  const load = useCallback(async () => {
+    if (!competition?.id) return
     setLoading(true)
-    const [boatsRes, teamsRes, catchesRes, participantsRes, daysRes] = await Promise.all([
-      supabase.from('competition_boats').select('*').eq('competition_id', selectedComp).order('boat_name'),
-      supabase.from('competition_teams').select('*').eq('competition_id', selectedComp).order('team_name'),
-      supabase.from('competition_catches').select('*').eq('competition_id', selectedComp).order('catch_time', { ascending: false }),
-      supabase.from('competition_participants').select('*').eq('competition_id', selectedComp).order('full_name'),
-      supabase.from('competition_days').select('*').eq('competition_id', selectedComp).order('day_number'),
+    const [{ data: t }, { data: p }] = await Promise.all([
+      supabase.from('competition_teams').select('*')
+        .eq('competition_id', competition.id).order('team_name'),
+      supabase.from('competition_participants').select('*')
+        .eq('competition_id', competition.id).order('full_name'),
     ])
-    setBoats(boatsRes.data || [])
-    setTeams(teamsRes.data || [])
-    setCatches(catchesRes.data || [])
-    setParticipants(participantsRes.data || [])
-    setDays(daysRes.data || [])
+    setTeams(t || [])
+    setParticipants(p || [])
     setLoading(false)
+  }, [competition?.id])
+
+  useEffect(() => { load() }, [load])
+
+  const handleAddTeam = async () => {
+    if (!newTeam.team_name) return
+    const { error: err } = await supabase.from('competition_teams').insert({
+      competition_id: competition.id,
+      team_name: newTeam.team_name,
+      province: newTeam.province || null,
+    })
+    if (err) { setError(err.message); return }
+    setNewTeam({ team_name: '', province: '' })
+    setAddingTeam(false)
+    load()
   }
 
-  const loadSignOff = async () => {
-    const { data } = await supabase
-      .from('competitions')
-      .select('td_name, td_verified, td_verified_at')
-      .eq('id', selectedComp)
-      .single()
-    if (data) {
-      setCompSignOff({ td_name: data.td_name || '', td_verified: data.td_verified || false, td_verified_at: data.td_verified_at })
-      setSignOffLoaded(true)
-    }
+  const handleAddAngler = async (teamId) => {
+    if (!newAngler.full_name) return
+    const { error: err } = await supabase.from('competition_participants').insert({
+      competition_id: competition.id,
+      team_id: teamId,
+      full_name: newAngler.full_name,
+      is_captain: newAngler.is_captain,
+      status: 'confirmed',
+    })
+    if (err) { setError(err.message); return }
+    setNewAngler({ full_name: '', is_captain: false, team_id: '' })
+    setAddingAngler(null)
+    load()
   }
 
-  const showMessage = (text, type = 'success') => {
-    setMessage({ text, type })
-    setTimeout(() => setMessage(null), 3000)
+  const handleDeleteAngler = async (id) => {
+    if (!window.confirm('Remove this angler?')) return
+    await supabase.from('competition_participants').delete().eq('id', id)
+    load()
   }
 
-  // ── BOATS ──────────────────────────────────────────────────────
-  const saveBoat = async () => {
-    if (!editingBoat) return
-    setSaving(true)
-    const { error } = await supabase.from('competition_boats')
-      .update({ boat_name: editingBoat.boat_name, skipper_name: editingBoat.skipper_name })
-      .eq('id', editingBoat.id)
-    if (error) showMessage('Error: ' + error.message, 'error')
-    else { showMessage('Boat updated'); setEditingBoat(null); loadData() }
-    setSaving(false)
+  const handleDeleteTeam = async (id) => {
+    if (!window.confirm('Delete this team and all its anglers?')) return
+    await supabase.from('competition_participants').delete().eq('team_id', id)
+    await supabase.from('competition_teams').delete().eq('id', id)
+    load()
   }
 
-  // ── TEAMS ──────────────────────────────────────────────────────
-  const saveTeamName = async (teamId, newName) => {
-    setSaving(true)
-    const { error } = await supabase.from('competition_teams').update({ team_name: newName }).eq('id', teamId)
-    if (error) showMessage('Error: ' + error.message, 'error')
-    else { showMessage('Team name updated'); setEditingTeam(null); loadData() }
-    setSaving(false)
+  const handleSetCaptain = async (participantId, teamId) => {
+    // Clear existing captain on team
+    await supabase.from('competition_participants')
+      .update({ is_captain: false })
+      .eq('team_id', teamId)
+    // Set new captain
+    await supabase.from('competition_participants')
+      .update({ is_captain: true })
+      .eq('id', participantId)
+    load()
   }
 
-  const addAnglerToTeam = async () => {
-    if (!addAngler.name.trim() || !addAngler.teamId) return
-    setSaving(true)
-    const { error } = await supabase.from('competition_participants').insert([{
-      competition_id: selectedComp,
-      team_id: addAngler.teamId,
-      user_id: crypto.randomUUID(),
-      full_name: addAngler.name.trim(),
-      category: addAngler.category,
-      division: 'Senior',
-      line_class_kg: 10,
-      status: addAngler.status,
-    }])
-    if (error) showMessage('Error: ' + error.message, 'error')
-    else { showMessage('Angler added'); setAddAngler({ teamId: null, name: '', category: 'Crew', status: 'active' }); loadData() }
-    setSaving(false)
+  const handleDQ = async (p) => {
+    const reason = window.prompt(`Disqualification reason for ${p.full_name}:`, p.disqualified_reason || '')
+    if (reason === null) return
+    await supabase.from('competition_participants')
+      .update({ disqualified: !p.disqualified, disqualified_reason: reason })
+      .eq('id', p.id)
+    load()
   }
 
-  const removeAngler = async (anglerId, anglerName) => {
-    if (!confirm('Remove ' + anglerName + ' from the team?')) return
-    setSaving(true)
-    const { error } = await supabase.from('competition_participants').delete().eq('id', anglerId)
-    if (error) showMessage('Error: ' + error.message, 'error')
-    else { showMessage('Angler removed'); loadData() }
-    setSaving(false)
-  }
+  if (!competition?.id) return (
+    <div style={{ color: GREY, fontStyle: 'italic' }}>Save the competition first to manage teams.</div>
+  )
 
-  const activateReserve = async (anglerId, anglerName) => {
-    setSaving(true)
-    const { error } = await supabase.from('competition_participants')
-      .update({ status: 'active' }).eq('id', anglerId)
-    if (error) showMessage('Error: ' + error.message, 'error')
-    else { showMessage(anglerName + ' activated'); loadData() }
-    setSaving(false)
-  }
+  if (loading) return <div style={{ color: GREY }}>Loading…</div>
 
-  // ── CATCHES ────────────────────────────────────────────────────
-  const calcPoints = (weightKg, lineClassKg, scoring) => {
-    if (!scoring || !weightKg || parseFloat(weightKg) <= 0) return 0
-    const w = parseFloat(weightKg)
-    const factors = { 10: 0.32, 15: 0.142 }
-    const f = factors[parseInt(lineClassKg || 10)] || 0.32
-    return parseFloat((w * w * f).toFixed(2))
-  }
-
-  const saveCatch = async () => {
-    if (!editingCatch) return
-    setSaving(true)
-    const recalcPoints = calcPoints(editingCatch.weight_kg, editingCatch.line_class_kg, editingCatch.scoring)
-    const { error } = await supabase.from('competition_catches').update({
-      team_id: editingCatch.team_id,
-      angler_id: editingCatch.angler_id,
-      boat_id: editingCatch.boat_id,
-      species_name: editingCatch.species_name,
-      weight_kg: editingCatch.weight_kg ? parseFloat(editingCatch.weight_kg) : null,
-      line_class_kg: parseInt(editingCatch.line_class_kg || 10),
-      points: recalcPoints,
-      scoring: editingCatch.scoring,
-      notes: editingCatch.notes,
-    }).eq('id', editingCatch.id)
-    if (error) showMessage('Error: ' + error.message, 'error')
-    else { showMessage('Catch updated — points recalculated'); setEditingCatch(null); loadData() }
-    setSaving(false)
-  }
-
-  const deleteCatch = async (id) => {
-    if (!confirm('Permanently delete this catch?')) return
-    setSaving(true)
-    const { error } = await supabase.from('competition_catches').delete().eq('id', id)
-    if (error) showMessage('Error: ' + error.message, 'error')
-    else { showMessage('Catch deleted'); loadData() }
-    setSaving(false)
-  }
-
-  // ── DAYS ───────────────────────────────────────────────────────
-  const addDay = async (dayNumber, date) => {
-    setSaving(true)
-    const { error } = await supabase.from('competition_days').insert([{
-      competition_id: selectedComp, day_number: dayNumber, date, session_status: 'pending'
-    }])
-    if (error) showMessage('Error: ' + error.message, 'error')
-    else { showMessage('Day ' + dayNumber + ' added'); loadData() }
-    setSaving(false)
-  }
-
-  const saveDay = async (day) => {
-    setSaving(true)
-    const { error } = await supabase.from('competition_days').update({
-      fishing_start_time: day.fishing_start_time,
-      fishing_end_time:   day.fishing_end_time,
-      lines_up_time:      day.lines_up_time,
-      capturer_name:      day.capturer_name,
-      capturer_contact:   day.capturer_contact,
-    }).eq('id', day.id)
-    if (error) showMessage('Error: ' + error.message, 'error')
-    else { showMessage('Day ' + day.day_number + ' updated'); setEditingDay(null); loadData() }
-    setSaving(false)
-  }
-
-  const saveDayStatus = async (dayId, dayNumber, status, reason, cancelTime) => {
-    setSaving(true)
-    const updates = {
-      day_status: status,
-      cancellation_reason: reason || null,
-      cancellation_time: cancelTime || null,
-      cancelled: status !== 'fishing',
-    }
-    const { error } = await supabase.from('competition_days').update(updates).eq('id', dayId)
-    if (error) showMessage('Error: ' + error.message, 'error')
-    else { showMessage('Day ' + dayNumber + ' status updated'); loadData() }
-    setSaving(false)
-  }
-
-  const saveSignOff = async () => {
-    setSaving(true)
-    const now = new Date().toISOString()
-    const { error } = await supabase.from('competitions').update({
-      td_name: compSignOff.td_name,
-      td_verified: compSignOff.td_verified,
-      td_verified_at: compSignOff.td_verified ? now : null,
-    }).eq('id', selectedComp)
-    if (error) showMessage('Error: ' + error.message, 'error')
-    else { showMessage('TD sign-off saved'); loadSignOff() }
-    setSaving(false)
-  }
-
-  // ── ROLES ──────────────────────────────────────────────────────
-  const loadRoles = async () => {
-    const { data } = await supabase
-      .from('competition_user_roles')
-      .select('id, role, user_id')
-      .eq('competition_id', selectedComp)
-    setRoles(data || [])
-  }
-
-  const addRole = async () => {
-    if (!roleEmail.trim()) return showMessage('Email is required', 'error')
-    setRolesLoading(true)
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('email', roleEmail.trim().toLowerCase())
-      .single()
-    if (userError || !userData) {
-      showMessage('User not found — they must register in the app first.', 'error')
-      setRolesLoading(false)
-      return
-    }
-    const { error } = await supabase.from('competition_user_roles').insert([{
-      competition_id: selectedComp,
-      user_id: userData.id,
-      role: roleValue,
-    }])
-    if (error) showMessage('Error: ' + error.message, 'error')
-    else { showMessage('Role assigned successfully'); setRoleEmail(''); loadRoles() }
-    setRolesLoading(false)
-  }
-
-  const removeRole = async (roleId) => {
-    if (!confirm('Remove this role?')) return
-    setSaving(true)
-    const { error } = await supabase.from('competition_user_roles').delete().eq('id', roleId)
-    if (error) showMessage('Error: ' + error.message, 'error')
-    else { showMessage('Role removed'); loadRoles() }
-    setSaving(false)
-  }
-
-  const toggleBlackout = async (dayId, current) => {
-    setSaving(true)
-    const newStatus = current === 'hidden' ? 'pending' : 'hidden'
-    const { error } = await supabase.from('competition_days')
-      .update({ session_status: newStatus }).eq('id', dayId)
-    if (error) showMessage('Error: ' + error.message, 'error')
-    else { showMessage('Day ' + (newStatus === 'hidden' ? 'results hidden' : 'results visible')); loadData() }
-    setSaving(false)
-  }
-
-  if (!isAuthorised) {
-    return (
-      <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>
-        <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🔒</div>
-        <div style={{ fontWeight: '600' }}>Access restricted to authorised officials only.</div>
-        <button onClick={onClose} style={{ marginTop: '1rem', padding: '0.5rem 1.5rem', background: NAVY, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Close</button>
-      </div>
-    )
-  }
-
-  if (loading) return <div style={{ padding: '2rem', textAlign: 'center', color: '#6b7280' }}>Loading...</div>
-
-  const iStyle = { width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '0.9rem', marginBottom: '0.5rem' }
-  const btn = (color) => ({ padding: '0.5rem 1rem', background: color, color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' })
-  const smallBtn = (color) => ({ padding: '0.25rem 0.6rem', background: color, color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: '600' })
-
-  const anglerGroups = {}
-  catches.forEach(c => {
-    const key = c.angler_id || 'unknown'
-    if (!anglerGroups[key]) {
-      const angler = participants.find(p => p.id === c.angler_id)
-      const team = teams.find(t => t.id === c.team_id)
-      anglerGroups[key] = { angler, team, name: angler?.full_name || 'Unknown', catches: [] }
-    }
-    anglerGroups[key].catches.push(c)
-  })
-  const sortedGroups = Object.values(anglerGroups).sort((a, b) => a.name.localeCompare(b.name))
+  const teamAnglers = (teamId) => participants.filter(p => p.team_id === teamId)
+  const totalAnglers = participants.length
+  const expectedAnglers = teams.length * (competition.team_size || 3)
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f3f4f6', paddingBottom: '3rem' }}>
-
-      {/* Header */}
-      <div style={{ background: NAVY, color: 'white', padding: '1rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <div style={{ fontSize: '0.7rem', opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.1em' }}>SADSAA — Admin</div>
-          <div style={{ fontSize: '1.1rem', fontWeight: '800' }}>Competition Data Editor</div>
+    <div>
+      {/* Summary */}
+      <div style={{ ...S.card, background: '#eff6ff' }}>
+        <div style={S.row}>
+          {[
+            { label: 'Teams', val: teams.length },
+            { label: 'Anglers', val: totalAnglers },
+            { label: 'Expected', val: expectedAnglers },
+            { label: 'Captains', val: participants.filter(p => p.is_captain).length },
+          ].map(s => (
+            <div key={s.label} style={{ textAlign: 'center', minWidth: 70 }}>
+              <div style={{ fontWeight: 800, fontSize: '1.4rem', color: NAVY }}>{s.val}</div>
+              <div style={{ fontSize: '0.72rem', color: GREY }}>{s.label}</div>
+            </div>
+          ))}
+          {totalAnglers < expectedAnglers && (
+            <div style={{ marginLeft: 'auto', fontSize: '0.82rem', color: GOLD, fontWeight: 600 }}>
+              ⚠ {expectedAnglers - totalAnglers} anglers still to add
+            </div>
+          )}
         </div>
-        <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', borderRadius: '20px', padding: '0.35rem 0.9rem', cursor: 'pointer', fontSize: '0.8rem' }}>✕ Close</button>
       </div>
 
-      {message && (
-        <div style={{ background: message.type === 'error' ? '#fee2e2' : '#d1fae5', color: message.type === 'error' ? '#991b1b' : '#065f46', padding: '0.75rem 1.5rem', fontWeight: '600', fontSize: '0.875rem' }}>
-          {message.text}
+      {error && <div style={{ background: '#fef2f2', color: RED, padding: '0.75rem', borderRadius: 6, marginBottom: '0.75rem' }}>{error}</div>}
+
+      {/* Team list */}
+      {teams.map(team => (
+        <div key={team.id} style={{ ...S.card, borderLeft: `4px solid ${NAVY}` }}>
+          {/* Team header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+            <div>
+              <span style={{ fontWeight: 700, fontSize: '1rem', color: NAVY }}>{team.team_name}</span>
+              {team.province && <span style={{ fontSize: '0.8rem', color: GREY, marginLeft: 8 }}>{team.province}</span>}
+            </div>
+            <div style={S.row}>
+              <button onClick={() => setAddingAngler(team.id)}
+                style={S.btnSm(GREEN)}>+ Angler</button>
+              <button onClick={() => handleDeleteTeam(team.id)}
+                style={S.btnSm('#f3f4f6','#374151')}>🗑</button>
+            </div>
+          </div>
+
+          {/* Anglers */}
+          {teamAnglers(team.id).length === 0 ? (
+            <div style={{ color: GREY, fontStyle: 'italic', fontSize: '0.85rem' }}>No anglers yet</div>
+          ) : (
+            teamAnglers(team.id)
+              .sort((a,b) => (b.is_captain ? 1 : 0) - (a.is_captain ? 1 : 0))
+              .map(p => (
+              <div key={p.id} style={{
+                display: 'flex', alignItems: 'center', gap: '0.5rem',
+                padding: '0.4rem 0', borderBottom: '1px solid #f0f0f0',
+                background: p.disqualified ? '#fef2f2' : 'transparent',
+                borderRadius: 4, paddingLeft: 4,
+              }}>
+                <span style={{ minWidth: 20 }}>{p.is_captain ? '⚓' : ''}</span>
+                <span style={{ flex: 1, fontWeight: p.is_captain ? 700 : 400, color: p.disqualified ? RED : '#111' }}>
+                  {p.full_name}
+                  {p.disqualified && <span style={{ ...S.badge(RED), marginLeft: 8 }}>DQ</span>}
+                </span>
+                {!p.is_captain && (
+                  <button onClick={() => handleSetCaptain(p.id, team.id)}
+                    style={S.btnSm('#f3f4f6','#374151')} title='Set as captain'>⚓</button>
+                )}
+                <button onClick={() => handleDQ(p)}
+                  style={S.btnSm(p.disqualified ? GOLD : '#f3f4f6', p.disqualified ? 'white' : '#374151')}
+                  title={p.disqualified ? 'Remove DQ' : 'Disqualify'}>
+                  {p.disqualified ? 'Un-DQ' : 'DQ'}
+                </button>
+                <button onClick={() => handleDeleteAngler(p.id)}
+                  style={S.btnSm('#f3f4f6','#374151')}>✕</button>
+              </div>
+            ))
+          )}
+
+          {/* Add angler inline form */}
+          {addingAngler === team.id && (
+            <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: '#f9fafb', borderRadius: 6 }}>
+              <div style={S.row}>
+                <input style={{ ...S.input, flex: 1 }}
+                  placeholder='Angler full name'
+                  value={newAngler.full_name}
+                  onChange={e => setNewAngler(a => ({ ...a, full_name: e.target.value }))}
+                  onKeyDown={e => e.key === 'Enter' && handleAddAngler(team.id)}
+                  autoFocus />
+                <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
+                  <input type='checkbox' checked={newAngler.is_captain}
+                    onChange={e => setNewAngler(a => ({ ...a, is_captain: e.target.checked }))} />
+                  Captain
+                </label>
+                <button onClick={() => handleAddAngler(team.id)} style={S.btnSm(GREEN)}>Add</button>
+                <button onClick={() => setAddingAngler(null)} style={S.btnSm('#f3f4f6','#374151')}>Cancel</button>
+              </div>
+            </div>
+          )}
         </div>
+      ))}
+
+      {/* Add team */}
+      {addingTeam ? (
+        <div style={{ ...S.card, borderLeft: `4px solid ${GREEN}` }}>
+          <div style={{ fontWeight: 700, marginBottom: '0.75rem', color: GREEN }}>New Team</div>
+          <div style={{ ...S.grid2, marginBottom: '0.75rem' }}>
+            <div>
+              <label style={S.label}>Team Name *</label>
+              <input style={S.input} placeholder='e.g. WPDSAA A'
+                value={newTeam.team_name}
+                onChange={e => setNewTeam(t => ({ ...t, team_name: e.target.value }))}
+                onKeyDown={e => e.key === 'Enter' && handleAddTeam()}
+                autoFocus />
+            </div>
+            <div>
+              <label style={S.label}>Province</label>
+              <input style={S.input} placeholder='e.g. Western Province'
+                value={newTeam.province}
+                onChange={e => setNewTeam(t => ({ ...t, province: e.target.value }))} />
+            </div>
+          </div>
+          <div style={S.row}>
+            <button onClick={handleAddTeam} style={S.btn(GREEN)}>Add Team</button>
+            <button onClick={() => setAddingTeam(false)} style={S.btn('#f3f4f6','#374151')}>Cancel</button>
+          </div>
+        </div>
+      ) : (
+        <button onClick={() => setAddingTeam(true)} style={{ ...S.btn(NAVY), marginTop: '0.25rem' }}>
+          + Add Team
+        </button>
       )}
-
-      {/* Competition selector */}
-      <div style={{ background: 'white', padding: '0.75rem 1rem', borderBottom: '1px solid #e5e7eb' }}>
-        <select value={selectedComp} onChange={e => setSelectedComp(e.target.value)}
-          style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '0.9rem', width: '100%' }}>
-          <option value={NAT_COMP_ID}>Tuna Nationals 2026</option>
-          <option value={INT_COMP_ID}>Tuna International 2026</option>
-          <option value={GAMEFISH_ID}>Junior Gamefish Nationals 2026</option>
-        </select>
-      </div>
-
-      {/* Tabs */}
-      <div style={{ display: 'flex', background: 'white', borderBottom: '2px solid #e5e7eb' }}>
-        {[['boats','Boats & Skippers'],['teams','Teams & Anglers'],['catches','Catches'],['days','Days'],['roles','Roles'],['linking','Angler Linking']].map(([v, label]) => (
-          <button key={v} onClick={() => setTab(v)} style={{
-            flex: 1, padding: '0.7rem 0.25rem', border: 'none', cursor: 'pointer',
-            fontWeight: '600', fontSize: '0.72rem', background: 'none',
-            borderBottom: tab === v ? '3px solid ' + NAVY : '3px solid transparent',
-            color: tab === v ? NAVY : '#6b7280'
-          }}>{label}</button>
-        ))}
-      </div>
-
-      <div style={{ maxWidth: '650px', margin: '0 auto', padding: '1rem' }}>
-
-        {/* ── BOATS TAB ── */}
-        {tab === 'boats' && (
-          <div>
-            <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '1rem' }}>Tap Edit to change a boat name or skipper.</p>
-            {boats.map(boat => {
-              const team = teams.find(t => t.boat_id === boat.id)
-              const isEditing = editingBoat?.id === boat.id
-              return (
-                <div key={boat.id} style={{ background: 'white', borderRadius: '8px', padding: '1rem', marginBottom: '0.75rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-                  {isEditing ? (
-                    <div>
-                      <div style={{ fontWeight: '600', fontSize: '0.85rem', color: NAVY, marginBottom: '0.5rem' }}>Editing: {boat.boat_name}</div>
-                      <input style={iStyle} placeholder="Boat name" value={editingBoat.boat_name}
-                        onChange={e => setEditingBoat(b => ({ ...b, boat_name: e.target.value }))} />
-                      <input style={iStyle} placeholder="Skipper name" value={editingBoat.skipper_name}
-                        onChange={e => setEditingBoat(b => ({ ...b, skipper_name: e.target.value }))} />
-                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                        <button onClick={saveBoat} disabled={saving} style={btn('#166534')}>{saving ? 'Saving...' : 'Save'}</button>
-                        <button onClick={() => setEditingBoat(null)} style={btn('#6b7280')}>Cancel</button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ fontWeight: '700', color: '#111827' }}>{boat.boat_name}</div>
-                        <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>Skipper: {boat.skipper_name}</div>
-                        {team && <div style={{ fontSize: '0.75rem', color: NAVY, marginTop: '0.2rem' }}>Team: {team.team_name}</div>}
-                      </div>
-                      <button onClick={() => setEditingBoat({ ...boat })} style={btn('#1e40af')}>Edit</button>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        )}
-
-        {/* ── TEAMS & ANGLERS TAB ── */}
-        {tab === 'teams' && (
-          <div>
-            <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '1rem' }}>
-              View and edit team members. Add reserves or replacements directly.
-            </p>
-            {teams.map(team => {
-              const teamAnglers = participants
-                .filter(p => p.team_id === team.id)
-                .sort((a, b) => {
-                  if (a.status === 'reserve' && b.status !== 'reserve') return 1
-                  if (b.status === 'reserve' && a.status !== 'reserve') return -1
-                  return a.full_name.localeCompare(b.full_name)
-                })
-              const isEditingName = editingTeam === team.id
-              const isAddingAngler = addAngler.teamId === team.id
-
-              return (
-                <div key={team.id} style={{ marginBottom: '1.25rem' }}>
-                  {/* Team header */}
-                  <div style={{ background: NAVY, color: 'white', borderRadius: isEditingName ? '8px 8px 0 0' : (teamAnglers.length > 0 || isAddingAngler ? '8px 8px 0 0' : '8px'), padding: '0.75rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    {isEditingName ? (
-                      <input
-                        style={{ flex: 1, padding: '0.3rem 0.5rem', borderRadius: '4px', border: 'none', fontSize: '0.9rem', fontWeight: '700', marginRight: '0.5rem' }}
-                        defaultValue={team.team_name}
-                        id={'team-name-' + team.id}
-                      />
-                    ) : (
-                      <div style={{ fontWeight: '700', fontSize: '0.9rem' }}>{team.team_name}</div>
-                    )}
-                    <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
-                      {isEditingName ? (
-                        <>
-                          <button onClick={() => {
-                            const val = document.getElementById('team-name-' + team.id)?.value
-                            if (val) saveTeamName(team.id, val)
-                          }} style={smallBtn('#166534')}>Save</button>
-                          <button onClick={() => setEditingTeam(null)} style={smallBtn('#6b7280')}>Cancel</button>
-                        </>
-                      ) : (
-                        <>
-                          <button onClick={() => setEditingTeam(team.id)} style={smallBtn('#1e40af')}>Rename</button>
-                          <button onClick={() => setAddAngler({ teamId: team.id, name: '', category: 'Crew', status: 'active' })} style={smallBtn('#166534')}>+ Angler</button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Anglers list */}
-                  {teamAnglers.map((angler, idx) => {
-                    const isLast = idx === teamAnglers.length - 1 && !isAddingAngler
-                    const isReserve = angler.status === 'reserve'
-                    return (
-                      <div key={angler.id} style={{
-                        background: isReserve ? '#fefce8' : (idx % 2 === 0 ? '#f8fafc' : 'white'),
-                        border: '1px solid #e5e7eb', borderTop: 'none',
-                        padding: '0.6rem 1rem',
-                        borderRadius: isLast ? '0 0 8px 8px' : '0',
-                        display: 'flex', justifyContent: 'space-between', alignItems: 'center'
-                      }}>
-                        <div>
-                          <span style={{ fontWeight: '600', fontSize: '0.875rem', color: '#111827' }}>{angler.full_name}</span>
-                          <span style={{ fontSize: '0.75rem', color: '#6b7280', marginLeft: '0.5rem' }}>{angler.category}</span>
-                          {isReserve && (
-                            <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', background: '#fef9c3', color: '#92400e', padding: '0.1rem 0.4rem', borderRadius: '10px' }}>Reserve</span>
-                          )}
-                        </div>
-                        <div style={{ display: 'flex', gap: '0.4rem' }}>
-                          {isReserve && (
-                            <button onClick={() => activateReserve(angler.id, angler.full_name)} style={smallBtn('#166534')}>Activate</button>
-                          )}
-                          <button onClick={() => removeAngler(angler.id, angler.full_name)} style={smallBtn('#ef4444')}>Remove</button>
-                        </div>
-                      </div>
-                    )
-                  })}
-
-                  {/* Add angler form */}
-                  {isAddingAngler && (
-                    <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderTop: 'none', padding: '0.875rem 1rem', borderRadius: '0 0 8px 8px' }}>
-                      <div style={{ fontWeight: '600', fontSize: '0.8rem', color: NAVY, marginBottom: '0.5rem' }}>Add angler to {team.team_name}</div>
-                      <input style={iStyle} placeholder="Full name" value={addAngler.name}
-                        onChange={e => setAddAngler(a => ({ ...a, name: e.target.value }))} />
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                        <div>
-                          <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#374151' }}>Role</label>
-                          <select style={iStyle} value={addAngler.category}
-                            onChange={e => setAddAngler(a => ({ ...a, category: e.target.value }))}>
-                            <option>Captain</option>
-                            <option>Crew 1</option>
-                            <option>Crew 2</option>
-                            <option>Crew 3</option>
-                            <option>Crew</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label style={{ fontSize: '0.75rem', fontWeight: '600', color: '#374151' }}>Status</label>
-                          <select style={iStyle} value={addAngler.status}
-                            onChange={e => setAddAngler(a => ({ ...a, status: e.target.value }))}>
-                            <option value="active">Active</option>
-                            <option value="reserve">Reserve</option>
-                          </select>
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button onClick={addAnglerToTeam} disabled={saving || !addAngler.name.trim()} style={btn('#166534')}>{saving ? 'Adding...' : 'Add Angler'}</button>
-                        <button onClick={() => setAddAngler({ teamId: null, name: '', category: 'Crew', status: 'active' })} style={btn('#6b7280')}>Cancel</button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        )}
-
-        {/* ── CATCHES TAB ── */}
-        {tab === 'catches' && (
-          <div>
-            <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '1rem' }}>
-              Grouped by angler alphabetically, sorted by day. Tap Edit to correct a catch.
-            </p>
-            {catches.length === 0 && (
-              <div style={{ background: 'white', borderRadius: '8px', padding: '2rem', textAlign: 'center', color: '#9ca3af' }}>No catches logged yet.</div>
-            )}
-            {sortedGroups.map(group => {
-              const groupTotal = group.catches.reduce((s, c) => s + (parseFloat(c.points) || 0), 0)
-              const sortedCatches = [...group.catches].sort((a, b) => {
-                const da = days.find(d => d.id === a.competition_day_id)?.day_number || 0
-                const db = days.find(d => d.id === b.competition_day_id)?.day_number || 0
-                if (da !== db) return da - db
-                return parseFloat(b.weight_kg || 0) - parseFloat(a.weight_kg || 0)
-              })
-              return (
-                <div key={group.name} style={{ marginBottom: '1rem' }}>
-                  <div style={{ background: NAVY, color: 'white', borderRadius: '8px 8px 0 0', padding: '0.6rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontWeight: '700', fontSize: '0.9rem' }}>{group.name}</div>
-                      <div style={{ fontSize: '0.75rem', opacity: 0.8 }}>
-                        {group.team?.team_name} — {group.catches.length} catch{group.catches.length !== 1 ? 'es' : ''}
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '0.8rem', opacity: 0.9 }}>{groupTotal.toFixed(2)} pts</div>
-                  </div>
-                  {sortedCatches.map((c, idx) => {
-                    const day = days.find(d => d.id === c.competition_day_id)
-                    const isLast = idx === sortedCatches.length - 1
-                    const isEditing = editingCatch?.id === c.id
-                    return (
-                      <div key={c.id} style={{ background: idx % 2 === 0 ? '#f8fafc' : 'white', border: '1px solid #e5e7eb', borderTop: 'none', padding: '0.6rem 1rem', borderRadius: isLast && !isEditing ? '0 0 8px 8px' : '0' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                              <span style={{ fontWeight: '600', fontSize: '0.875rem', color: '#111827' }}>{c.species_name}</span>
-                              {c.scoring === false && (
-                                <span style={{ fontSize: '0.7rem', background: '#fef3c7', color: '#92400e', padding: '0.1rem 0.4rem', borderRadius: '10px' }}>Non-scoring</span>
-                              )}
-                            </div>
-                            <div style={{ fontSize: '0.775rem', color: '#6b7280', marginTop: '0.15rem' }}>
-                              {'Day ' + (day?.day_number || '?') + '  •  '}
-                              {c.weight_kg ? parseFloat(c.weight_kg).toFixed(2) + ' kg' : 'No weight'}
-                              {'  •  ' + (c.line_class_kg || 10) + ' kg line  •  '}
-                              <span style={{ color: '#7c3aed', fontWeight: '600' }}>{parseFloat(c.points || 0).toFixed(2)} pts</span>
-                            </div>
-                          </div>
-                          <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
-                            <button onClick={() => setEditingCatch({ ...c })} style={btn('#1e40af')}>Edit</button>
-                            <button onClick={() => deleteCatch(c.id)} style={btn('#ef4444')}>Del</button>
-                          </div>
-                        </div>
-                        {isEditing && (
-                          <CatchEditForm
-                            editingCatch={editingCatch}
-                            setEditingCatch={setEditingCatch}
-                            teams={teams}
-                            participants={participants}
-                            boats={boats}
-                            saving={saving}
-                            onSave={saveCatch}
-                            onCancel={() => setEditingCatch(null)}
-                          />
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              )
-            })}
-          </div>
-        )}
-
-        {/* ── DAYS TAB ── */}
-        {tab === 'days' && (
-          <div>
-            <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '1rem' }}>
-              Manage fishing times, capturer details, results visibility and weather cancellations per day.
-            </p>
-
-            {days.map(d => {
-              const isHidden = d.session_status === 'hidden'
-              const isEditing = editingDay?.id === d.id
-              const fishingHours = (() => {
-                if (d.fishing_start_time && d.fishing_end_time) {
-                  const [sh, sm] = d.fishing_start_time.split(':').map(Number)
-                  const [eh, em] = d.fishing_end_time.split(':').map(Number)
-                  return ((eh * 60 + em) - (sh * 60 + sm)) / 60
-                }
-                return null
-              })()
-
-              const isCancelled = d.day_status === 'cancelled_before' || d.day_status === 'cancelled_during'
-              const statusColour = isCancelled ? '#fee2e2' : d.day_status === 'rest_day' ? '#fef3c7' : 'white'
-              const statusBorder = isCancelled ? '2px solid #fca5a5' : d.day_status === 'rest_day' ? '2px solid #fbbf24' : '1px solid transparent'
-              const statusLabel = {
-                fishing: null,
-                cancelled_before: '⛔ Cancelled — before start',
-                cancelled_during: '⛔ Cancelled during fishing',
-                rest_day: '🛟 Rest / travel day',
-              }[d.day_status]
-
-              return (
-                <div key={d.id} style={{ marginBottom: '0.75rem' }}>
-                  {/* Day header — always visible */}
-                  <div style={{ background: statusColour, border: statusBorder, borderRadius: isEditing ? '8px 8px 0 0' : '8px', padding: '0.875rem 1rem', boxShadow: '0 1px 2px rgba(0,0,0,0.06)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <span style={{ fontWeight: '700', color: isCancelled ? '#991b1b' : '#111827', fontSize: '0.95rem' }}>Day {d.day_number} — {d.date}</span>
-                          {statusLabel && <span style={{ fontSize: '0.72rem', fontWeight: '700', color: isCancelled ? '#991b1b' : '#92400e', background: isCancelled ? '#fee2e2' : '#fef3c7', padding: '0.15rem 0.5rem', borderRadius: '10px' }}>{statusLabel}</span>}
-                        </div>
-                        {isCancelled && d.cancellation_reason && (
-                          <div style={{ fontSize: '0.775rem', color: '#991b1b', marginTop: '0.2rem', fontStyle: 'italic' }}>
-                            Reason: {d.cancellation_reason}
-                            {d.day_status === 'cancelled_during' && d.cancellation_time && ` — called off at ${d.cancellation_time.slice(0,5)}`}
-                          </div>
-                        )}
-                        <div style={{ fontSize: '0.775rem', color: '#6b7280', marginTop: '0.2rem' }}>
-                          Lines In: {d.fishing_start_time?.slice(0,5) || '—'}  •  Lines Up: {d.fishing_end_time?.slice(0,5) || '—'}
-                          {fishingHours !== null && <span> • {fishingHours} hrs</span>}
-                        </div>
-                        {d.capturer_name && (
-                          <div style={{ fontSize: '0.775rem', color: '#6b7280' }}>
-                            Capturer: {d.capturer_name}{d.capturer_contact ? ' — ' + d.capturer_contact : ''}
-                          </div>
-                        )}
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.4rem' }}>
-                        {/* Hide/Show slider-style toggle */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <span style={{ fontSize: '0.75rem', fontWeight: '600', color: isHidden ? '#92400e' : '#065f46' }}>
-                            {isHidden ? '🔒 Hidden' : '✅ Visible'}
-                          </span>
-                          <div
-                            onClick={() => toggleBlackout(d.id, d.session_status)}
-                            style={{
-                              width: '44px', height: '24px', borderRadius: '12px', cursor: 'pointer',
-                              background: isHidden ? '#f59e0b' : '#10b981',
-                              position: 'relative', transition: 'background 0.2s',
-                              flexShrink: 0
-                            }}>
-                            <div style={{
-                              width: '18px', height: '18px', borderRadius: '50%', background: 'white',
-                              position: 'absolute', top: '3px',
-                              left: isHidden ? '3px' : '23px',
-                              transition: 'left 0.2s',
-                              boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
-                            }} />
-                          </div>
-                        </div>
-                        <button onClick={() => setEditingDay(isEditing ? null : { ...d, fishing_start_time: d.fishing_start_time?.slice(0,5) || '06:00', fishing_end_time: d.fishing_end_time?.slice(0,5) || '16:00', lines_up_time: d.lines_up_time?.slice(0,5) || '16:00', capturer_name: d.capturer_name || '', capturer_contact: d.capturer_contact || '', day_status: d.day_status || 'fishing', cancellation_reason: d.cancellation_reason || '', cancellation_time: d.cancellation_time?.slice(0,5) || '' })}
-                          style={smallBtn(isEditing ? '#6b7280' : '#1e40af')}>
-                          {isEditing ? 'Cancel' : 'Edit'}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Edit form */}
-                  {isEditing && (
-                    <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderTop: 'none', padding: '1rem', borderRadius: '0 0 8px 8px' }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
-                        <div>
-                          <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.25rem' }}>Lines In</label>
-                          <input type="time" style={iStyle} value={editingDay.fishing_start_time}
-                            onChange={e => setEditingDay(d => ({ ...d, fishing_start_time: e.target.value, lines_up_time: d.fishing_end_time }))} />
-                        </div>
-                        <div>
-                          <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.25rem' }}>Lines Up</label>
-                          <input type="time" style={iStyle} value={editingDay.fishing_end_time}
-                            onChange={e => setEditingDay(d => ({ ...d, fishing_end_time: e.target.value, lines_up_time: e.target.value }))} />
-                        </div>
-                      </div>
-                      <div style={{ fontSize: '0.775rem', color: '#6b7280', marginBottom: '0.75rem' }}>
-                        {(() => {
-                          if (editingDay.fishing_start_time && editingDay.fishing_end_time) {
-                            const [sh, sm] = editingDay.fishing_start_time.split(':').map(Number)
-                            const [eh, em] = editingDay.fishing_end_time.split(':').map(Number)
-                            const hrs = ((eh * 60 + em) - (sh * 60 + sm)) / 60
-                            return 'Fishing hours: ' + hrs + ' hrs — CPUE will use this value in reports'
-                          }
-                          return ''
-                        })()}
-                      </div>
-                      <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.25rem' }}>Capturer Name</label>
-                      <input style={iStyle} placeholder="Full name of data capturer" value={editingDay.capturer_name}
-                        onChange={e => setEditingDay(d => ({ ...d, capturer_name: e.target.value }))} />
-                      <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.25rem' }}>Capturer Contact Number</label>
-                      <input style={iStyle} placeholder="e.g. 082 555 1234" value={editingDay.capturer_contact}
-                        onChange={e => setEditingDay(d => ({ ...d, capturer_contact: e.target.value }))} />
-                      {/* Weather Committee */}
-                      <div style={{ marginTop: '1rem', borderTop: '1px solid #bfdbfe', paddingTop: '1rem' }}>
-                        <div style={{ fontWeight: '700', fontSize: '0.85rem', color: '#991b1b', marginBottom: '0.5rem' }}>⛅ Weather Committee</div>
-                        <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.25rem' }}>Day Status</label>
-                        <select style={iStyle} value={editingDay.day_status || 'fishing'}
-                          onChange={e => setEditingDay(d => ({ ...d, day_status: e.target.value, cancellation_time: e.target.value !== 'cancelled_during' ? '' : d.cancellation_time }))}>
-                          <option value="fishing">✅ Fishing — normal day</option>
-                          <option value="cancelled_before">⛔ Cancelled before start</option>
-                          <option value="cancelled_during">⛔ Cancelled during fishing</option>
-                          <option value="rest_day">🛟 Rest / travel day</option>
-                        </select>
-                        {(editingDay.day_status === 'cancelled_before' || editingDay.day_status === 'cancelled_during') && (
-                          <>
-                            <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.25rem' }}>Reason</label>
-                            <input style={iStyle} placeholder="e.g. Gale force winds, Rough seas" value={editingDay.cancellation_reason || ''}
-                              onChange={e => setEditingDay(d => ({ ...d, cancellation_reason: e.target.value }))} />
-                          </>
-                        )}
-                        {editingDay.day_status === 'cancelled_during' && (
-                          <>
-                            <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.25rem' }}>Time called off</label>
-                            <input type="time" style={iStyle} value={editingDay.cancellation_time || ''}
-                              onChange={e => setEditingDay(d => ({ ...d, cancellation_time: e.target.value }))} />
-                          </>
-                        )}
-                        {(editingDay.day_status === 'cancelled_before' || editingDay.day_status === 'cancelled_during' || editingDay.day_status === 'rest_day') && (
-                          <button onClick={() => saveDayStatus(editingDay.id, editingDay.day_number, editingDay.day_status, editingDay.cancellation_reason, editingDay.cancellation_time)}
-                            disabled={saving}
-                            style={{ ...btn('#dc2626'), marginBottom: '0.5rem' }}>
-                            {saving ? 'Saving...' : 'Save Day Status'}
-                          </button>
-                        )}
-                        {editingDay.day_status === 'fishing' && (editingDay.cancellation_reason || editingDay.cancellation_time) && (
-                          <button onClick={() => saveDayStatus(editingDay.id, editingDay.day_number, 'fishing', null, null)}
-                            disabled={saving}
-                            style={{ ...btn('#166534'), marginBottom: '0.5rem' }}>
-                            {saving ? 'Saving...' : 'Clear Cancellation'}
-                          </button>
-                        )}
-                      </div>
-                      <button onClick={() => saveDay(editingDay)} disabled={saving} style={btn('#166534')}>
-                        {saving ? 'Saving...' : 'Save Day Details'}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-
-            {/* Add Day */}
-            <div style={{ background: 'white', borderRadius: '8px', padding: '1rem', marginTop: '0.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-              <div style={{ fontWeight: '600', fontSize: '0.875rem', color: NAVY, marginBottom: '0.75rem' }}>Add a Day</div>
-              <AddDayForm days={days} onAdd={addDay} saving={saving} iStyle={iStyle} btn={btn} />
-            </div>
-
-            {/* TD Sign-off */}
-            <div style={{ background: compSignOff.td_verified ? '#d1fae5' : 'white', border: compSignOff.td_verified ? '2px solid #6ee7b7' : '2px solid #e5e7eb', borderRadius: '8px', padding: '1rem', marginTop: '1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-              <div style={{ fontWeight: '700', fontSize: '0.925rem', color: NAVY, marginBottom: '0.25rem' }}>
-                Tournament Director Sign-off
-              </div>
-              <div style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '0.875rem' }}>
-                The TD verifies that all competition results are true and correct.
-              </div>
-              <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.25rem' }}>TD Name</label>
-              <input style={iStyle} placeholder="Full name of Tournament Director"
-                value={compSignOff.td_name}
-                onChange={e => setCompSignOff(s => ({ ...s, td_name: e.target.value }))} />
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: 'pointer', marginBottom: '0.875rem', padding: '0.75rem', background: compSignOff.td_verified ? '#ecfdf5' : '#f9fafb', borderRadius: '6px', border: '1px solid ' + (compSignOff.td_verified ? '#6ee7b7' : '#e5e7eb') }}>
-                <input type="checkbox" checked={compSignOff.td_verified}
-                  onChange={e => setCompSignOff(s => ({ ...s, td_verified: e.target.checked }))}
-                  style={{ width: '1.2rem', height: '1.2rem', cursor: 'pointer' }} />
-                <div>
-                  <div style={{ fontWeight: '600', fontSize: '0.875rem', color: compSignOff.td_verified ? '#065f46' : '#374151' }}>
-                    {compSignOff.td_verified ? '✅ Results verified as true and correct' : 'I verify these results are true and correct'}
-                  </div>
-                  {compSignOff.td_verified_at && (
-                    <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.15rem' }}>
-                      Verified: {new Date(compSignOff.td_verified_at).toLocaleString('en-ZA')}
-                    </div>
-                  )}
-                </div>
-              </label>
-              <button onClick={saveSignOff} disabled={saving || !compSignOff.td_name.trim()} style={btn(compSignOff.td_verified ? '#166534' : '#1e40af')}>
-                {saving ? 'Saving...' : compSignOff.td_verified ? 'Save Verification' : 'Save TD Details'}
-              </button>
-            </div>
-
-          </div>
-        )}
-
-        {/* ── ROLES TAB ── */}
-        {tab === 'roles' && (
-          <div>
-            <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '1rem' }}>
-              Assign roles to registered users for this competition. The user must have signed up
-              at recfish-za.netlify.app before they can be assigned a role.
-            </p>
-
-            {/* Assign new role */}
-            <div style={{ background: 'white', borderRadius: '8px', padding: '1rem', marginBottom: '1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-              <div style={{ fontWeight: '700', fontSize: '0.875rem', color: NAVY, marginBottom: '0.75rem' }}>
-                Assign a Role
-              </div>
-              <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.25rem' }}>
-                User Email
-              </label>
-              <input
-                style={iStyle}
-                type="email"
-                placeholder="e.g. mark.rode@example.com"
-                value={roleEmail}
-                onChange={e => setRoleEmail(e.target.value)}
-              />
-              <label style={{ fontSize: '0.78rem', fontWeight: '600', color: '#374151', display: 'block', marginBottom: '0.25rem' }}>
-                Role
-              </label>
-              <select style={iStyle} value={roleValue} onChange={e => setRoleValue(e.target.value)}>
-                <option value="tournament_director">Tournament Director</option>
-                <option value="admin">Admin</option>
-                <option value="skipper">Skipper</option>
-                <option value="angler">Angler</option>
-                <option value="viewer">Viewer</option>
-              </select>
-              <button
-                onClick={addRole}
-                disabled={rolesLoading || !roleEmail.trim()}
-                style={btn('#166534')}
-              >
-                {rolesLoading ? 'Looking up user...' : 'Assign Role'}
-              </button>
-            </div>
-
-            {/* Current roles list */}
-            <div style={{ background: 'white', borderRadius: '8px', padding: '1rem', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-              <div style={{ fontWeight: '700', fontSize: '0.875rem', color: NAVY, marginBottom: '0.75rem' }}>
-                Current Roles ({roles.length})
-              </div>
-              {roles.length === 0 ? (
-                <p style={{ fontSize: '0.85rem', color: '#6b7280', fontStyle: 'italic' }}>
-                  No roles assigned yet for this competition.
-                </p>
-              ) : (
-                roles.map(r => {
-                  const roleColors = {
-                    tournament_director: '#1e40af',
-                    admin: '#7c3aed',
-                    skipper: '#b45309',
-                    angler: '#166534',
-                    viewer: '#6b7280',
-                  }
-                  const roleLabels = {
-                    tournament_director: 'Tournament Director',
-                    admin: 'Admin',
-                    skipper: 'Skipper',
-                    angler: 'Angler',
-                    viewer: 'Viewer',
-                  }
-                  return (
-                    <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.6rem 0', borderBottom: '1px solid #f3f4f6' }}>
-                      <div>
-                        <span style={{ display: 'inline-block', background: roleColors[r.role] || '#6b7280', color: 'white', borderRadius: '4px', padding: '0.15rem 0.5rem', fontSize: '0.75rem', fontWeight: '700', marginRight: '0.5rem' }}>
-                          {roleLabels[r.role] || r.role}
-                        </span>
-                        <span style={{ fontSize: '0.8rem', color: '#374151' }}>
-                          user_id: {r.user_id.slice(0, 8)}…
-                        </span>
-                      </div>
-                      <button onClick={() => removeRole(r.id)} style={smallBtn('#dc2626')}>Remove</button>
-                    </div>
-                  )
-                })
-              )}
-            </div>
-
-            {/* Note about profiles table */}
-            <div style={{ marginTop: '1rem', padding: '0.75rem', background: '#fefce8', border: '1px solid #fde047', borderRadius: '6px', fontSize: '0.8rem', color: '#713f12' }}>
-              <strong>Note:</strong> Role lookup uses the <code>users</code> table. If "User not found" appears
-              for a registered user, run this query in Supabase to check their record exists:<br />
-              <code style={{ fontSize: '0.75rem' }}>SELECT id, email FROM users WHERE email = 'their@email.com';</code>
-            </div>
-          </div>
-        )}
-
-        {/* ── ANGLER LINKING TAB ── */}
-        {tab === 'linking' && (
-          <AnglerLinkingTab
-            competitionId={selectedComp}
-            supabase={supabase}
-            showMessage={showMessage}
-          />
-        )}
-
-      </div>
     </div>
   )
 }
 
-// ── Angler Linking Tab Component ─────────────────────────────────────────────
-function AnglerLinkingTab({ competitionId, supabase, showMessage }) {
-  const [participants, setParticipants] = useState([])
-  const [registeredUsers, setRegisteredUsers] = useState([])
-  const [searchName, setSearchName] = useState('')
-  const [selectedParticipant, setSelectedParticipant] = useState(null)
-  const [selectedUser, setSelectedUser] = useState(null)
-  const [linking, setLinking] = useState(false)
-  const [loading, setLoading] = useState(true)
+// ─── ROLES TAB ────────────────────────────────────────────────────────────────
+function RolesTab({ competition }) {
+  const [roles, setRoles]         = useState([])
+  const [email, setEmail]         = useState('')
+  const [role, setRole]           = useState('scorer')
+  const [loading, setLoading]     = useState(true)
+  const [adding, setAdding]       = useState(false)
+  const [error, setError]         = useState('')
+  const [success, setSuccess]     = useState('')
 
-  useEffect(() => { if (competitionId) loadData() }, [competitionId])
-
-  const loadData = async () => {
-    setLoading(true)
-    const [{ data: parts }, { data: users }] = await Promise.all([
-      supabase.from('competition_participants')
-        .select(`
-          id, full_name, user_id, category,
-          competition:competition_id ( name )
-        `)
-        .eq('competition_id', competitionId)
-        .order('full_name'),
-      supabase.from('users')
-        .select('id, full_name, email')
-        .order('full_name')
-    ])
-
-    // Get catch counts for each participant
-    const withCounts = await Promise.all((parts || []).map(async (p) => {
-      const { count } = await supabase
-        .from('competition_catches')
-        .select('id', { count: 'exact', head: true })
-        .eq('angler_id', p.user_id)
-        .eq('competition_id', competitionId)
-      return { ...p, catch_count: count || 0 }
-    }))
-
-    // Check which user_ids match real auth accounts
-    const { data: authMatches } = await supabase
-      .from('users')
-      .select('id')
-      .in('id', (parts || []).map(p => p.user_id).filter(Boolean))
-
-    const authIds = new Set((authMatches || []).map(a => a.id))
-    const withStatus = withCounts.map(p => ({
-      ...p,
-      is_linked: authIds.has(p.user_id)
-    }))
-
-    setParticipants(withStatus)
-    setRegisteredUsers(users || [])
+  const load = useCallback(async () => {
+    if (!competition?.id) return
+    const { data } = await supabase
+      .from('allcoastals_roles')
+      .select('*')
+      .order('created_at')
+    setRoles((data || []))
     setLoading(false)
+  }, [competition?.id])
+
+  useEffect(() => { load() }, [load])
+
+  const handleGrant = async () => {
+    if (!email) return
+    setAdding(true); setError(''); setSuccess('')
+    const { data: user } = await supabase
+      .from('auth.users').select('id,email').eq('email', email).single()
+      .catch(() => ({ data: null }))
+
+    // Try auth.users via RPC
+    const { data: userData } = await supabase
+      .rpc('get_user_by_email', { email_input: email })
+      .catch(() => ({ data: null }))
+
+    const userId = user?.id || userData?.id
+    if (!userId) {
+      // Try direct lookup
+      const { data: authData } = await supabase.auth.admin
+        ?.listUsers?.()
+        .catch(() => ({ data: null })) || {}
+      const found = authData?.users?.find(u => u.email === email)
+      if (!found) {
+        setError('User not found — they must register in the app first.')
+        setAdding(false); return
+      }
+    }
+
+    const { error: err } = await supabase.from('allcoastals_roles').insert({
+      user_id: userId,
+      email,
+      role,
+    })
+    if (err) { setError(err.message); setAdding(false); return }
+    setSuccess(`✅ ${role} access granted to ${email}`)
+    setEmail(''); setAdding(false)
+    load()
   }
 
-  const filteredUsers = registeredUsers.filter(u =>
-    !searchName || u.full_name?.toLowerCase().includes(searchName.toLowerCase()) ||
-    u.email?.toLowerCase().includes(searchName.toLowerCase())
+  const handleRevoke = async (id) => {
+    if (!window.confirm('Revoke this access?')) return
+    await supabase.from('allcoastals_roles').delete().eq('id', id)
+    load()
+  }
+
+  if (!competition?.id) return (
+    <div style={{ color: GREY, fontStyle: 'italic' }}>Save the competition first to manage roles.</div>
   )
 
-  const linkAngler = async () => {
-    if (!selectedParticipant || !selectedUser) return
-    if (!confirm(
-      `Link ${selectedParticipant.full_name}'s competition record to app user ${selectedUser.full_name} (${selectedUser.email})?\n\n` +
-      `This will update ${selectedParticipant.catch_count} catches.`
-    )) return
-
-    setLinking(true)
-    try {
-      // Update catches
-      const { error: e1 } = await supabase
-        .from('competition_catches')
-        .update({ angler_id: selectedUser.id })
-        .eq('angler_id', selectedParticipant.user_id)
-        .eq('competition_id', competitionId)
-      if (e1) throw e1
-
-      // Update participant
-      const { error: e2 } = await supabase
-        .from('competition_participants')
-        .update({ user_id: selectedUser.id })
-        .eq('id', selectedParticipant.id)
-      if (e2) throw e2
-
-      showMessage(`✅ Linked ${selectedParticipant.full_name} → ${selectedUser.full_name}`)
-      setSelectedParticipant(null)
-      setSelectedUser(null)
-      setSearchName('')
-      loadData()
-    } catch (err) {
-      showMessage('Error: ' + err.message, 'error')
-    }
-    setLinking(false)
-  }
-
-  if (loading) return <p style={{ color: '#6b7280', fontSize: '0.875rem' }}>Loading participants...</p>
-
-  const NAVY = '#1e3a8a'
-
   return (
-    <div>
-      <p style={{ fontSize: '0.85rem', color: '#6b7280', marginBottom: '1rem' }}>
-        Link competition participants to their app accounts. Use this when an angler's name
-        in the competition doesn't exactly match their profile name, so the self-service
-        claim on My Catches didn't trigger automatically.
-      </p>
+    <div style={S.card}>
+      <div style={{ fontWeight: 700, color: NAVY, marginBottom: '1rem' }}>Access & Roles</div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+      {/* Grant form */}
+      <div style={{ padding: '1rem', background: '#f9fafb', borderRadius: 8, marginBottom: '1rem' }}>
+        <div style={{ fontWeight: 600, marginBottom: '0.75rem' }}>Grant Access</div>
+        <div style={S.row}>
+          <input style={{ ...S.input, flex: 1 }} type='email'
+            placeholder='user@email.com'
+            value={email} onChange={e => setEmail(e.target.value)} />
+          <select style={{ ...S.select, width: 'auto' }} value={role} onChange={e => setRole(e.target.value)}>
+            <option value='scorer'>Scorer</option>
+            <option value='admin'>Admin</option>
+            <option value='observer'>Observer</option>
+          </select>
+          <button onClick={handleGrant} disabled={adding || !email}
+            style={{ ...S.btn(GREEN), opacity: adding || !email ? 0.5 : 1 }}>
+            {adding ? 'Checking…' : 'Grant Access'}
+          </button>
+        </div>
+        {error   && <div style={{ color: RED,   marginTop: '0.5rem', fontSize: '0.85rem' }}>{error}</div>}
+        {success && <div style={{ color: GREEN, marginTop: '0.5rem', fontSize: '0.85rem' }}>{success}</div>}
+      </div>
 
-        {/* Left: Participants */}
+      {/* Current roles */}
+      {loading ? <div style={{ color: GREY }}>Loading…</div> : (
+        roles.length === 0 ? (
+          <div style={{ color: GREY, fontStyle: 'italic' }}>No roles assigned yet.</div>
+        ) : (
+          roles.map(r => (
+            <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem 0', borderBottom: '1px solid #f0f0f0' }}>
+              <span style={S.badge(r.role === 'admin' ? RED : r.role === 'scorer' ? NAVY : GREY)}>
+                {r.role.toUpperCase()}
+              </span>
+              <span style={{ flex: 1 }}>{r.email}</span>
+              <button onClick={() => handleRevoke(r.id)} style={S.btnSm('#fef2f2', RED)}>Revoke</button>
+            </div>
+          ))
+        )
+      )}
+    </div>
+  )
+}
+
+// ─── OVERVIEW TAB ─────────────────────────────────────────────────────────────
+function OverviewTab({ competition, onEditSetup }) {
+  if (!competition?.id) return (
+    <div style={{ ...S.card, textAlign: 'center', padding: '3rem', color: GREY }}>
+      <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🏆</div>
+      <div style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: '0.5rem' }}>No competition selected</div>
+      <div style={{ marginBottom: '1rem' }}>Use the Setup tab to create a new competition.</div>
+    </div>
+  )
+
+  const c = competition
+  return (
+    <div style={S.card}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
         <div>
-          <div style={{ fontWeight: '700', fontSize: '0.875rem', color: NAVY, marginBottom: '0.5rem' }}>
-            Competition Participants
-          </div>
-          <div style={{ background: 'white', borderRadius: '8px', border: '1px solid #e5e7eb', overflow: 'hidden', maxHeight: '420px', overflowY: 'auto' }}>
-            {participants.map(p => (
-              <div key={p.id}
-                onClick={() => setSelectedParticipant(selectedParticipant?.id === p.id ? null : p)}
-                style={{
-                  padding: '0.65rem 0.85rem', cursor: 'pointer', fontSize: '0.85rem',
-                  borderBottom: '1px solid #f3f4f6',
-                  background: selectedParticipant?.id === p.id ? '#eff6ff' : 'white',
-                  borderLeft: selectedParticipant?.id === p.id ? '3px solid #1e3a8a' : '3px solid transparent'
-                }}>
-                <div style={{ fontWeight: '600', display: 'flex', justifyContent: 'space-between' }}>
-                  <span>{p.full_name}</span>
-                  <span style={{
-                    fontSize: '0.72rem', padding: '0.1rem 0.45rem', borderRadius: '10px',
-                    background: p.is_linked ? '#dcfce7' : '#fef3c7',
-                    color: p.is_linked ? '#166534' : '#92400e', fontWeight: '700'
-                  }}>
-                    {p.is_linked ? '✓ Linked' : '⚠ Unlinked'}
-                  </span>
-                </div>
-                <div style={{ color: '#6b7280', fontSize: '0.78rem', marginTop: '0.15rem' }}>
-                  {p.category} · {p.catch_count} catches
-                </div>
-              </div>
-            ))}
+          <div style={{ fontWeight: 800, fontSize: '1.2rem', color: NAVY }}>{c.name}</div>
+          <div style={{ fontSize: '0.85rem', color: GREY, marginTop: 2 }}>
+            {c.venue} {c.start_date && `· ${c.start_date}`} {c.end_date && `→ ${c.end_date}`}
           </div>
         </div>
+        <button onClick={onEditSetup} style={S.btnSm(NAVY)}>✏️ Edit Setup</button>
+      </div>
 
-        {/* Right: App users */}
-        <div>
-          <div style={{ fontWeight: '700', fontSize: '0.875rem', color: NAVY, marginBottom: '0.5rem' }}>
-            Registered App Users
+      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+        {c.discipline && <span style={S.badge(NAVY)}>{DISCIPLINE_LABELS[c.discipline] || c.discipline}</span>}
+        {c.level      && <span style={S.badge(GREY)}>{LEVEL_LABELS[c.level] || c.level}</span>}
+        {c.category   && <span style={S.badge(GREEN)}>{CATEGORY_LABELS[c.category] || c.category}</span>}
+        {c.team_size  && <span style={S.badge(GOLD)}>Teams: {c.team_size} anglers</span>}
+        <span style={S.badge(c.results_visible ? GREEN : RED)}>
+          {c.results_visible ? '👁 Results visible' : '🔒 Results hidden'}
+        </span>
+      </div>
+
+      <div style={{ ...S.grid2, fontSize: '0.85rem' }}>
+        {[
+          ['Tournament Director', c.td_name],
+          ['Hosting Province',    c.hosting_province],
+          ['Team Format',         c.team_format],
+          ['Default Line Class',  c.default_line_class_kg ? `${c.default_line_class_kg}kg` : null],
+          ['Fine Grid (SAN)',     c.fine_grid_number],
+          ['Coarse Grid (SAN)',   c.coarse_grid_number],
+          ['Catch & Release',     c.catch_release_enabled ? 'Enabled' : 'Disabled'],
+          ['Competition ID',      c.id?.slice(0,8) + '…'],
+        ].filter(([,v]) => v).map(([k,v]) => (
+          <div key={k}>
+            <span style={{ color: GREY }}>{k}: </span>
+            <span style={{ fontWeight: 600 }}>{v}</span>
           </div>
-          <input
-            style={{ width: '100%', padding: '0.5rem 0.75rem', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.875rem', marginBottom: '0.5rem', boxSizing: 'border-box' }}
-            placeholder="Search by name or email..."
-            value={searchName}
-            onChange={e => setSearchName(e.target.value)}
-          />
-          <div style={{ background: 'white', borderRadius: '8px', border: '1px solid #e5e7eb', overflow: 'hidden', maxHeight: '370px', overflowY: 'auto' }}>
-            {filteredUsers.map(u => (
-              <div key={u.id}
-                onClick={() => setSelectedUser(selectedUser?.id === u.id ? null : u)}
-                style={{
-                  padding: '0.65rem 0.85rem', cursor: 'pointer', fontSize: '0.85rem',
-                  borderBottom: '1px solid #f3f4f6',
-                  background: selectedUser?.id === u.id ? '#eff6ff' : 'white',
-                  borderLeft: selectedUser?.id === u.id ? '3px solid #1e3a8a' : '3px solid transparent'
-                }}>
-                <div style={{ fontWeight: '600' }}>{u.full_name || '(no name)'}</div>
-                <div style={{ color: '#6b7280', fontSize: '0.78rem' }}>{u.email}</div>
-              </div>
-            ))}
-            {filteredUsers.length === 0 && (
-              <div style={{ padding: '1rem', color: '#9ca3af', fontSize: '0.85rem', textAlign: 'center' }}>
-                No users found
-              </div>
-            )}
+        ))}
+      </div>
+
+      {c.description && (
+        <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: '#f9fafb', borderRadius: 6, fontSize: '0.85rem', color: '#374151' }}>
+          {c.description}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
+export default function CompetitionAdmin() {
+  const { competitionId } = useParams()
+  const navigate          = useNavigate()
+  const { user }          = useAuth()
+  const [competition, setCompetition] = useState(null)
+  const [activeTab, setActiveTab]     = useState(competitionId ? 'overview' : 'setup')
+  const [recentComps, setRecentComps] = useState([])
+  const [showPicker, setShowPicker]   = useState(!competitionId)
+
+  // Load competition if ID in URL
+  useEffect(() => {
+    if (!competitionId) return
+    supabase.from('competitions').select('*').eq('id', competitionId).single()
+      .then(({ data }) => { if (data) setCompetition(data) })
+  }, [competitionId])
+
+  // Load recent competitions for the picker
+  useEffect(() => {
+    supabase.from('competitions').select('id,name,discipline,level,start_date,status')
+      .order('created_at', { ascending: false }).limit(20)
+      .then(({ data }) => setRecentComps(data || []))
+  }, [])
+
+  const handleSaved = (comp) => {
+    setCompetition(comp)
+    setActiveTab('teams')
+    navigate(`/competition-admin-v2/${comp.id}`, { replace: true })
+    setShowPicker(false)
+  }
+
+  const TABS = [
+    { id: 'overview',  label: '📋 Overview' },
+    { id: 'setup',     label: '⚙️ Setup' },
+    { id: 'teams',     label: '👥 Teams' },
+    { id: 'roles',     label: '🔑 Roles' },
+  ]
+
+  return (
+    <div style={S.page}>
+      {/* Header */}
+      <div style={{ background: NAVY, color: 'white', padding: '1rem 1.5rem', borderRadius: 8, marginBottom: '1.25rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: '1.1rem' }}>
+              🏆 Competition Administration
+            </div>
+            <div style={{ fontSize: '0.82rem', opacity: 0.8, marginTop: 2 }}>
+              {competition ? competition.name : 'RecFish ZA — Universal Admin Panel'}
+            </div>
+          </div>
+          <div style={S.row}>
+            <button onClick={() => setShowPicker(!showPicker)}
+              style={{ background: 'rgba(255,255,255,0.15)', color: 'white', border: '1px solid rgba(255,255,255,0.3)', padding: '0.4rem 0.9rem', borderRadius: 6, cursor: 'pointer', fontSize: '0.85rem' }}>
+              {showPicker ? '✕ Close' : '📂 Open Competition'}
+            </button>
+            <button onClick={() => { setCompetition(null); setActiveTab('setup'); navigate('/competition-admin-v2'); setShowPicker(false) }}
+              style={{ background: 'rgba(255,255,255,0.15)', color: 'white', border: '1px solid rgba(255,255,255,0.3)', padding: '0.4rem 0.9rem', borderRadius: 6, cursor: 'pointer', fontSize: '0.85rem' }}>
+              + New
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Link button */}
-      {selectedParticipant && selectedUser && (
-        <div style={{ marginTop: '1rem', padding: '1rem', background: '#eff6ff', borderRadius: '8px', border: '1px solid #bfdbfe', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-          <div style={{ fontSize: '0.875rem', color: '#1e3a8a' }}>
-            Link <strong>{selectedParticipant.full_name}</strong> ({selectedParticipant.catch_count} catches)
-            → <strong>{selectedUser.full_name}</strong> ({selectedUser.email})
-          </div>
-          <button onClick={linkAngler} disabled={linking}
-            style={{ padding: '0.6rem 1.5rem', background: linking ? '#9ca3af' : NAVY, color: 'white', border: 'none', borderRadius: '6px', fontWeight: '700', fontSize: '0.875rem', cursor: linking ? 'not-allowed' : 'pointer' }}>
-            {linking ? 'Linking...' : 'Confirm Link'}
-          </button>
+      {/* Competition picker */}
+      {showPicker && (
+        <div style={{ ...S.card, borderLeft: `4px solid ${GOLD}` }}>
+          <div style={{ fontWeight: 700, color: NAVY, marginBottom: '0.75rem' }}>Select a Competition</div>
+          {recentComps.length === 0 ? (
+            <div style={{ color: GREY, fontStyle: 'italic' }}>No competitions yet — use Setup to create one.</div>
+          ) : (
+            recentComps.map(c => (
+              <div key={c.id}
+                onClick={() => { navigate(`/competition-admin-v2/${c.id}`); setShowPicker(false) }}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 0.75rem', borderRadius: 6, cursor: 'pointer', marginBottom: '0.25rem', background: competition?.id === c.id ? '#eff6ff' : '#f9fafb' }}
+                onMouseEnter={e => e.currentTarget.style.background='#eff6ff'}
+                onMouseLeave={e => e.currentTarget.style.background= competition?.id === c.id ? '#eff6ff' : '#f9fafb'}
+              >
+                <span style={{ fontWeight: 600, flex: 1 }}>{c.name}</span>
+                {c.discipline && <span style={S.badge(NAVY)}>{c.discipline}</span>}
+                {c.level      && <span style={S.badge(GREY)}>{c.level}</span>}
+                {c.start_date && <span style={{ fontSize: '0.78rem', color: GREY }}>{c.start_date}</span>}
+              </div>
+            ))
+          )}
         </div>
       )}
 
-      {/* Status summary */}
-      <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', background: '#f9fafb', borderRadius: '6px', fontSize: '0.8rem', color: '#6b7280', display: 'flex', gap: '1.5rem' }}>
-        <span>✓ Linked: <strong style={{ color: '#166534' }}>{participants.filter(p => p.is_linked).length}</strong></span>
-        <span>⚠ Unlinked: <strong style={{ color: '#92400e' }}>{participants.filter(p => !p.is_linked).length}</strong></span>
-        <span>Total: <strong>{participants.length}</strong></span>
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: 0, marginBottom: '1rem', borderRadius: 8, overflow: 'hidden', border: '1px solid #e5e7eb' }}>
+        {TABS.map(t => (
+          <button key={t.id} onClick={() => setActiveTab(t.id)} style={S.tab(activeTab === t.id)}>
+            {t.label}
+          </button>
+        ))}
       </div>
+
+      {/* Tab content */}
+      {activeTab === 'overview' && (
+        <OverviewTab competition={competition} onEditSetup={() => setActiveTab('setup')} />
+      )}
+      {activeTab === 'setup' && (
+        <SetupTab competition={competition} onSaved={handleSaved} />
+      )}
+      {activeTab === 'teams' && (
+        <TeamsTab competition={competition} />
+      )}
+      {activeTab === 'roles' && (
+        <RolesTab competition={competition} />
+      )}
     </div>
   )
 }
