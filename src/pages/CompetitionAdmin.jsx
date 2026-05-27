@@ -645,22 +645,44 @@ function TeamsTab({ competition }) {
 }
 
 // ─── ROLES TAB ────────────────────────────────────────────────────────────────
+const ROLE_OPTIONS = [
+  { value: 'catch_recorder',           label: 'Official Catch Recorder' },
+  { value: 'tournament_director',      label: 'Tournament Director' },
+  { value: 'national_tournament_officer', label: 'National Tournament Officer' },
+  { value: 'admin',                    label: 'System Administrator' },
+  { value: 'observer',                 label: 'Observer' },
+  { value: 'scorer',                   label: 'Scorer' },
+  { value: 'read_only',                label: 'Read Only' },
+]
+
+const ROLE_COLORS = {
+  admin:                       '#dc2626',
+  tournament_director:         '#7c3aed',
+  national_tournament_officer: '#1d4ed8',
+  catch_recorder:              '#065f46',
+  scorer:                      '#1e3a8a',
+  observer:                    '#6b7280',
+  read_only:                   '#9ca3af',
+}
+
 function RolesTab({ competition }) {
-  const [roles, setRoles]         = useState([])
-  const [email, setEmail]         = useState('')
-  const [role, setRole]           = useState('scorer')
-  const [loading, setLoading]     = useState(true)
-  const [adding, setAdding]       = useState(false)
-  const [error, setError]         = useState('')
-  const [success, setSuccess]     = useState('')
+  const [roles, setRoles]   = useState([])
+  const [email, setEmail]   = useState('')
+  const [role, setRole]     = useState('catch_recorder')
+  const [loading, setLoading] = useState(true)
+  const [adding, setAdding] = useState(false)
+  const [error, setError]   = useState('')
+  const [success, setSuccess] = useState('')
 
   const load = useCallback(async () => {
     if (!competition?.id) return
+    // Filter by competition_id to avoid showing roles from other competitions
     const { data } = await supabase
       .from('allcoastals_roles')
       .select('*')
+      .eq('competition_id', competition.id)
       .order('created_at')
-    setRoles((data || []))
+    setRoles(data || [])
     setLoading(false)
   }, [competition?.id])
 
@@ -669,36 +691,30 @@ function RolesTab({ competition }) {
   const handleGrant = async () => {
     if (!email) return
     setAdding(true); setError(''); setSuccess('')
-    const { data: user } = await supabase
-      .from('auth.users').select('id,email').eq('email', email).single()
-      .catch(() => ({ data: null }))
 
-    // Try auth.users via RPC
+    // Look up user by email
+    let userId = null
     const { data: userData } = await supabase
       .rpc('get_user_by_email', { email_input: email })
       .catch(() => ({ data: null }))
+    userId = userData?.id
 
-    const userId = user?.id || userData?.id
-    if (!userId) {
-      // Try direct lookup
-      const { data: authData } = await supabase.auth.admin
-        ?.listUsers?.()
-        .catch(() => ({ data: null })) || {}
-      const found = authData?.users?.find(u => u.email === email)
-      if (!found) {
-        setError('User not found — they must register in the app first.')
-        setAdding(false); return
-      }
-    }
-
+    const roleOption = ROLE_OPTIONS.find(o => o.value === role)
     const { error: err } = await supabase.from('allcoastals_roles').insert({
-      user_id: userId,
+      user_id:        userId || null,
       email,
       role,
+      role_title:     roleOption?.label || role,
+      competition_id: competition.id,
     })
-    if (err) { setError(err.message); setAdding(false); return }
-    setSuccess(`✅ ${role} access granted to ${email}`)
-    setEmail(''); setAdding(false)
+    if (err) {
+      setError(err.message)
+      setAdding(false)
+      return
+    }
+    setSuccess(`✅ ${roleOption?.label} access granted to ${email}`)
+    setEmail('')
+    setAdding(false)
     load()
   }
 
@@ -724,9 +740,9 @@ function RolesTab({ competition }) {
             placeholder='user@email.com'
             value={email} onChange={e => setEmail(e.target.value)} />
           <select style={{ ...S.select, width: 'auto' }} value={role} onChange={e => setRole(e.target.value)}>
-            <option value='scorer'>Scorer</option>
-            <option value='admin'>Admin</option>
-            <option value='observer'>Observer</option>
+            {ROLE_OPTIONS.map(o => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
           </select>
           <button onClick={handleGrant} disabled={adding || !email}
             style={{ ...S.btn(GREEN), opacity: adding || !email ? 0.5 : 1 }}>
@@ -743,11 +759,24 @@ function RolesTab({ competition }) {
           <div style={{ color: GREY, fontStyle: 'italic' }}>No roles assigned yet.</div>
         ) : (
           roles.map(r => (
-            <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem 0', borderBottom: '1px solid #f0f0f0' }}>
-              <span style={S.badge(r.role === 'admin' ? RED : r.role === 'scorer' ? NAVY : GREY)}>
-                {r.role.toUpperCase()}
+            <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 0', borderBottom: '1px solid #f0f0f0' }}>
+              <span style={{
+                background: ROLE_COLORS[r.role] || GREY,
+                color: 'white',
+                padding: '0.2rem 0.7rem',
+                borderRadius: 20,
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                whiteSpace: 'nowrap',
+              }}>
+                {r.role_title || r.role}
               </span>
-              <span style={{ flex: 1 }}>{r.email}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 500 }}>{r.email}</div>
+                {!r.user_id && (
+                  <div style={{ fontSize: '0.75rem', color: GOLD }}>⏳ Pending registration</div>
+                )}
+              </div>
               <button onClick={() => handleRevoke(r.id)} style={S.btnSm('#fef2f2', RED)}>Revoke</button>
             </div>
           ))
