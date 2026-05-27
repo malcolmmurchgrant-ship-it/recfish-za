@@ -35,15 +35,16 @@ const navLinkStyle = (active = false) => ({
 })
 
 // ─── DROPDOWN MENU ────────────────────────────────────────────────────────────
-function DropdownMenu({ label, items, activePrefix }) {
+// currentPath passed as prop to avoid stale location inside component
+function DropdownMenu({ label, items, currentPath }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
-  const location = useLocation()
-  const isActive = items.some(i => location.pathname.startsWith(i.to))
+  const isActive = items.some(i => i.to && currentPath.startsWith(i.to))
 
-  // Close on outside click
   useEffect(() => {
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
@@ -53,7 +54,14 @@ function DropdownMenu({ label, items, activePrefix }) {
       <button
         onClick={() => setOpen(o => !o)}
         style={{
-          ...navLinkStyle(isActive || open),
+          color: 'white',
+          fontWeight: '600',
+          fontSize: '0.8rem',
+          padding: '0.5rem 0.75rem',
+          borderRadius: '20px',
+          background: (isActive || open) ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.15)',
+          whiteSpace: 'nowrap',
+          flexShrink: 0,
           border: 'none',
           cursor: 'pointer',
           display: 'flex',
@@ -61,8 +69,7 @@ function DropdownMenu({ label, items, activePrefix }) {
           gap: '0.3rem',
         }}
       >
-        {label}
-        <span style={{ fontSize: '0.65rem', opacity: 0.8 }}>{open ? '▲' : '▼'}</span>
+        {label} <span style={{ fontSize: '0.65rem', opacity: 0.75 }}>{open ? '▲' : '▼'}</span>
       </button>
 
       {open && (
@@ -72,55 +79,43 @@ function DropdownMenu({ label, items, activePrefix }) {
           left: 0,
           background: 'white',
           borderRadius: 8,
-          boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
-          minWidth: 210,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.18)',
+          minWidth: 220,
           zIndex: 1000,
           overflow: 'hidden',
         }}>
-          {items.map(item => (
-            item.divider ? (
-              <div key={item.key} style={{ height: 1, background: '#e5e7eb', margin: '0.25rem 0' }} />
-            ) : item.external ? (
-              <a
-                key={item.to}
-                href={item.to}
-                target='_blank'
-                rel='noopener noreferrer'
-                onClick={() => setOpen(false)}
-                style={{
-                  display: 'block',
-                  padding: '0.6rem 1rem',
-                  color: '#374151',
-                  textDecoration: 'none',
-                  fontSize: '0.85rem',
-                  fontWeight: 500,
-                }}
+          {items.map((item, i) => {
+            if (item.divider) return (
+              <div key={`div-${i}`} style={{ height: 1, background: '#e5e7eb', margin: '0.2rem 0' }} />
+            )
+            const active = item.to && currentPath.startsWith(item.to)
+            const baseStyle = {
+              display: 'block',
+              padding: '0.6rem 1rem',
+              textDecoration: 'none',
+              fontSize: '0.85rem',
+              fontWeight: active ? 700 : 500,
+              color: active ? '#1e3a8a' : '#374151',
+              background: active ? '#eff6ff' : 'white',
+              cursor: 'pointer',
+            }
+            if (item.external) return (
+              <a key={item.to} href={item.to} target='_blank' rel='noopener noreferrer'
+                onClick={() => setOpen(false)} style={baseStyle}
                 onMouseEnter={e => e.currentTarget.style.background = '#f3f4f6'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-              >
+                onMouseLeave={e => e.currentTarget.style.background = active ? '#eff6ff' : 'white'}>
                 {item.label}
               </a>
-            ) : (
-              <Link
-                key={item.to}
-                to={item.to}
-                onClick={() => setOpen(false)}
-                style={{
-                  display: 'block',
-                  padding: '0.6rem 1rem',
-                  color: location.pathname.startsWith(item.to) ? '#1e3a8a' : '#374151',
-                  textDecoration: 'none',
-                  fontSize: '0.85rem',
-                  fontWeight: location.pathname.startsWith(item.to) ? 700 : 500,
-                  background: location.pathname.startsWith(item.to) ? '#eff6ff' : 'transparent',
-                }}
-                onMouseEnter={e => { if (!location.pathname.startsWith(item.to)) e.currentTarget.style.background = '#f3f4f6' }}
-                onMouseLeave={e => { if (!location.pathname.startsWith(item.to)) e.currentTarget.style.background = location.pathname.startsWith(item.to) ? '#eff6ff' : 'transparent' }}
-              >
+            )
+            return (
+              <Link key={item.to} to={item.to}
+                onClick={() => setOpen(false)} style={baseStyle}
+                onMouseEnter={e => { if (!active) e.currentTarget.style.background = '#f3f4f6' }}
+                onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'white' }}>
                 {item.label}
               </Link>
             )
-          ))}
+          })}
         </div>
       )}
     </div>
@@ -130,11 +125,12 @@ function DropdownMenu({ label, items, activePrefix }) {
 // ─── NAVIGATION ───────────────────────────────────────────────────────────────
 function Navigation() {
   const location = useLocation()
+  const path = location.pathname
 
   const competitionItems = [
     { to: '/competitions',          label: '🏆 Competitions Hub' },
     { to: '/competition-admin-v2',  label: '⚙️ Competition Admin' },
-    { divider: true, key: 'div1' },
+    { divider: true },
     { to: '/allcoastals-teams',     label: '🏅 All Coastals — Teams' },
     { to: '/allcoastals',           label: '🎣 All Coastals — Logger' },
     { to: '/allcoastals-scores',    label: '📊 All Coastals — Scores' },
@@ -142,8 +138,8 @@ function Navigation() {
   ]
 
   const toolItems = [
-    { to: '/species',               label: '🐟 Species Lookup' },
-    { to: '/catch-map',             label: '🗺️ Catch Map' },
+    { to: '/species',   label: '🐟 Species Lookup' },
+    { to: '/catch-map', label: '🗺️ Catch Map' },
     { to: 'https://safishid.netlify.app', label: '🔍 Fish ID ↗', external: true },
   ]
 
@@ -158,20 +154,15 @@ function Navigation() {
         scrollbarWidth: 'none',
         msOverflowStyle: 'none',
       }}>
-        {/* Core links */}
-        <Link to='/dashboard' style={navLinkStyle(location.pathname === '/dashboard')}>🏠 Home</Link>
-        <Link to='/log-catch' style={navLinkStyle(location.pathname === '/log-catch')}>🎣 Log Catch</Link>
-        <Link to='/my-catches' style={navLinkStyle(location.pathname === '/my-catches')}>📋 My Catches</Link>
-        <Link to='/sessions' style={navLinkStyle(location.pathname === '/sessions')}>⏱ Sessions</Link>
+        <Link to='/dashboard'  style={navLinkStyle(path === '/dashboard')}>🏠 Home</Link>
+        <Link to='/log-catch'  style={navLinkStyle(path === '/log-catch')}>🎣 Log Catch</Link>
+        <Link to='/my-catches' style={navLinkStyle(path === '/my-catches')}>📋 My Catches</Link>
+        <Link to='/sessions'   style={navLinkStyle(path === '/sessions')}>⏱ Sessions</Link>
 
-        {/* Competitions dropdown */}
-        <DropdownMenu label='🏆 Competitions' items={competitionItems} />
+        <DropdownMenu label='🏆 Competitions' items={competitionItems} currentPath={path} />
+        <DropdownMenu label='🔧 Tools'        items={toolItems}        currentPath={path} />
 
-        {/* Tools dropdown */}
-        <DropdownMenu label='🔧 Tools' items={toolItems} />
-
-        {/* Profile */}
-        <Link to='/profile' style={navLinkStyle(location.pathname === '/profile')}>👤 Profile</Link>
+        <Link to='/profile' style={navLinkStyle(path === '/profile')}>👤 Profile</Link>
       </div>
     </nav>
   )
