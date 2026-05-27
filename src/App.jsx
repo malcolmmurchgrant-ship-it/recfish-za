@@ -1,5 +1,5 @@
-import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation, useNavigate } from 'react-router-dom'
-import { useState, useRef, useEffect } from 'react'
+import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom'
+import { useState } from 'react'
 import { AuthProvider } from './contexts/AuthContext'
 import { SessionProvider, useSession } from './contexts/SessionContext'
 import Login from './pages/Login'
@@ -20,141 +20,49 @@ import AllCoastalsTeams from './pages/AllCoastalsTeams'
 import Profile from './pages/Profile'
 import SessionEndSummaryModal from './components/SessionEndSummaryModal'
 
-// ─── NAV LINK STYLE ───────────────────────────────────────────────────────────
-const navLinkStyle = (active = false) => ({
+const NAVY = '#1e3a8a'
+
+const pill = (active) => ({
   color: 'white',
   textDecoration: 'none',
-  fontWeight: '600',
+  fontWeight: 600,
   fontSize: '0.8rem',
   padding: '0.5rem 0.75rem',
-  borderRadius: '20px',
+  borderRadius: 20,
   background: active ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.15)',
   whiteSpace: 'nowrap',
   flexShrink: 0,
   display: 'inline-block',
+  cursor: 'pointer',
+  border: 'none',
 })
 
-// ─── DROPDOWN MENU ────────────────────────────────────────────────────────────
-function DropdownMenu({ label, items, currentPath }) {
-  const [open, setOpen] = useState(false)
-  const [pos,  setPos]  = useState({ top: 0, left: 0 })
-  const btnRef          = useRef(null)
-  const navigate        = useNavigate()
-  const isActive        = items.some(i => i.to && currentPath.startsWith(i.to))
-
-  const openMenu = () => {
-    if (btnRef.current) {
-      const r = btnRef.current.getBoundingClientRect()
-      setPos({ top: r.bottom + 4, left: r.left })
-    }
-    setOpen(true)
-  }
-
-  const handleItem = (item) => {
-    setOpen(false)
-    if (item.external) {
-      window.open(item.to, '_blank', 'noopener,noreferrer')
-    } else {
-      navigate(item.to)
-    }
-  }
-
-  useEffect(() => {
-    if (!open) return
-    const handler = (e) => {
-      if (btnRef.current && !btnRef.current.contains(e.target)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [open])
-
-  useEffect(() => {
-    if (!open) return
-    const close = () => setOpen(false)
-    window.addEventListener('scroll', close, true)
-    window.addEventListener('resize', close)
-    return () => {
-      window.removeEventListener('scroll', close, true)
-      window.removeEventListener('resize', close)
-    }
-  }, [open])
-
-  const btnStyle = {
-    color: 'white',
-    fontWeight: '600',
-    fontSize: '0.8rem',
-    padding: '0.5rem 0.75rem',
-    borderRadius: '20px',
-    background: (isActive || open) ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.15)',
-    whiteSpace: 'nowrap',
-    flexShrink: 0,
-    border: 'none',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.3rem',
-  }
+// Simple expand/collapse group — no positioning, no portals, no z-index tricks
+// The group label is a button; clicking expands an inline sub-menu below the nav bar
+function NavGroup({ label, items, currentPath, openGroup, setOpenGroup, groupId }) {
+  const isOpen   = openGroup === groupId
+  const isActive = items.some(i => i.to && currentPath.startsWith(i.to))
 
   return (
-    <>
-      <button ref={btnRef} onClick={() => open ? setOpen(false) : openMenu()} style={btnStyle}>
-        {label}
-        <span style={{ fontSize: '0.6rem', opacity: 0.75 }}>{open ? '▲' : '▼'}</span>
+    <div style={{ flexShrink: 0 }}>
+      <button
+        onClick={() => setOpenGroup(isOpen ? null : groupId)}
+        style={{ ...pill(isActive || isOpen) }}
+      >
+        {label} <span style={{ fontSize: '0.6rem' }}>{isOpen ? '▲' : '▼'}</span>
       </button>
-
-      {open && (
-        <div style={{
-          position: 'fixed',
-          top:  pos.top,
-          left: pos.left,
-          background: 'white',
-          borderRadius: 8,
-          boxShadow: '0 4px 20px rgba(0,0,0,0.20)',
-          minWidth: 230,
-          zIndex: 9999,
-          overflow: 'hidden',
-        }}>
-          {items.map((item, i) => {
-            if (item.divider) return (
-              <div key={`d${i}`} style={{ height: 1, background: '#e5e7eb', margin: '0.2rem 0' }} />
-            )
-            const active = item.to && currentPath.startsWith(item.to)
-            return (
-              <div
-                key={item.to}
-                onClick={() => handleItem(item)}
-                style={{
-                  padding: '0.65rem 1.1rem',
-                  fontSize: '0.85rem',
-                  fontWeight: active ? 700 : 500,
-                  color: active ? '#1e3a8a' : '#374151',
-                  background: active ? '#eff6ff' : 'white',
-                  cursor: 'pointer',
-                  borderLeft: active ? '3px solid #1e3a8a' : '3px solid transparent',
-                  userSelect: 'none',
-                }}
-                onMouseEnter={e => { if (!active) e.currentTarget.style.background = '#f3f4f6' }}
-                onMouseLeave={e => { if (!active) e.currentTarget.style.background = active ? '#eff6ff' : 'white' }}
-              >
-                {item.label}
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </>
+    </div>
   )
 }
 
-// ─── NAVIGATION ───────────────────────────────────────────────────────────────
 function Navigation() {
   const location = useLocation()
-  const path     = location.pathname
+  const path = location.pathname
+  const [openGroup, setOpenGroup] = useState(null)
 
   const competitionItems = [
     { to: '/competitions',         label: '🏆 Competitions Hub' },
     { to: '/competition-admin-v2', label: '⚙️ Competition Admin' },
-    { divider: true },
     { to: '/allcoastals-teams',    label: '🏅 All Coastals — Teams' },
     { to: '/allcoastals',          label: '🎣 All Coastals — Logger' },
     { to: '/allcoastals-scores',   label: '📊 All Coastals — Scores' },
@@ -164,35 +72,98 @@ function Navigation() {
   const toolItems = [
     { to: '/species',   label: '🐟 Species Lookup' },
     { to: '/catch-map', label: '🗺️ Catch Map' },
-    { to: 'https://safishid.netlify.app', label: '🔍 Fish ID ↗', external: true },
   ]
 
+  const subMenuStyle = {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '0.4rem',
+    padding: '0.6rem 1rem',
+    background: '#162d6e',
+    borderTop: '1px solid rgba(255,255,255,0.1)',
+  }
+
+  const subLinkStyle = (active) => ({
+    color: active ? '#fbbf24' : 'rgba(255,255,255,0.85)',
+    textDecoration: 'none',
+    fontWeight: active ? 700 : 500,
+    fontSize: '0.8rem',
+    padding: '0.35rem 0.7rem',
+    borderRadius: 20,
+    background: active ? 'rgba(255,255,255,0.12)' : 'transparent',
+    whiteSpace: 'nowrap',
+    border: '1px solid rgba(255,255,255,0.15)',
+  })
+
+  const activeItems = openGroup === 'competitions' ? competitionItems
+                    : openGroup === 'tools'        ? toolItems
+                    : []
+
   return (
-    <nav style={{ background: '#1e3a8a', padding: '0.75rem 1rem', marginBottom: '2rem' }}>
+    <nav style={{ background: NAVY, marginBottom: '2rem' }}>
+      {/* Main bar */}
       <div style={{
         display: 'flex',
         gap: '0.4rem',
         alignItems: 'center',
+        padding: '0.75rem 1rem',
         overflowX: 'auto',
         WebkitOverflowScrolling: 'touch',
         scrollbarWidth: 'none',
-        msOverflowStyle: 'none',
       }}>
-        <Link to='/dashboard'  style={navLinkStyle(path === '/dashboard')}>🏠 Home</Link>
-        <Link to='/log-catch'  style={navLinkStyle(path === '/log-catch')}>🎣 Log Catch</Link>
-        <Link to='/my-catches' style={navLinkStyle(path === '/my-catches')}>📋 My Catches</Link>
-        <Link to='/sessions'   style={navLinkStyle(path === '/sessions')}>⏱ Sessions</Link>
+        <Link to='/dashboard'  style={pill(path === '/dashboard')}>🏠 Home</Link>
+        <Link to='/log-catch'  style={pill(path === '/log-catch')}>🎣 Log Catch</Link>
+        <Link to='/my-catches' style={pill(path === '/my-catches')}>📋 My Catches</Link>
+        <Link to='/sessions'   style={pill(path === '/sessions')}>⏱ Sessions</Link>
 
-        <DropdownMenu label='🏆 Competitions' items={competitionItems} currentPath={path} />
-        <DropdownMenu label='🔧 Tools'        items={toolItems}        currentPath={path} />
+        <NavGroup
+          groupId='competitions'
+          label='🏆 Competitions'
+          items={competitionItems}
+          currentPath={path}
+          openGroup={openGroup}
+          setOpenGroup={setOpenGroup}
+        />
+        <NavGroup
+          groupId='tools'
+          label='🔧 Tools'
+          items={toolItems}
+          currentPath={path}
+          openGroup={openGroup}
+          setOpenGroup={setOpenGroup}
+        />
 
-        <Link to='/profile' style={navLinkStyle(path === '/profile')}>👤 Profile</Link>
+        <Link to='/profile' style={pill(path === '/profile')}>👤 Profile</Link>
+
+        <a href='https://safishid.netlify.app' target='_blank' rel='noopener noreferrer'
+          style={pill(false)}>🔍 Fish ID ↗</a>
       </div>
+
+      {/* Inline sub-menu — appears below the nav bar, no positioning needed */}
+      {openGroup && activeItems.length > 0 && (
+        <div style={subMenuStyle}>
+          {activeItems.map(item => (
+            <Link
+              key={item.to}
+              to={item.to}
+              style={subLinkStyle(path.startsWith(item.to))}
+              onClick={() => setOpenGroup(null)}
+            >
+              {item.label}
+            </Link>
+          ))}
+          <button
+            onClick={() => setOpenGroup(null)}
+            style={{ ...subLinkStyle(false), marginLeft: 'auto', cursor: 'pointer' }}
+          >
+            ✕ Close
+          </button>
+        </div>
+      )}
     </nav>
   )
 }
 
-// ─── APP CONTENT ──────────────────────────────────────────────────────────────
 function AppContent() {
   const { lastEndedSession, clearLastEndedSession } = useSession()
   return (
@@ -233,7 +204,6 @@ function AppContent() {
   )
 }
 
-// ─── APP ──────────────────────────────────────────────────────────────────────
 function App() {
   return (
     <AuthProvider>
