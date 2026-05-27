@@ -35,106 +35,130 @@ const navLinkStyle = (active = false) => ({
 })
 
 // ─── DROPDOWN MENU ────────────────────────────────────────────────────────────
-// currentPath passed as prop to avoid stale location inside component
 function DropdownMenu({ label, items, currentPath }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef(null)
-  const isActive = items.some(i => i.to && currentPath.startsWith(i.to))
+  const [open, setOpen]   = useState(false)
+  const [pos,  setPos]    = useState({ top: 0, left: 0 })
+  const btnRef            = useRef(null)
+  const isActive          = items.some(i => i.to && currentPath.startsWith(i.to))
 
+  // Position the dropdown exactly under the button using fixed positioning
+  // This escapes any overflow:hidden/auto on parent elements
+  const openMenu = () => {
+    if (btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect()
+      setPos({ top: r.bottom + 4, left: r.left })
+    }
+    setOpen(true)
+  }
+
+  // Close on outside click
   useEffect(() => {
+    if (!open) return
     const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+      if (btnRef.current && !btnRef.current.contains(e.target)) setOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [])
+  }, [open])
+
+  // Close on scroll/resize
+  useEffect(() => {
+    if (!open) return
+    const close = () => setOpen(false)
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('resize', close)
+    return () => {
+      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('resize', close)
+    }
+  }, [open])
+
+  const btnStyle = {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: '0.8rem',
+    padding: '0.5rem 0.75rem',
+    borderRadius: '20px',
+    background: (isActive || open) ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.15)',
+    whiteSpace: 'nowrap',
+    flexShrink: 0,
+    border: 'none',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.3rem',
+  }
 
   return (
-    <div ref={ref} style={{ position: 'relative', flexShrink: 0 }}>
-      <button
-        onClick={() => setOpen(o => !o)}
-        style={{
-          color: 'white',
-          fontWeight: '600',
-          fontSize: '0.8rem',
-          padding: '0.5rem 0.75rem',
-          borderRadius: '20px',
-          background: (isActive || open) ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.15)',
-          whiteSpace: 'nowrap',
-          flexShrink: 0,
-          border: 'none',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.3rem',
-        }}
-      >
-        {label} <span style={{ fontSize: '0.65rem', opacity: 0.75 }}>{open ? '▲' : '▼'}</span>
+    <>
+      <button ref={btnRef} onClick={() => open ? setOpen(false) : openMenu()} style={btnStyle}>
+        {label}
+        <span style={{ fontSize: '0.6rem', opacity: 0.75 }}>{open ? '▲' : '▼'}</span>
       </button>
 
       {open && (
         <div style={{
-          position: 'absolute',
-          top: 'calc(100% + 6px)',
-          left: 0,
+          position: 'fixed',
+          top:  pos.top,
+          left: pos.left,
           background: 'white',
           borderRadius: 8,
-          boxShadow: '0 4px 20px rgba(0,0,0,0.18)',
-          minWidth: 220,
-          zIndex: 1000,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.20)',
+          minWidth: 230,
+          zIndex: 9999,
           overflow: 'hidden',
         }}>
           {items.map((item, i) => {
             if (item.divider) return (
-              <div key={`div-${i}`} style={{ height: 1, background: '#e5e7eb', margin: '0.2rem 0' }} />
+              <div key={`d${i}`} style={{ height: 1, background: '#e5e7eb', margin: '0.2rem 0' }} />
             )
             const active = item.to && currentPath.startsWith(item.to)
-            const baseStyle = {
+            const style = {
               display: 'block',
-              padding: '0.6rem 1rem',
+              padding: '0.65rem 1.1rem',
               textDecoration: 'none',
               fontSize: '0.85rem',
               fontWeight: active ? 700 : 500,
               color: active ? '#1e3a8a' : '#374151',
               background: active ? '#eff6ff' : 'white',
               cursor: 'pointer',
+              borderLeft: active ? '3px solid #1e3a8a' : '3px solid transparent',
             }
             if (item.external) return (
               <a key={item.to} href={item.to} target='_blank' rel='noopener noreferrer'
-                onClick={() => setOpen(false)} style={baseStyle}
+                onClick={() => setOpen(false)} style={style}
                 onMouseEnter={e => e.currentTarget.style.background = '#f3f4f6'}
                 onMouseLeave={e => e.currentTarget.style.background = active ? '#eff6ff' : 'white'}>
                 {item.label}
               </a>
             )
             return (
-              <Link key={item.to} to={item.to}
-                onClick={() => setOpen(false)} style={baseStyle}
+              <Link key={item.to} to={item.to} onClick={() => setOpen(false)} style={style}
                 onMouseEnter={e => { if (!active) e.currentTarget.style.background = '#f3f4f6' }}
-                onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'white' }}>
+                onMouseLeave={e => { if (!active) e.currentTarget.style.background = active ? '#eff6ff' : 'white' }}>
                 {item.label}
               </Link>
             )
           })}
         </div>
       )}
-    </div>
+    </>
   )
 }
 
 // ─── NAVIGATION ───────────────────────────────────────────────────────────────
 function Navigation() {
   const location = useLocation()
-  const path = location.pathname
+  const path     = location.pathname
 
   const competitionItems = [
-    { to: '/competitions',          label: '🏆 Competitions Hub' },
-    { to: '/competition-admin-v2',  label: '⚙️ Competition Admin' },
+    { to: '/competitions',         label: '🏆 Competitions Hub' },
+    { to: '/competition-admin-v2', label: '⚙️ Competition Admin' },
     { divider: true },
-    { to: '/allcoastals-teams',     label: '🏅 All Coastals — Teams' },
-    { to: '/allcoastals',           label: '🎣 All Coastals — Logger' },
-    { to: '/allcoastals-scores',    label: '📊 All Coastals — Scores' },
-    { to: '/allcoastals-admin',     label: '🔧 All Coastals — Admin' },
+    { to: '/allcoastals-teams',    label: '🏅 All Coastals — Teams' },
+    { to: '/allcoastals',          label: '🎣 All Coastals — Logger' },
+    { to: '/allcoastals-scores',   label: '📊 All Coastals — Scores' },
+    { to: '/allcoastals-admin',    label: '🔧 All Coastals — Admin' },
   ]
 
   const toolItems = [
