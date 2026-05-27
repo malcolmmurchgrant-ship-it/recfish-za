@@ -184,21 +184,28 @@ function SetupTab({ competition, onSaved }) {
       catch_release_enabled: form.catch_release_enabled,
       description:           form.description || null,
       td_name:               form.td_name || null,
+      scoring_method:        form.scoring_method || null,
       status:                'active',
       updated_at:            new Date().toISOString(),
     }
 
-    let result
+    let savedData, saveError
     if (competition?.id) {
-      result = await supabase.from('competitions').update(payload).eq('id', competition.id).select().single()
+      const { data, error } = await supabase
+        .from('competitions').update(payload).eq('id', competition.id).select()
+      saveError = error
+      savedData = data?.[0] || null
     } else {
-      result = await supabase.from('competitions').insert(payload).select().single()
+      const { data, error } = await supabase
+        .from('competitions').insert(payload).select()
+      saveError = error
+      savedData = data?.[0] || null
     }
 
-    if (result.error) { setError(result.error.message); setSaving(false); return }
+    if (saveError) { setError(saveError.message); setSaving(false); return }
     setSaving(false); setSaved(true)
     setTimeout(() => setSaved(false), 3000)
-    onSaved(result.data)
+    if (savedData) onSaved(savedData)
   }
 
   const selectedFed  = federations.find(f => f.id === form.federation_id)
@@ -345,7 +352,7 @@ function SetupTab({ competition, onSaved }) {
             <select style={S.select} value={form.team_format}
               onChange={e => set('team_format', e.target.value)}>
               <option value='split_boat'>Split Boat Draw</option>
-              <option value='full_boat'>Full Boat</option>
+              <option value='traditional'>Own Boat (Traditional)</option>
               <option value='individual'>Individual</option>
               <option value='pairs'>Pairs</option>
             </select>
@@ -859,8 +866,8 @@ export default function CompetitionAdmin() {
   // Load competition if ID in URL
   useEffect(() => {
     if (!competitionId) return
-    supabase.from('competitions').select('*').eq('id', competitionId).single()
-      .then(({ data }) => { if (data) setCompetition(data) })
+    supabase.from('competitions').select('*').eq('id', competitionId)
+      .then(({ data }) => { if (data?.[0]) setCompetition(data[0]) })
   }, [competitionId])
 
   // Load recent competitions for the picker
