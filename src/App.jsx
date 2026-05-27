@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useState, useRef, useEffect } from 'react'
 import { AuthProvider } from './contexts/AuthContext'
 import { SessionProvider, useSession } from './contexts/SessionContext'
@@ -36,13 +36,12 @@ const navLinkStyle = (active = false) => ({
 
 // ─── DROPDOWN MENU ────────────────────────────────────────────────────────────
 function DropdownMenu({ label, items, currentPath }) {
-  const [open, setOpen]   = useState(false)
-  const [pos,  setPos]    = useState({ top: 0, left: 0 })
-  const btnRef            = useRef(null)
-  const isActive          = items.some(i => i.to && currentPath.startsWith(i.to))
+  const [open, setOpen] = useState(false)
+  const [pos,  setPos]  = useState({ top: 0, left: 0 })
+  const btnRef          = useRef(null)
+  const navigate        = useNavigate()
+  const isActive        = items.some(i => i.to && currentPath.startsWith(i.to))
 
-  // Position the dropdown exactly under the button using fixed positioning
-  // This escapes any overflow:hidden/auto on parent elements
   const openMenu = () => {
     if (btnRef.current) {
       const r = btnRef.current.getBoundingClientRect()
@@ -51,7 +50,15 @@ function DropdownMenu({ label, items, currentPath }) {
     setOpen(true)
   }
 
-  // Close on outside click
+  const handleItem = (item) => {
+    setOpen(false)
+    if (item.external) {
+      window.open(item.to, '_blank', 'noopener,noreferrer')
+    } else {
+      navigate(item.to)
+    }
+  }
+
   useEffect(() => {
     if (!open) return
     const handler = (e) => {
@@ -61,7 +68,6 @@ function DropdownMenu({ label, items, currentPath }) {
     return () => document.removeEventListener('mousedown', handler)
   }, [open])
 
-  // Close on scroll/resize
   useEffect(() => {
     if (!open) return
     const close = () => setOpen(false)
@@ -113,31 +119,25 @@ function DropdownMenu({ label, items, currentPath }) {
               <div key={`d${i}`} style={{ height: 1, background: '#e5e7eb', margin: '0.2rem 0' }} />
             )
             const active = item.to && currentPath.startsWith(item.to)
-            const style = {
-              display: 'block',
-              padding: '0.65rem 1.1rem',
-              textDecoration: 'none',
-              fontSize: '0.85rem',
-              fontWeight: active ? 700 : 500,
-              color: active ? '#1e3a8a' : '#374151',
-              background: active ? '#eff6ff' : 'white',
-              cursor: 'pointer',
-              borderLeft: active ? '3px solid #1e3a8a' : '3px solid transparent',
-            }
-            if (item.external) return (
-              <a key={item.to} href={item.to} target='_blank' rel='noopener noreferrer'
-                onClick={() => setOpen(false)} style={style}
-                onMouseEnter={e => e.currentTarget.style.background = '#f3f4f6'}
-                onMouseLeave={e => e.currentTarget.style.background = active ? '#eff6ff' : 'white'}>
-                {item.label}
-              </a>
-            )
             return (
-              <Link key={item.to} to={item.to} onClick={() => setOpen(false)} style={style}
+              <div
+                key={item.to}
+                onClick={() => handleItem(item)}
+                style={{
+                  padding: '0.65rem 1.1rem',
+                  fontSize: '0.85rem',
+                  fontWeight: active ? 700 : 500,
+                  color: active ? '#1e3a8a' : '#374151',
+                  background: active ? '#eff6ff' : 'white',
+                  cursor: 'pointer',
+                  borderLeft: active ? '3px solid #1e3a8a' : '3px solid transparent',
+                  userSelect: 'none',
+                }}
                 onMouseEnter={e => { if (!active) e.currentTarget.style.background = '#f3f4f6' }}
-                onMouseLeave={e => { if (!active) e.currentTarget.style.background = active ? '#eff6ff' : 'white' }}>
+                onMouseLeave={e => { if (!active) e.currentTarget.style.background = active ? '#eff6ff' : 'white' }}
+              >
                 {item.label}
-              </Link>
+              </div>
             )
           })}
         </div>
