@@ -207,6 +207,19 @@ function SetupTab({ competition, onSaved }) {
     }
 
     if (saveError) { setError(saveError.message); setSaving(false); return }
+
+    // Fetch fresh data from DB to ensure form reflects actual saved state
+    const compId = competition?.id || savedData?.id
+    if (compId) {
+      const { data: fresh } = await supabase
+        .from('competitions').select('*').eq('id', compId)
+      if (fresh?.[0]) {
+        setSaving(false); setSaved(true)
+        setTimeout(() => setSaved(false), 3000)
+        onSaved(fresh[0])
+        return
+      }
+    }
     setSaving(false); setSaved(true)
     setTimeout(() => setSaved(false), 3000)
     if (savedData) onSaved(savedData)
