@@ -699,17 +699,19 @@ function RolesTab({ competition }) {
     const roleData = data || []
     setRoles(roleData)
 
-    // Fetch display names for registered users
-    const userIds = roleData.filter(r => r.user_id).map(r => r.user_id)
-    if (userIds.length > 0) {
-      const { data: userRows } = await supabase
-        .from('users')
-        .select('id, full_name, email')
-        .in('id', userIds)
-      const nameMap = {}
-      ;(userRows || []).forEach(u => { nameMap[u.email] = u.full_name || u.email })
-      setNames(nameMap)
-    }
+    // Fetch display names for registered users (safe — fail silently)
+    try {
+      const userIds = roleData.filter(r => r.user_id).map(r => r.user_id)
+      if (userIds.length > 0) {
+        const { data: userRows } = await supabase
+          .from('users')
+          .select('id, full_name, email')
+          .in('id', userIds)
+        const nameMap = {}
+        ;(userRows || []).forEach(u => { nameMap[u.email] = u.full_name || u.email })
+        setNames(nameMap)
+      }
+    } catch (_) {}
     setLoading(false)
   }, [competition?.id])
 

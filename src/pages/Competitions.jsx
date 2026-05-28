@@ -1,143 +1,235 @@
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
 
 const NAVY = '#1e3a8a'
+const GOLD = '#d97706'
+const GREEN = '#16a34a'
 
-const competitions = [
-  {
-    id: 'gamefish',
-    title: 'Junior Gamefish Nationals 2026',
-    subtitle: 'Sodwana Bay · 30 Mar – 3 Apr 2026',
-    status: 'past',
-    statusLabel: '⚪ Completed',
-    type: 'gamefish',
-    typeLabel: '🎣 Gamefish',
-    typeColor: { bg: '#dbeafe', col: '#1e40af' },
-    description: 'Junior gamefish competition — weight & release-based scoring',
-    links: [
-      { to: '/competition', label: '🎣 Catch Logger / Results', primary: true },
+// ─── Route map — links shown per competition based on discipline ──────────────
+// Falls back to Competition Admin for any competition not explicitly mapped
+function getLinks(comp) {
+  const id = comp.id
+
+  // Specific competitions with dedicated pages
+  const specific = {
+    'c8332f15-ce44-4d0b-a3ab-009fc2a2c484': [  // All Coastals
+      { to: '/allcoastals',        label: '🎣 Enter Catches',    primary: true },
+      { to: '/allcoastals-scores', label: '📊 Scoreboard',       primary: false },
+      { to: '/allcoastals-teams',  label: '🏅 Teams',            primary: false },
     ],
-  },
-  {
-    id: 'tuna-nationals',
-    title: 'Tuna Nationals 2026',
-    subtitle: 'Atlantic Boat Club, Hout Bay · 13 – 17 Apr 2026',
-    status: 'past',
-    statusLabel: '⚪ Completed',
-    type: 'tuna',
-    typeLabel: '🐟 Tuna',
-    typeColor: { bg: '#fef3c7', col: '#92400e' },
-    description: 'National tuna competition — weight-based scoring with line class factors',
-    links: [
-      { to: '/competition', label: '🐟 Catch Logger / Results', primary: true },
+    '3855034f-ab39-4297-9be4-ba9a7e566ce0': [  // Gamefish Nationals
+      { to: '/gamefish',           label: '🎣 Enter Catches',    primary: true },
     ],
-  },
-  {
-    id: 'tuna-international',
-    title: 'Tuna International 2026',
-    subtitle: 'Atlantic Boat Club, Hout Bay · 13 – 17 Apr 2026',
-    status: 'past',
-    statusLabel: '⚪ Completed',
-    type: 'tuna',
-    typeLabel: '🐟 Tuna',
-    typeColor: { bg: '#fef3c7', col: '#92400e' },
-    description: 'International tuna competition — weight-based scoring with line class factors',
-    links: [
-      { to: '/competition', label: '🐟 Catch Logger / Results', primary: true },
-    ],
-  },
-  {
-    id: 'allcoastals',
-    title: 'All Coastal Bottomfish Inter-Provincial 2026',
-    subtitle: 'St Francis Bay · May 2026',
-    status: 'active',
-    statusLabel: '🟢 Live',
-    type: 'bottomfish',
-    typeLabel: '🎣 Bottomfish',
-    typeColor: { bg: '#dcfce7', col: '#16a34a' },
-    description: '12 teams · 36 anglers · 10 boats · 3 fishing days · 32 species',
-    links: [
-      { to: '/allcoastals',        label: '🎣 Enter Catches',   primary: true  },
-      { to: '/allcoastals-scores', label: '📊 Live Scoreboard', primary: false },
-    ],
-  },
-]
+  }
+  if (specific[id]) return specific[id]
+
+  // Generic fallback
+  return [
+    { to: `/competition-admin-v2/${id}`, label: '⚙️ Manage Competition', primary: true },
+  ]
+}
+
+// ─── Discipline colours & labels ──────────────────────────────────────────────
+const DISCIPLINE_STYLE = {
+  bottomfish:     { bg: '#dcfce7', col: '#15803d', label: '🎣 Bottomfish' },
+  gamefish:       { bg: '#dbeafe', col: '#1e40af', label: '🐟 Gamefish' },
+  tuna:           { bg: '#fef3c7', col: '#92400e', label: '🐟 Tuna' },
+  billfish_light: { bg: '#f3e8ff', col: '#7c3aed', label: '🎣 LT Billfish' },
+  billfish_heavy: { bg: '#fce7f3', col: '#be185d', label: '🎣 HT Billfish' },
+  mixed:          { bg: '#f0fdf4', col: '#166534', label: '🎣 Mixed' },
+  shore:          { bg: '#fff7ed', col: '#c2410c', label: '🏖 Shore' },
+  spearfishing:   { bg: '#ecfeff', col: '#0e7490', label: '🤿 Spearfishing' },
+}
+
+const STATUS_STYLE = {
+  active:            { bg: '#dcfce7', col: GREEN,  label: '🟢 Live',      border: GREEN },
+  upcoming:          { bg: '#eff6ff', col: NAVY,   label: '🔵 Upcoming',  border: NAVY },
+  registration_open: { bg: '#fef3c7', col: GOLD,   label: '🟡 Open',     border: GOLD },
+  completed:         { bg: '#f3f4f6', col: '#6b7280', label: '⚪ Completed', border: '#d1d5db' },
+  cancelled:         { bg: '#fef2f2', col: '#dc2626', label: '🔴 Cancelled', border: '#fca5a5' },
+}
+
+const LEVEL_LABELS = {
+  international:   'International',
+  national:        'National',
+  interprovincial: 'Interprovincial',
+  provincial:      'Provincial',
+  regional:        'Regional',
+  club:            'Club',
+  special:         'Special',
+}
 
 export default function Competitions() {
   const navigate = useNavigate()
+  const [competitions, setCompetitions] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState('all') // all | active | upcoming | completed
+
+  useEffect(() => {
+    supabase
+      .from('competitions')
+      .select(`
+        id, name, short_name, venue, start_date, end_date,
+        status, discipline, level, category, description,
+        team_size, default_line_class_kg, hosting_province,
+        federation_id, association_id
+      `)
+      .not('status', 'eq', 'cancelled')
+      .order('start_date', { ascending: false })
+      .then(({ data }) => {
+        setCompetitions(data || [])
+        setLoading(false)
+      })
+  }, [])
+
+  const filtered = competitions.filter(c => {
+    if (filter === 'all') return true
+    if (filter === 'active') return c.status === 'active'
+    if (filter === 'upcoming') return ['upcoming','registration_open'].includes(c.status)
+    if (filter === 'completed') return c.status === 'completed'
+    return true
+  })
+
+  const filterCounts = {
+    all:       competitions.length,
+    active:    competitions.filter(c => c.status === 'active').length,
+    upcoming:  competitions.filter(c => ['upcoming','registration_open'].includes(c.status)).length,
+    completed: competitions.filter(c => c.status === 'completed').length,
+  }
 
   return (
     <div style={{ maxWidth: 800, margin: '0 auto', padding: '1rem', fontFamily: 'system-ui, sans-serif' }}>
 
       {/* Header */}
-      <div style={{ background: NAVY, color: 'white', padding: '1.25rem 1.5rem', borderRadius: 8, marginBottom: '1.5rem' }}>
+      <div style={{ background: NAVY, color: 'white', padding: '1.25rem 1.5rem', borderRadius: 8, marginBottom: '1.25rem' }}>
         <div style={{ fontSize: '1.2rem', fontWeight: 700 }}>🏆 SADSAA Competitions</div>
         <div style={{ fontSize: '0.85rem', opacity: 0.8, marginTop: 3 }}>
           Select a competition to enter catches or view results
         </div>
       </div>
 
-      {/* Competition cards */}
-      {competitions.map(comp => (
-        <div key={comp.id} style={{
-          background: 'white',
-          borderRadius: 10,
-          padding: '1.25rem 1.5rem',
-          boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
-          marginBottom: '1rem',
-          borderLeft: `5px solid ${comp.status === 'active' ? '#16a34a' : '#d1d5db'}`,
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 700, fontSize: '1.05rem', color: NAVY }}>{comp.title}</div>
-              <div style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: 2 }}>{comp.subtitle}</div>
-            </div>
-            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-              <span style={{
-                fontSize: '0.75rem', fontWeight: 700,
-                background: comp.typeColor.bg, color: comp.typeColor.col,
-                padding: '0.25rem 0.75rem', borderRadius: 20,
-              }}>{comp.typeLabel}</span>
-              <span style={{
-                fontSize: '0.75rem', fontWeight: 700,
-                background: comp.status === 'active' ? '#dcfce7' : '#f3f4f6',
-                color: comp.status === 'active' ? '#16a34a' : '#6b7280',
-                padding: '0.25rem 0.75rem', borderRadius: 20,
-              }}>{comp.statusLabel}</span>
-            </div>
-          </div>
-
-          <div style={{ fontSize: '0.85rem', color: '#374151', marginBottom: '1rem' }}>
-            {comp.description}
-          </div>
-
-          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-            {comp.links.map(link => (
-              <button key={link.to + link.label} onClick={() => navigate(link.to)}
-                style={{
-                  background: link.primary ? NAVY : 'white',
-                  color: link.primary ? 'white' : NAVY,
-                  border: `2px solid ${NAVY}`,
-                  padding: '0.5rem 1.1rem',
-                  borderRadius: 6,
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                  fontSize: '0.88rem',
-                }}>
-                {link.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      ))}
-
-      {/* Admin shortcut */}
-      <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
-        <button onClick={() => navigate('/allcoastals-admin')}
-          style={{ background: 'none', border: 'none', color: '#9ca3af', fontSize: '0.82rem', cursor: 'pointer', textDecoration: 'underline' }}>
-          ⚙️ All Coastals Admin Panel
-        </button>
+      {/* Filter tabs */}
+      <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+        {[
+          { key: 'all',       label: 'All' },
+          { key: 'active',    label: '🟢 Live' },
+          { key: 'upcoming',  label: '🔵 Upcoming' },
+          { key: 'completed', label: '⚪ Completed' },
+        ].map(f => (
+          <button key={f.key} onClick={() => setFilter(f.key)}
+            style={{
+              padding: '0.4rem 0.9rem',
+              borderRadius: 20,
+              border: `2px solid ${filter === f.key ? NAVY : '#d1d5db'}`,
+              background: filter === f.key ? NAVY : 'white',
+              color: filter === f.key ? 'white' : '#374151',
+              fontWeight: 600,
+              fontSize: '0.82rem',
+              cursor: 'pointer',
+            }}>
+            {f.label}
+            <span style={{ marginLeft: 4, opacity: 0.7, fontSize: '0.75rem' }}>
+              ({filterCounts[f.key]})
+            </span>
+          </button>
+        ))}
       </div>
 
+      {/* Competition cards */}
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '3rem', color: '#9ca3af' }}>Loading competitions…</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '3rem', color: '#9ca3af' }}>No competitions found.</div>
+      ) : (
+        filtered.map(comp => {
+          const disc    = DISCIPLINE_STYLE[comp.discipline] || { bg: '#f3f4f6', col: '#6b7280', label: comp.discipline || 'Unknown' }
+          const statStyle = STATUS_STYLE[comp.status]       || STATUS_STYLE.completed
+          const links   = getLinks(comp)
+          const dateStr = comp.start_date && comp.end_date
+            ? `${comp.start_date} → ${comp.end_date}`
+            : comp.start_date || ''
+
+          return (
+            <div key={comp.id} style={{
+              background: 'white',
+              borderRadius: 10,
+              padding: '1.25rem 1.5rem',
+              boxShadow: '0 1px 4px rgba(0,0,0,0.10)',
+              marginBottom: '1rem',
+              borderLeft: `5px solid ${statStyle.border}`,
+            }}>
+              {/* Title row */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                <div style={{ flex: 1, minWidth: 200 }}>
+                  <div style={{ fontWeight: 700, fontSize: '1.05rem', color: NAVY }}>{comp.name}</div>
+                  <div style={{ fontSize: '0.82rem', color: '#6b7280', marginTop: 2 }}>
+                    {comp.venue}{comp.hosting_province ? ` · ${comp.hosting_province}` : ''}
+                    {dateStr ? ` · ${dateStr}` : ''}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 700, background: disc.bg, color: disc.col, padding: '0.2rem 0.65rem', borderRadius: 20 }}>
+                    {disc.label}
+                  </span>
+                  {comp.level && (
+                    <span style={{ fontSize: '0.72rem', fontWeight: 700, background: '#f3f4f6', color: '#374151', padding: '0.2rem 0.65rem', borderRadius: 20 }}>
+                      {LEVEL_LABELS[comp.level] || comp.level}
+                    </span>
+                  )}
+                  <span style={{ fontSize: '0.72rem', fontWeight: 700, background: statStyle.bg, color: statStyle.col, padding: '0.2rem 0.65rem', borderRadius: 20 }}>
+                    {statStyle.label}
+                  </span>
+                </div>
+              </div>
+
+              {/* Description */}
+              {comp.description && (
+                <div style={{ fontSize: '0.82rem', color: '#374151', marginBottom: '0.75rem' }}>
+                  {comp.description}
+                </div>
+              )}
+
+              {/* Action buttons */}
+              <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                {links.map(link => (
+                  <button key={link.to + link.label} onClick={() => navigate(link.to)}
+                    style={{
+                      background: link.primary ? NAVY : 'white',
+                      color: link.primary ? 'white' : NAVY,
+                      border: `2px solid ${NAVY}`,
+                      padding: '0.5rem 1.1rem',
+                      borderRadius: 6,
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                      fontSize: '0.85rem',
+                    }}>
+                    {link.label}
+                  </button>
+                ))}
+                <button onClick={() => navigate(`/competition-admin-v2/${comp.id}`)}
+                  style={{
+                    background: 'white', color: '#6b7280',
+                    border: '1px solid #d1d5db',
+                    padding: '0.5rem 0.9rem',
+                    borderRadius: 6, cursor: 'pointer',
+                    fontWeight: 600, fontSize: '0.85rem',
+                  }}>
+                  ⚙️ Admin
+                </button>
+              </div>
+            </div>
+          )
+        })
+      )}
+
+      {/* New competition shortcut */}
+      <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
+        <button onClick={() => navigate('/competition-admin-v2')}
+          style={{ background: 'none', border: 'none', color: '#9ca3af', fontSize: '0.82rem', cursor: 'pointer', textDecoration: 'underline' }}>
+          + Create New Competition
+        </button>
+      </div>
     </div>
   )
 }
