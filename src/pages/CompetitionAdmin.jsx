@@ -653,13 +653,13 @@ function TeamsTab({ competition }) {
 
 // ─── ROLES TAB ────────────────────────────────────────────────────────────────
 const ROLE_OPTIONS = [
-  { value: 'catch_recorder',           label: 'Official Catch Recorder' },
-  { value: 'tournament_director',      label: 'Tournament Director' },
+  { value: 'catch_recorder',              label: 'Official Catch Recorder' },
+  { value: 'tournament_director',         label: 'Tournament Director' },
   { value: 'national_tournament_officer', label: 'National Tournament Officer' },
-  { value: 'admin',                    label: 'System Administrator' },
-  { value: 'observer',                 label: 'Observer' },
-  { value: 'scorer',                   label: 'Scorer' },
-  { value: 'read_only',                label: 'Read Only' },
+  { value: 'admin',                       label: 'System Administrator' },
+  { value: 'observer',                    label: 'Observer' },
+  { value: 'scorer',                      label: 'Scorer' },
+  { value: 'read_only',                   label: 'Read Only' },
 ]
 
 const ROLE_COLORS = {
@@ -672,24 +672,45 @@ const ROLE_COLORS = {
   read_only:                   '#9ca3af',
 }
 
+// Derive a display name from email or full_name
+function displayName(email, fullName) {
+  if (fullName && fullName !== email) return fullName
+  // Capitalise the part before the @ as a fallback
+  const local = email.split('@')[0]
+  return local.replace(/[._]/g, ' ').replace(/\w/g, c => c.toUpperCase())
+}
+
 function RolesTab({ competition }) {
-  const [roles, setRoles]   = useState([])
-  const [email, setEmail]   = useState('')
-  const [role, setRole]     = useState('catch_recorder')
-  const [loading, setLoading] = useState(true)
-  const [adding, setAdding] = useState(false)
-  const [error, setError]   = useState('')
-  const [success, setSuccess] = useState('')
+  const [roles,    setRoles]   = useState([])
+  const [names,    setNames]   = useState({})  // email → display name
+  const [email,    setEmail]   = useState('')
+  const [role,     setRole]    = useState('catch_recorder')
+  const [loading,  setLoading] = useState(true)
+  const [adding,   setAdding]  = useState(false)
+  const [error,    setError]   = useState('')
+  const [success,  setSuccess] = useState('')
 
   const load = useCallback(async () => {
     if (!competition?.id) return
-    // Filter by competition_id to avoid showing roles from other competitions
     const { data } = await supabase
       .from('allcoastals_roles')
       .select('*')
       .eq('competition_id', competition.id)
       .order('created_at')
-    setRoles(data || [])
+    const roleData = data || []
+    setRoles(roleData)
+
+    // Fetch display names for registered users
+    const userIds = roleData.filter(r => r.user_id).map(r => r.user_id)
+    if (userIds.length > 0) {
+      const { data: userRows } = await supabase
+        .from('users')
+        .select('id, full_name, email')
+        .in('id', userIds)
+      const nameMap = {}
+      ;(userRows || []).forEach(u => { nameMap[u.email] = u.full_name || u.email })
+      setNames(nameMap)
+    }
     setLoading(false)
   }, [competition?.id])
 
@@ -698,14 +719,11 @@ function RolesTab({ competition }) {
   const handleGrant = async () => {
     if (!email) return
     setAdding(true); setError(''); setSuccess('')
-
-    // Look up user by email
     let userId = null
     const { data: userData } = await supabase
       .rpc('get_user_by_email', { email_input: email })
       .catch(() => ({ data: null }))
     userId = userData?.id
-
     const roleOption = ROLE_OPTIONS.find(o => o.value === role)
     const { error: err } = await supabase.from('allcoastals_roles').insert({
       user_id:        userId || null,
@@ -714,14 +732,9 @@ function RolesTab({ competition }) {
       role_title:     roleOption?.label || role,
       competition_id: competition.id,
     })
-    if (err) {
-      setError(err.message)
-      setAdding(false)
-      return
-    }
-    setSuccess(`✅ ${roleOption?.label} access granted to ${email}`)
-    setEmail('')
-    setAdding(false)
+    if (err) { setError(err.message); setAdding(false); return }
+    setSuccess(`✅ ${roleOption?.label} granted to ${email}`)
+    setEmail(''); setAdding(false)
     load()
   }
 
@@ -739,54 +752,80 @@ function RolesTab({ competition }) {
     <div style={S.card}>
       <div style={{ fontWeight: 700, color: NAVY, marginBottom: '1rem' }}>Access & Roles</div>
 
-      {/* Grant form */}
+      {/* Grant form — stacks vertically on mobile */}
       <div style={{ padding: '1rem', background: '#f9fafb', borderRadius: 8, marginBottom: '1rem' }}>
         <div style={{ fontWeight: 600, marginBottom: '0.75rem' }}>Grant Access</div>
-        <div style={S.row}>
-          <input style={{ ...S.input, flex: 1 }} type='email'
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+          <input style={S.input} type='email'
             placeholder='user@email.com'
             value={email} onChange={e => setEmail(e.target.value)} />
-          <select style={{ ...S.select, width: 'auto' }} value={role} onChange={e => setRole(e.target.value)}>
+          <select style={S.select} value={role} onChange={e => setRole(e.target.value)}>
             {ROLE_OPTIONS.map(o => (
               <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
           <button onClick={handleGrant} disabled={adding || !email}
-            style={{ ...S.btn(GREEN), opacity: adding || !email ? 0.5 : 1 }}>
-            {adding ? 'Checking…' : 'Grant Access'}
+            style={{ ...S.btn(GREEN), opacity: adding || !email ? 0.5 : 1, width: '100%', padding: '0.65rem' }}>
+            {adding ? 'Checking…' : '+ Grant Access'}
           </button>
         </div>
         {error   && <div style={{ color: RED,   marginTop: '0.5rem', fontSize: '0.85rem' }}>{error}</div>}
         {success && <div style={{ color: GREEN, marginTop: '0.5rem', fontSize: '0.85rem' }}>{success}</div>}
       </div>
 
-      {/* Current roles */}
+      {/* Role list — card per person for mobile clarity */}
       {loading ? <div style={{ color: GREY }}>Loading…</div> : (
         roles.length === 0 ? (
           <div style={{ color: GREY, fontStyle: 'italic' }}>No roles assigned yet.</div>
         ) : (
-          roles.map(r => (
-            <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 0', borderBottom: '1px solid #f0f0f0' }}>
-              <span style={{
-                background: ROLE_COLORS[r.role] || GREY,
-                color: 'white',
-                padding: '0.2rem 0.7rem',
-                borderRadius: 20,
-                fontSize: '0.78rem',
-                fontWeight: 700,
-                whiteSpace: 'nowrap',
+          roles.map(r => {
+            const name = displayName(r.email, names[r.email])
+            const isEmail = name.toLowerCase() === r.email.toLowerCase()
+            return (
+              <div key={r.id} style={{
+                border: '1px solid #e5e7eb',
+                borderRadius: 8,
+                padding: '0.75rem',
+                marginBottom: '0.5rem',
+                borderLeft: `4px solid ${ROLE_COLORS[r.role] || GREY}`,
               }}>
-                {r.role_title || r.role}
-              </span>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 500 }}>{r.email}</div>
-                {!r.user_id && (
-                  <div style={{ fontSize: '0.75rem', color: GOLD }}>⏳ Pending registration</div>
-                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {/* Name */}
+                    <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#111827' }}>
+                      {isEmail ? r.email.split('@')[0].replace(/[._]/g, ' ').replace(/\w/g, c => c.toUpperCase()) : name}
+                    </div>
+                    {/* Email */}
+                    <div style={{ fontSize: '0.78rem', color: GREY, marginTop: 1, wordBreak: 'break-all' }}>
+                      {r.email}
+                    </div>
+                    {/* Role badge */}
+                    <div style={{ marginTop: '0.4rem' }}>
+                      <span style={{
+                        background: ROLE_COLORS[r.role] || GREY,
+                        color: 'white',
+                        padding: '0.15rem 0.6rem',
+                        borderRadius: 20,
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                      }}>
+                        {r.role_title || r.role}
+                      </span>
+                      {!r.user_id && (
+                        <span style={{ fontSize: '0.72rem', color: GOLD, marginLeft: '0.5rem' }}>
+                          ⏳ Pending registration
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <button onClick={() => handleRevoke(r.id)}
+                    style={{ ...S.btnSm('#fef2f2', RED), flexShrink: 0, alignSelf: 'center' }}>
+                    Revoke
+                  </button>
+                </div>
               </div>
-              <button onClick={() => handleRevoke(r.id)} style={S.btnSm('#fef2f2', RED)}>Revoke</button>
-            </div>
-          ))
+            )
+          })
         )
       )}
     </div>
