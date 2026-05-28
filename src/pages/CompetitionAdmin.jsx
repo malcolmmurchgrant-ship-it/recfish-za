@@ -81,7 +81,7 @@ function SetupTab({ competition, onSaved }) {
   const [saved,  setSaved]  = useState(false)
   const [error,  setError]  = useState('')
 
-  // Pre-fill from existing competition
+  // Pre-fill from existing competition — re-run whenever competition id or key fields change
   useEffect(() => {
     if (competition) {
       setForm(f => ({ ...f,
@@ -106,9 +106,10 @@ function SetupTab({ competition, onSaved }) {
         catch_release_enabled: competition.catch_release_enabled ?? false,
         description:           competition.description || '',
         td_name:               competition.td_name || '',
+        num_fishing_days:      competition.num_fishing_days || 3,
       }))
     }
-  }, [competition])
+  }, [competition?.id, competition?.updated_ation])
 
   // Load federations
   useEffect(() => {
@@ -188,6 +189,9 @@ function SetupTab({ competition, onSaved }) {
       status:                'active',
       updated_at:            new Date().toISOString(),
     }
+
+    // Also save num_fishing_days if the column exists
+    if (form.num_fishing_days) payload.num_fishing_days = parseInt(form.num_fishing_days)
 
     let savedData, saveError
     if (competition?.id) {
