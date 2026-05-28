@@ -675,9 +675,8 @@ const ROLE_COLORS = {
 // Derive a display name from email or full_name
 function displayName(email, fullName) {
   if (fullName && fullName !== email) return fullName
-  // Capitalise the part before the @ as a fallback
-  const local = email.split('@')[0]
-  return local.replace(/[._]/g, ' ').replace(/\w/g, c => c.toUpperCase())
+  // Split email local part on dots and underscores, capitalise each word
+  return email.split('@')[0].split(/[._]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
 }
 
 function RolesTab({ competition }) {
@@ -780,7 +779,6 @@ function RolesTab({ competition }) {
         ) : (
           roles.map(r => {
             const name = displayName(r.email, names[r.email])
-            const isEmail = name.toLowerCase() === r.email.toLowerCase()
             return (
               <div key={r.id} style={{
                 border: '1px solid #e5e7eb',
@@ -793,7 +791,7 @@ function RolesTab({ competition }) {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     {/* Name */}
                     <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#111827' }}>
-                      {isEmail ? r.email.split('@')[0].replace(/[._]/g, ' ').replace(/\w/g, c => c.toUpperCase()) : name}
+                      {isEmail ? displayName(r.email, null) : name}
                     </div>
                     {/* Email */}
                     <div style={{ fontSize: '0.78rem', color: GREY, marginTop: 1, wordBreak: 'break-all' }}>
