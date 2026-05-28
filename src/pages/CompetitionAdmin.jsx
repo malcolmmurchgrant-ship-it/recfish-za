@@ -793,7 +793,7 @@ function RolesTab({ competition }) {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     {/* Name */}
                     <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#111827' }}>
-                      {isEmail ? displayName(r.email, null) : name}
+                      {name}
                     </div>
                     {/* Email */}
                     <div style={{ fontSize: '0.78rem', color: GREY, marginTop: 1, wordBreak: 'break-all' }}>
@@ -902,9 +902,15 @@ export default function CompetitionAdmin() {
   const [recentComps, setRecentComps] = useState([])
   const [showPicker, setShowPicker]   = useState(!competitionId)
 
-  // Load competition if ID in URL
+  // Load competition if ID in URL — reset state cleanly on navigation
   useEffect(() => {
-    if (!competitionId) return
+    if (!competitionId) {
+      setCompetition(null)
+      setActiveTab('setup')
+      setShowPicker(true)
+      return
+    }
+    setActiveTab('overview')
     supabase.from('competitions').select('*').eq('id', competitionId)
       .then(({ data }) => { if (data?.[0]) setCompetition(data[0]) })
   }, [competitionId])
