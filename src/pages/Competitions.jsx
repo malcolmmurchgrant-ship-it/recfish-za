@@ -2,53 +2,53 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
-const NAVY = '#1e3a8a'
-const GOLD = '#d97706'
+const NAVY  = '#1e3a8a'
+const GOLD  = '#d97706'
 const GREEN = '#16a34a'
 
-// ─── Route map — links shown per competition based on discipline ──────────────
-// Falls back to Competition Admin for any competition not explicitly mapped
-function getLinks(comp) {
+// Your Supabase user ID — always sees Enter Catches buttons
+const OWNER_ID = 'b9c5048a-b229-46af-9042-44551b162d75'
+
+// Roles that grant catch-entry access
+const CATCH_ROLES = ['admin', 'tournament_director']
+
+// ─── Competition-specific page links ─────────────────────────────────────────
+// canEnter: whether the current user has catch-entry access for this competition
+function getLinks(comp, canEnter) {
   const id = comp.id
 
-  // Specific competitions with dedicated pages
   const specific = {
-    'c8332f15-ce44-4d0b-a3ab-009fc2a2c484': [  // All Coastals
-      { to: '/allcoastals',        label: '🎣 Enter Catches',    primary: true },
-      { to: '/allcoastals-scores', label: '📊 Scoreboard',       primary: false },
-      { to: '/allcoastals-teams',  label: '🏅 Teams',            primary: false },
-    ],
     '3855034f-ab39-4297-9be4-ba9a7e566ce0': [  // Gamefish Nationals
-      { to: '/gamefish',        label: '🎣 Enter Catches',  primary: true },
-      { to: '/gamefish-scores', label: '📊 Scoreboard',     primary: false },
+      ...(canEnter ? [{ to: '/gamefish',        label: '🎣 Enter Catches', primary: true  }] : []),
+      {                to: '/gamefish-scores',   label: '📊 Scoreboard',    primary: !canEnter },
     ],
   }
   if (specific[id]) return specific[id]
 
-  // Generic fallback
+  // Generic fallback — no Enter Catches for unknown competitions
   return [
     { to: `/competition-admin-v2/${id}`, label: '⚙️ Manage Competition', primary: true },
   ]
 }
 
-// ─── Discipline colours & labels ──────────────────────────────────────────────
+// ─── Discipline colours & labels ─────────────────────────────────────────────
 const DISCIPLINE_STYLE = {
-  bottomfish:     { bg: '#dcfce7', col: '#15803d', label: '🎣 Bottomfish' },
-  gamefish:       { bg: '#dbeafe', col: '#1e40af', label: '🐟 Gamefish' },
-  tuna:           { bg: '#fef3c7', col: '#92400e', label: '🐟 Tuna' },
+  bottomfish:     { bg: '#dcfce7', col: '#15803d', label: '🎣 Bottomfish'  },
+  gamefish:       { bg: '#dbeafe', col: '#1e40af', label: '🐟 Gamefish'    },
+  tuna:           { bg: '#fef3c7', col: '#92400e', label: '🐟 Tuna'        },
   billfish_light: { bg: '#f3e8ff', col: '#7c3aed', label: '🎣 LT Billfish' },
   billfish_heavy: { bg: '#fce7f3', col: '#be185d', label: '🎣 HT Billfish' },
-  mixed:          { bg: '#f0fdf4', col: '#166534', label: '🎣 Mixed' },
-  shore:          { bg: '#fff7ed', col: '#c2410c', label: '🏖 Shore' },
-  spearfishing:   { bg: '#ecfeff', col: '#0e7490', label: '🤿 Spearfishing' },
+  mixed:          { bg: '#f0fdf4', col: '#166534', label: '🎣 Mixed'       },
+  shore:          { bg: '#fff7ed', col: '#c2410c', label: '🏖 Shore'       },
+  spearfishing:   { bg: '#ecfeff', col: '#0e7490', label: '🤿 Spearfishing'},
 }
 
 const STATUS_STYLE = {
-  active:            { bg: '#dcfce7', col: GREEN,  label: '🟢 Live',      border: GREEN },
-  upcoming:          { bg: '#eff6ff', col: NAVY,   label: '🔵 Upcoming',  border: NAVY },
-  registration_open: { bg: '#fef3c7', col: GOLD,   label: '🟡 Open',     border: GOLD },
-  completed:         { bg: '#f3f4f6', col: '#6b7280', label: '⚪ Completed', border: '#d1d5db' },
-  cancelled:         { bg: '#fef2f2', col: '#dc2626', label: '🔴 Cancelled', border: '#fca5a5' },
+  active:            { bg: '#dcfce7', col: GREEN,      label: '🟢 Live',      border: GREEN      },
+  upcoming:          { bg: '#eff6ff', col: NAVY,       label: '🔵 Upcoming',  border: NAVY       },
+  registration_open: { bg: '#fef3c7', col: GOLD,       label: '🟡 Open',      border: GOLD       },
+  completed:         { bg: '#f3f4f6', col: '#6b7280',  label: '⚪ Completed', border: '#d1d5db'  },
+  cancelled:         { bg: '#fef2f2', col: '#dc2626',  label: '🔴 Cancelled', border: '#fca5a5'  },
 }
 
 const LEVEL_LABELS = {
@@ -61,12 +61,51 @@ const LEVEL_LABELS = {
   special:         'Special',
 }
 
+// Competitions that are finished and should not appear on the Hub
+const HIDDEN_IDS = new Set([
+  'c8332f15-ce44-4d0b-a3ab-009fc2a2c484',  // All Coastals 2026 — completed
+])
+
 export default function Competitions() {
   const navigate = useNavigate()
-  const [competitions, setCompetitions] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState('all') // all | active | upcoming | completed
+  const [competitions,  setCompetitions]  = useState([])
+  const [loading,       setLoading]       = useState(true)
+  const [filter,        setFilter]        = useState('all')
+  const [userId,        setUserId]        = useState(null)
+  const [catchAccess,   setCatchAccess]   = useState(new Set()) // competition IDs user can enter
 
+  // ── Auth + roles ────────────────────────────────────────────────────────────
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      const uid = data?.user?.id || null
+      setUserId(uid)
+
+      if (!uid) return
+
+      // Owner bypass — grant access to all competitions immediately
+      if (uid === OWNER_ID) {
+        setCatchAccess('all') // special sentinel
+        return
+      }
+
+      // Look up competition_user_roles for this user
+      supabase
+        .from('competition_user_roles')
+        .select('competition_id, role')
+        .eq('user_id', uid)
+        .then(({ data: roles }) => {
+          if (!roles) return
+          const ids = new Set(
+            roles
+              .filter(r => CATCH_ROLES.includes(r.role))
+              .map(r => r.competition_id)
+          )
+          setCatchAccess(ids)
+        })
+    })
+  }, [])
+
+  // ── Competitions ────────────────────────────────────────────────────────────
   useEffect(() => {
     supabase
       .from('competitions')
@@ -79,15 +118,18 @@ export default function Competitions() {
       .not('status', 'eq', 'cancelled')
       .order('start_date', { ascending: false })
       .then(({ data }) => {
-        setCompetitions(data || [])
+        setCompetitions((data || []).filter(c => !HIDDEN_IDS.has(c.id)))
         setLoading(false)
       })
   }, [])
 
+  const canEnter = (compId) =>
+    catchAccess === 'all' || (catchAccess instanceof Set && catchAccess.has(compId))
+
   const filtered = competitions.filter(c => {
-    if (filter === 'all') return true
-    if (filter === 'active') return c.status === 'active'
-    if (filter === 'upcoming') return ['upcoming','registration_open'].includes(c.status)
+    if (filter === 'all')       return true
+    if (filter === 'active')    return c.status === 'active'
+    if (filter === 'upcoming')  return ['upcoming', 'registration_open'].includes(c.status)
     if (filter === 'completed') return c.status === 'completed'
     return true
   })
@@ -95,7 +137,7 @@ export default function Competitions() {
   const filterCounts = {
     all:       competitions.length,
     active:    competitions.filter(c => c.status === 'active').length,
-    upcoming:  competitions.filter(c => ['upcoming','registration_open'].includes(c.status)).length,
+    upcoming:  competitions.filter(c => ['upcoming', 'registration_open'].includes(c.status)).length,
     completed: competitions.filter(c => c.status === 'completed').length,
   }
 
@@ -106,16 +148,16 @@ export default function Competitions() {
       <div style={{ background: NAVY, color: 'white', padding: '1.25rem 1.5rem', borderRadius: 8, marginBottom: '1.25rem' }}>
         <div style={{ fontSize: '1.2rem', fontWeight: 700 }}>🏆 SADSAA Competitions</div>
         <div style={{ fontSize: '0.85rem', opacity: 0.8, marginTop: 3 }}>
-          Select a competition to enter catches or view results
+          Select a competition to view results or enter catches
         </div>
       </div>
 
       {/* Filter tabs */}
       <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
         {[
-          { key: 'all',       label: 'All' },
-          { key: 'active',    label: '🟢 Live' },
-          { key: 'upcoming',  label: '🔵 Upcoming' },
+          { key: 'all',       label: 'All'          },
+          { key: 'active',    label: '🟢 Live'      },
+          { key: 'upcoming',  label: '🔵 Upcoming'  },
           { key: 'completed', label: '⚪ Completed' },
         ].map(f => (
           <button key={f.key} onClick={() => setFilter(f.key)}
@@ -144,10 +186,10 @@ export default function Competitions() {
         <div style={{ textAlign: 'center', padding: '3rem', color: '#9ca3af' }}>No competitions found.</div>
       ) : (
         filtered.map(comp => {
-          const disc    = DISCIPLINE_STYLE[comp.discipline] || { bg: '#f3f4f6', col: '#6b7280', label: comp.discipline || 'Unknown' }
-          const statStyle = STATUS_STYLE[comp.status]       || STATUS_STYLE.completed
-          const links   = getLinks(comp)
-          const dateStr = comp.start_date && comp.end_date
+          const disc     = DISCIPLINE_STYLE[comp.discipline] || { bg: '#f3f4f6', col: '#6b7280', label: comp.discipline || 'Unknown' }
+          const statStyle = STATUS_STYLE[comp.status]        || STATUS_STYLE.completed
+          const links    = getLinks(comp, canEnter(comp.id))
+          const dateStr  = comp.start_date && comp.end_date
             ? `${comp.start_date} → ${comp.end_date}`
             : comp.start_date || ''
 
