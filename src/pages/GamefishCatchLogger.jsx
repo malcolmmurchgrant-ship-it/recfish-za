@@ -44,6 +44,7 @@ const SPECIES_GROUPS = [
       'Sailfish',
       'Shortbill Spearfish',
       'Broadbill Swordfish',
+      'Other Billfish (specify in notes)',
     ]
   },
   {
@@ -82,6 +83,7 @@ const SPECIES_GROUPS = [
       'Elf / Shad',
       'Cape Snoek',
       'Bonito',
+      'Other Gamefish (specify in notes)',
     ]
   },
 ]
@@ -136,21 +138,37 @@ function FishRow({ fish, index, onChange, onRemove, lineClass = 10 }) {
       marginBottom: '0.4rem',
       border: `1px solid ${fish.billfish ? '#fcd34d' : '#e5e7eb'}`,
     }}>
-      <select
-        style={{ ...S.select, fontSize: '0.85rem', padding: '0.4rem 0.5rem' }}
-        value={fish.species}
-        onChange={e => {
-          const sp = ALL_SPECIES.find(s => s.name === e.target.value)
-          onChange(index, { ...fish, species: e.target.value, billfish: sp?.billfish || false, min_weight: sp?.minWeight || 4 })
-        }}
-      >
-        <option value=''>Select species…</option>
-        {SPECIES_GROUPS.map(g => (
-          <optgroup key={g.label} label={g.label}>
-            {g.species.map(s => <option key={s} value={s}>{s}</option>)}
-          </optgroup>
-        ))}
-      </select>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+        <select
+          style={{ ...S.select, fontSize: '0.85rem', padding: '0.4rem 0.5rem' }}
+          value={fish.customSpecies ? '__custom__' : fish.species}
+          onChange={e => {
+            const val = e.target.value
+            const sp  = ALL_SPECIES.find(s => s.name === val)
+            if (val.startsWith('Other ')) {
+              onChange(index, { ...fish, species: val, customSpecies: '', billfish: val.includes('Billfish'), min_weight: 4 })
+            } else {
+              onChange(index, { ...fish, species: val, customSpecies: null, billfish: sp?.billfish || false, min_weight: sp?.minWeight || 4 })
+            }
+          }}
+        >
+          <option value=''>Select species…</option>
+          {SPECIES_GROUPS.map(g => (
+            <optgroup key={g.label} label={g.label}>
+              {g.species.map(s => <option key={s} value={s}>{s}</option>)}
+            </optgroup>
+          ))}
+        </select>
+        {fish.species?.startsWith('Other ') && (
+          <input
+            style={{ ...S.input, fontSize: '0.82rem', padding: '0.35rem 0.5rem' }}
+            placeholder='Type species name…'
+            value={fish.customSpecies || ''}
+            onChange={e => onChange(index, { ...fish, customSpecies: e.target.value })}
+            autoFocus
+          />
+        )}
+      </div>
 
       <div>
         <input
@@ -256,7 +274,12 @@ export default function GamefishCatchLogger() {
   const updateFish = (i, fish) => setCatches(prev => prev.map((f, idx) => idx === i ? fish : f))
   const removeFish = (i)       => setCatches(prev => prev.filter((_, idx) => idx !== i))
 
-  const validCatches = catches.filter(c => c.species && (c.billfish || (parseFloat(c.weight_kg) || 0) >= c.min_weight))
+  const validCatches = catches
+    .filter(c => c.species && (c.billfish || (parseFloat(c.weight_kg) || 0) >= c.min_weight))
+    .map(c => c.customSpecies
+      ? { ...c, species: c.customSpecies || c.species }
+      : c
+    )
 
   const totalPoints = validCatches
     .filter(c => !c.billfish)
