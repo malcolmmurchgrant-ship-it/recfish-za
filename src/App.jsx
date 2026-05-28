@@ -1,7 +1,8 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { AuthProvider } from './contexts/AuthContext'
 import { SessionProvider, useSession } from './contexts/SessionContext'
+import { supabase } from './lib/supabase'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
@@ -24,6 +25,10 @@ import SessionEndSummaryModal from './components/SessionEndSummaryModal'
 
 const NAVY = '#1e3a8a'
 
+const OWNER_ID       = 'b9c5048a-b229-46af-9042-44551b162d75'
+const CATCH_ROLES    = ['admin', 'tournament_director']
+const GAMEFISH_ID    = '3855034f-ab39-4297-9be4-ba9a7e566ce0'
+
 const pill = (active) => ({
   color: 'white',
   textDecoration: 'none',
@@ -39,12 +44,9 @@ const pill = (active) => ({
   border: 'none',
 })
 
-// Simple expand/collapse group — no positioning, no portals, no z-index tricks
-// The group label is a button; clicking expands an inline sub-menu below the nav bar
 function NavGroup({ label, items, currentPath, openGroup, setOpenGroup, groupId }) {
   const isOpen   = openGroup === groupId
   const isActive = items.some(i => i.to && currentPath.startsWith(i.to))
-
   return (
     <div style={{ flexShrink: 0 }}>
       <button
@@ -60,24 +62,39 @@ function NavGroup({ label, items, currentPath, openGroup, setOpenGroup, groupId 
 function Navigation() {
   const location = useLocation()
   const path = location.pathname
-  const [openGroup, setOpenGroup] = useState(null)
+  const [openGroup,   setOpenGroup]   = useState(null)
+  const [canEnterGamefish, setCanEnterGamefish] = useState(false)
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      const uid = data?.user?.id
+      if (!uid) return
+      if (uid === OWNER_ID) { setCanEnterGamefish(true); return }
+      supabase
+        .from('competition_user_roles')
+        .select('role')
+        .eq('user_id', uid)
+        .eq('competition_id', GAMEFISH_ID)
+        .then(({ data: roles }) => {
+          if (roles?.some(r => CATCH_ROLES.includes(r.role)))
+            setCanEnterGamefish(true)
+        })
+    })
+  }, [])
 
   const competitionItems = [
-    { to: '/competitions',         label: '🏆 Competitions Hub' },
-    { to: '/competition-admin-v2', label: '⚙️ Competition Admin' },
-    { divider: true },
-    { to: '/gamefish',             label: '🎣 Gamefish Nationals — Logger' },
+    { to: '/competitions',         label: '🏆 Competitions Hub'          },
+    { to: '/competition-admin-v2', label: '⚙️ Competition Admin'          },
+    ...(canEnterGamefish ? [
+      { divider: true },
+      { to: '/gamefish',           label: '🎣 Gamefish Nationals — Logger' },
+    ] : []),
     { to: '/gamefish-scores',      label: '📊 Gamefish Nationals — Scores' },
-    { divider: true },
-    { to: '/allcoastals',          label: '🎣 All Coastals — Logger' },
-    { to: '/allcoastals-scores',   label: '📊 All Coastals — Scores' },
-    { to: '/allcoastals-teams',    label: '🏅 All Coastals — Teams' },
-    { to: '/allcoastals-admin',    label: '🔧 All Coastals — Admin' },
   ]
 
   const toolItems = [
     { to: '/species',   label: '🐟 Species Lookup' },
-    { to: '/catch-map', label: '🗺️ Catch Map' },
+    { to: '/catch-map', label: '🗺️ Catch Map'       },
   ]
 
   const subMenuStyle = {
@@ -145,10 +162,10 @@ function Navigation() {
           style={pill(false)}>🔍 Fish ID ↗</a>
       </div>
 
-      {/* Inline sub-menu — appears below the nav bar, no positioning needed */}
+      {/* Inline sub-menu */}
       {openGroup && activeItems.length > 0 && (
         <div style={subMenuStyle}>
-          {activeItems.map(item => (
+          {activeItems.filter(item => !item.divider).map(item => (
             <Link
               key={item.to}
               to={item.to}
@@ -196,7 +213,7 @@ function AppContent() {
             <Route path='/competition-admin-v2' element={<CompetitionAdmin />} />
             <Route path='/competition-admin-v2/:competitionId' element={<CompetitionAdmin />} />
             <Route path='/gamefish'             element={<GamefishCatchLogger />} />
-            <Route path='/gamefish-scores'       element={<GamefishScoreboard />} />
+            <Route path='/gamefish-scores'      element={<GamefishScoreboard />} />
             <Route path='/profile'              element={<Profile />} />
             <Route path='/'                     element={<Navigate to='/dashboard' replace />} />
           </Routes>
