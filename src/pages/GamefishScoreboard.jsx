@@ -267,7 +267,8 @@ export default function GamefishScoreboard() {
         </div>
       )}
 
-      {(resultsVisible || isAuthorised) && <>
+      {(resultsVisible || isAuthorised) && (
+        <>
 
       {/* Scoring note */}
       <div style={{ background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 6, padding: '0.6rem 1rem', marginBottom: '1rem', fontSize: '0.82rem', color: '#92400e' }}>
@@ -563,6 +564,7 @@ export default function GamefishScoreboard() {
         </div>
       )}
     </div>
-    </> }
+        </>
+      )}
   )
 }
