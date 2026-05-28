@@ -19,7 +19,8 @@ function getLinks(comp) {
       { to: '/allcoastals-teams',  label: '🏅 Teams',            primary: false },
     ],
     '3855034f-ab39-4297-9be4-ba9a7e566ce0': [  // Gamefish Nationals
-      { to: '/gamefish',           label: '🎣 Enter Catches',    primary: true },
+      { to: '/gamefish',        label: '🎣 Enter Catches',  primary: true },
+      { to: '/gamefish-scores', label: '📊 Scoreboard',     primary: false },
     ],
   }
   if (specific[id]) return specific[id]

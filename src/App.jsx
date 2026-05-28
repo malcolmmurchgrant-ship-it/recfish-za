@@ -19,6 +19,7 @@ import AllCoastalsAdmin from './pages/AllCoastalsAdmin'
 import AllCoastalsTeams from './pages/AllCoastalsTeams'
 import Profile from './pages/Profile'
 import GamefishCatchLogger from './pages/GamefishCatchLogger'
+import GamefishScoreboard from './pages/GamefishScoreboard'
 import SessionEndSummaryModal from './components/SessionEndSummaryModal'
 
 const NAVY = '#1e3a8a'
@@ -69,6 +70,7 @@ function Navigation() {
     { to: '/allcoastals-scores',   label: '📊 All Coastals — Scores' },
     { to: '/allcoastals-admin',    label: '🔧 All Coastals — Admin' },
     { to: '/gamefish',             label: '🎣 Gamefish Nationals — Logger' },
+    { to: '/gamefish-scores',      label: '📊 Gamefish Nationals — Scores' },
   ]
 
   const toolItems = [
@@ -192,6 +194,7 @@ function AppContent() {
             <Route path='/competition-admin-v2' element={<CompetitionAdmin />} />
             <Route path='/competition-admin-v2/:competitionId' element={<CompetitionAdmin />} />
             <Route path='/gamefish'             element={<GamefishCatchLogger />} />
+            <Route path='/gamefish-scores'       element={<GamefishScoreboard />} />
             <Route path='/profile'              element={<Profile />} />
             <Route path='/'                     element={<Navigate to='/dashboard' replace />} />
           </Routes>
