@@ -65,12 +65,14 @@ function Navigation() {
   const competitionItems = [
     { to: '/competitions',         label: '🏆 Competitions Hub' },
     { to: '/competition-admin-v2', label: '⚙️ Competition Admin' },
-    { to: '/allcoastals-teams',    label: '🏅 All Coastals — Teams' },
-    { to: '/allcoastals',          label: '🎣 All Coastals — Logger' },
-    { to: '/allcoastals-scores',   label: '📊 All Coastals — Scores' },
-    { to: '/allcoastals-admin',    label: '🔧 All Coastals — Admin' },
+    { divider: true },
     { to: '/gamefish',             label: '🎣 Gamefish Nationals — Logger' },
     { to: '/gamefish-scores',      label: '📊 Gamefish Nationals — Scores' },
+    { divider: true },
+    { to: '/allcoastals',          label: '🎣 All Coastals — Logger' },
+    { to: '/allcoastals-scores',   label: '📊 All Coastals — Scores' },
+    { to: '/allcoastals-teams',    label: '🏅 All Coastals — Teams' },
+    { to: '/allcoastals-admin',    label: '🔧 All Coastals — Admin' },
   ]
 
   const toolItems = [

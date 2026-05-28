@@ -431,15 +431,23 @@ export default function GamefishCatchLogger() {
                   </div>
                   <div style={{ textAlign: 'center' }}>
                     <div style={{ fontSize: '0.7rem', color: '#6b7280' }}>RAW PTS</div>
-                    <div style={{ fontSize: '1.6rem', fontWeight: 800, color: NAVY }}>{totalPoints.toFixed(2)}</div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#6b7280' }}>{totalPoints.toFixed(2)}</div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.7rem', color: '#6b7280' }}>×MULT</div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 800, color: GOLD }}>×{Math.max(1, speciesCount - 1)}</div>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.7rem', color: '#6b7280' }}>SCORE</div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 800, color: NAVY }}>{(totalPoints * Math.max(1, speciesCount - 1)).toFixed(2)}</div>
                   </div>
                   <div style={{ textAlign: 'center' }}>
                     <div style={{ fontSize: '0.7rem', color: '#6b7280' }}>FISH</div>
-                    <div style={{ fontSize: '1.6rem', fontWeight: 800, color: GREEN }}>{validCatches.length}/5</div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 800, color: GREEN }}>{validCatches.length}/5</div>
                   </div>
                   <div style={{ textAlign: 'center' }}>
                     <div style={{ fontSize: '0.7rem', color: '#6b7280' }}>SPECIES</div>
-                    <div style={{ fontSize: '1.6rem', fontWeight: 800, color: GOLD }}>{speciesCount}</div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#7c3aed' }}>{speciesCount}</div>
                   </div>
                 </div>
                 {speciesCount > 1 && (

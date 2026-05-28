@@ -97,16 +97,38 @@ export default function GamefishScoreboard() {
   const [activeTab,   setActiveTab]   = useState('team')
   const [dayFilter,   setDayFilter]   = useState('all')
 
+  const [resultsVisible, setResultsVisible] = useState(true)
+  const [userEmail, setUserEmail]           = useState(null)
+  const [isAuthorised, setIsAuthorised]     = useState(false)
+
+  // Check if current user is authorised to see results when hidden
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      const email = data?.user?.email
+      setUserEmail(email)
+      if (email) {
+        supabase.from('allcoastals_roles')
+          .select('role')
+          .eq('competition_id', COMPETITION_ID)
+          .eq('email', email)
+          .then(({ data: roles }) => setIsAuthorised((roles || []).length > 0))
+      }
+    })
+  }, [])
+
   const load = useCallback(async () => {
     setLoading(true)
-    const [{ data: c }, { data: s }] = await Promise.all([
+    const [{ data: c }, { data: s }, { data: comp }] = await Promise.all([
       supabase.from('gamefish_catches').select('*')
         .eq('competition_id', COMPETITION_ID).order('day_number'),
       supabase.from('competition_fishing_sessions').select('*')
         .eq('competition_id', COMPETITION_ID),
+      supabase.from('competitions').select('results_visible')
+        .eq('id', COMPETITION_ID),
     ])
     setCatches(c || [])
     setSessions(s || [])
+    setResultsVisible(comp?.[0]?.results_visible ?? true)
     setLastRefresh(new Date())
     setLoading(false)
   }, [])
@@ -235,6 +257,17 @@ export default function GamefishScoreboard() {
           ))}
         </div>
       </div>
+
+      {/* Results visibility gate */}
+      {!resultsVisible && !isAuthorised && (
+        <div style={{ background: '#1e3a8a', color: 'white', borderRadius: 8, padding: '2rem', textAlign: 'center', marginBottom: '1rem' }}>
+          <div style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>🔒</div>
+          <div style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: '0.5rem' }}>Results Not Yet Available</div>
+          <div style={{ opacity: 0.8, fontSize: '0.9rem' }}>The Tournament Director has not yet released the results. Please check back later.</div>
+        </div>
+      )}
+
+      {(resultsVisible || isAuthorised) && <>
 
       {/* Scoring note */}
       <div style={{ background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 6, padding: '0.6rem 1rem', marginBottom: '1rem', fontSize: '0.82rem', color: '#92400e' }}>
@@ -530,5 +563,6 @@ export default function GamefishScoreboard() {
         </div>
       )}
     </div>
+    </> }
   )
 }
