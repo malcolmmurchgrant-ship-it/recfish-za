@@ -851,6 +851,20 @@ function RolesTab({ competition }) {
 
 // ─── OVERVIEW TAB ─────────────────────────────────────────────────────────────
 function OverviewTab({ competition, onEditSetup }) {
+  const [assocName, setAssocName] = useState(null)
+
+  useEffect(() => {
+    if (!competition?.association_id) { setAssocName(null); return }
+    supabase
+      .from('associations')
+      .select('short_name, name')
+      .eq('id', competition.association_id)
+      .single()
+      .then(({ data }) => {
+        if (data) setAssocName(`${data.short_name} — ${data.name}`)
+      })
+  }, [competition?.association_id])
+
   if (!competition?.id) return (
     <div style={{ ...S.card, textAlign: 'center', padding: '3rem', color: GREY }}>
       <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🏆</div>
@@ -885,7 +899,7 @@ function OverviewTab({ competition, onEditSetup }) {
       <div style={{ ...S.grid2, fontSize: '0.85rem' }}>
         {[
           ['Tournament Director', c.td_name],
-          ['Hosting Province',    c.hosting_province],
+          ['Hosting Association', assocName || c.hosting_province],
           ['Team Format',         c.team_format],
           ['Default Line Class',  c.default_line_class_kg ? `${c.default_line_class_kg}kg` : null],
           ['Fine Grid (SAN)',     c.fine_grid_number],
