@@ -324,10 +324,12 @@ function SetupTab({ competition, onSaved }) {
               placeholder='e.g. Meerensee Boat Club' />
           </div>
           <div>
-            <label style={S.label}>Hosting Province</label>
-            <input style={S.input} value={form.hosting_province}
-              onChange={e => set('hosting_province', e.target.value)}
-              placeholder='e.g. KwaZulu-Natal' />
+            <label style={S.label}>Hosting Association</label>
+            <div style={{ ...S.input, background: '#f9fafb', color: associations.find(a => a.id === form.association_id)?.short_name ? '#111827' : '#9ca3af', cursor: 'default' }}>
+              {associations.find(a => a.id === form.association_id)
+                ? `${associations.find(a => a.id === form.association_id).short_name} — ${associations.find(a => a.id === form.association_id).name}`
+                : form.hosting_province || 'Select an association above'}
+            </div>
           </div>
         </div>
         <div style={{ ...S.grid3, marginBottom: '0.75rem' }}>
