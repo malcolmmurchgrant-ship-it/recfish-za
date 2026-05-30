@@ -211,19 +211,18 @@ function SetupTab({ competition, onSaved }) {
 
     // Fetch fresh data from DB to ensure form reflects actual saved state
     const compId = competition?.id || savedData?.id
+    const wasEditing = !!competition?.id
     if (compId) {
       const { data: fresh } = await supabase
         .from('competitions').select('*').eq('id', compId)
       if (fresh?.[0]) {
         setSaving(false); setSaved(true)
-        setTimeout(() => setSaved(false), 3000)
-        onSaved(fresh[0], !!competition?.id)
+        setTimeout(() => { setSaved(false); onSaved(fresh[0], wasEditing) }, 2500)
         return
       }
     }
     setSaving(false); setSaved(true)
-    setTimeout(() => setSaved(false), 3000)
-    if (savedData) onSaved(savedData, !!competition?.id)
+    if (savedData) setTimeout(() => { setSaved(false); onSaved(savedData, wasEditing) }, 2500)
   }
 
   const selectedFed  = federations.find(f => f.id === form.federation_id)
@@ -936,6 +935,7 @@ export default function CompetitionAdmin() {
   const [recentComps, setRecentComps] = useState([])
   const [showPicker, setShowPicker]   = useState(!competitionId)
 
+
   // Load competition if ID in URL — reset state cleanly on navigation
   useEffect(() => {
     if (!competitionId) {
@@ -962,6 +962,7 @@ export default function CompetitionAdmin() {
     setActiveTab(wasEditing ? 'overview' : 'teams')
     navigate(`/competition-admin-v2/${comp.id}`, { replace: true })
     setShowPicker(false)
+
   }
 
   const TABS = [
