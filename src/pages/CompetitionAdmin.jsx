@@ -216,13 +216,13 @@ function SetupTab({ competition, onSaved }) {
       if (fresh?.[0]) {
         setSaving(false); setSaved(true)
         setTimeout(() => setSaved(false), 3000)
-        onSaved(fresh[0])
+        onSaved(fresh[0], !!competition?.id)
         return
       }
     }
     setSaving(false); setSaved(true)
     setTimeout(() => setSaved(false), 3000)
-    if (savedData) onSaved(savedData)
+    if (savedData) onSaved(savedData, !!competition?.id)
   }
 
   const selectedFed  = federations.find(f => f.id === form.federation_id)
@@ -956,9 +956,9 @@ export default function CompetitionAdmin() {
       .then(({ data }) => setRecentComps(data || []))
   }, [])
 
-  const handleSaved = (comp) => {
+  const handleSaved = (comp, wasEditing) => {
     setCompetition(comp)
-    setActiveTab('teams')
+    setActiveTab(wasEditing ? 'overview' : 'teams')
     navigate(`/competition-admin-v2/${comp.id}`, { replace: true })
     setShowPicker(false)
   }
