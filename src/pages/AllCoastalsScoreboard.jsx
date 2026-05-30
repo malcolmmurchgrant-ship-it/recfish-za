@@ -4,6 +4,12 @@ import { supabase } from '../lib/supabase'
 // ─── COMPETITION ──────────────────────────────────────────────────────────────
 const COMPETITION_ID = 'c8332f15-ce44-4d0b-a3ab-009fc2a2c484'
 
+// ─── CONFIRMED FISHING HOURS (lines down → lines up) ─────────────────────────
+// Day 1: 07:30 → 16:00 = 8.5 hrs
+// Day 2: 06:30 → 15:00 = 8.5 hrs
+// Day 3: 06:30 → 14:00 = 7.5 hrs
+const FISHING_HOURS = { 1: 8.5, 2: 8.5, 3: 7.5 }
+
 // ─── TEAMS — corrected captains ───────────────────────────────────────────────
 const TEAMS = {
   'EPDSAA A':               { captain: 'Wayne Gerber' },
@@ -280,6 +286,7 @@ export default function AllCoastalsScoreboard() {
           { id: 'team',    label: '🏅 Teams' },
           { id: 'skipper', label: '⚓ Skippers' },
           { id: 'daily',   label: '📋 Daily' },
+          { id: 'cpue',   label: '📈 CPUE' },
           { id: 'stats',   label: '📊 Stats' },
         ].map(t => (
           <button key={t.id} onClick={() => setActiveTab(t.id)} style={S.tab(activeTab === t.id)}>
@@ -534,6 +541,60 @@ export default function AllCoastalsScoreboard() {
           {catches.filter(r => dayFilter === 'all' || r.day_number === dayFilter).length === 0 && (
             <div style={{ ...S.card, color: '#9ca3af', fontStyle: 'italic' }}>No data for selected day.</div>
           )}
+        </div>
+      )}
+
+      {/* ── CPUE ── */}
+      {activeTab === 'cpue' && (
+        <div style={S.card}>
+          <div style={{ fontWeight: 700, color: NAVY, marginBottom: '0.25rem' }}>CPUE — Catch Per Unit Effort</div>
+          <div style={{ fontSize: '0.78rem', color: '#6b7280', marginBottom: '0.75rem' }}>
+            Based on confirmed fishing hours: Day 1 = 8.5 hrs (07:30–16:00) · Day 2 = 8.5 hrs (06:30–15:00) · Day 3 = 7.5 hrs (06:30–14:00)
+          </div>
+          {[1, 2, 3].map(day => {
+            const hours = FISHING_HOURS[day]
+            const dayRows = catches
+              .filter(r => r.day_number === day && !r.disqualified)
+              .map(r => ({
+                angler: r.angler_name,
+                team: getAnglerTeam(r.angler_name),
+                fish: r.total_fish || 0,
+                pts: r.total_points || 0,
+                fph: (r.total_fish || 0) / hours,
+                pph: (r.total_points || 0) / hours,
+              }))
+              .sort((a, b) => b.fph - a.fph)
+            if (dayRows.length === 0) return null
+            return (
+              <div key={day} style={{ marginBottom: '1.25rem' }}>
+                <div style={{ fontWeight: 700, fontSize: '0.85rem', color: NAVY, textTransform: 'uppercase', marginBottom: '0.5rem', borderBottom: '2px solid #e5e7eb', paddingBottom: '0.3rem' }}>
+                  Day {day} — {hours} fishing hours
+                </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.83rem' }}>
+                  <thead>
+                    <tr style={{ background: NAVY, color: 'white' }}>
+                      {['#', 'Angler', 'Team', 'Fish', 'Pts', 'Fish/hr', 'Pts/hr'].map(h => (
+                        <th key={h} style={{ padding: '0.4rem 0.6rem', textAlign: 'left', fontWeight: 600, fontSize: '0.76rem' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dayRows.map((r, i) => (
+                      <tr key={r.angler} style={{ background: i % 2 === 0 ? 'white' : '#f9fafb' }}>
+                        <td style={{ padding: '0.4rem 0.6rem', color: '#6b7280' }}>{i + 1}</td>
+                        <td style={{ padding: '0.4rem 0.6rem', fontWeight: 600 }}>{r.angler}</td>
+                        <td style={{ padding: '0.4rem 0.6rem', color: '#6b7280', fontSize: '0.78rem' }}>{r.team}</td>
+                        <td style={{ padding: '0.4rem 0.6rem' }}>{r.fish}</td>
+                        <td style={{ padding: '0.4rem 0.6rem' }}>{r.pts}</td>
+                        <td style={{ padding: '0.4rem 0.6rem', fontWeight: 700, color: GREEN }}>{r.fph.toFixed(2)}</td>
+                        <td style={{ padding: '0.4rem 0.6rem', fontWeight: 700, color: NAVY }}>{r.pph.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          })}
         </div>
       )}
 

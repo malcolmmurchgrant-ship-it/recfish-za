@@ -109,7 +109,7 @@ function SetupTab({ competition, onSaved }) {
         num_fishing_days:      competition.num_fishing_days || 3,
       }))
     }
-  }, [competition?.id, competition?.updated_ation])
+  }, [competition?.id, competition?.updated_at])
 
   // Load federations
   useEffect(() => {
