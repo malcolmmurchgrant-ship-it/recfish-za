@@ -79,17 +79,18 @@ export default function TunaNationalsScoreboard() {
 
   // ── Derived data ──────────────────────────────────────────────────────────
   const fishingHours = getTotalFishingHours(days)
+  const dateToDay = Object.fromEntries((days || []).map(d => [d.date, d.day_number]))
   const cancelledDays = days.filter(d =>
     d.day_status === 'cancelled_before' || d.day_status === 'cancelled_during' || d.day_status === 'rest_day'
   )
   const fishingDays = days.filter(d => d.day_status === 'fishing' || !d.day_status)
 
   const teamMap   = Object.fromEntries(teams.map(t => [t.id, t]))
-  const anglerMap = Object.fromEntries(anglers.map(a => [a.id, a]))
+  const anglerMap = Object.fromEntries(anglers.map(a => [a.user_id, a]))
   const boatMap   = Object.fromEntries(boats.map(b => [b.id, b]))
   const dayMap    = Object.fromEntries(days.map(d => [d.id, d]))
 
-  const scoringCatches = catches.filter(c => c.scoring !== false && c.weight_kg && c.species_name !== 'No Catch')
+  const scoringCatches = catches.filter(c => c.scoring !== false && c.weight_kg && parseFloat(c.weight_kg) > 0 && c.species_name !== 'No Catch')
 
   // ── Team standings ────────────────────────────────────────────────────────
   const teamStandings = teams.map(t => {
@@ -110,13 +111,12 @@ export default function TunaNationalsScoreboard() {
 
   // ── Angler standings ──────────────────────────────────────────────────────
   const anglerStandings = anglers.map(a => {
-    const ac     = scoringCatches.filter(c => c.angler_id === a.id)
+    const ac     = catches.filter(c => c.angler_id === a.user_id && c.weight_kg && parseFloat(c.weight_kg) > 0 && c.species_name !== 'No Catch' && c.scoring !== false)
     const fish   = ac.length
     const kg     = ac.reduce((s, c) => s + parseFloat(c.weight_kg || 0), 0)
     const points = ac.reduce((s, c) => s + parseFloat(c.points || tunaPoints(c.weight_kg, c.line_class_kg)), 0)
     const team   = teamMap[a.team_id]?.team_name || a.division || ''
     // Group catches by day using fishing_date
-    const dateToDay = Object.fromEntries(days.map(d => [d.date, d.day_number]))
     const byDay = {}
     ac.forEach(c => {
       const dn = dateToDay[c.fishing_date]
