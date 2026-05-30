@@ -21,6 +21,7 @@ import AllCoastalsTeams from './pages/AllCoastalsTeams'
 import Profile from './pages/Profile'
 import GamefishCatchLogger from './pages/GamefishCatchLogger'
 import GamefishScoreboard from './pages/GamefishScoreboard'
+import TunaNationalsScoreboard from './pages/TunaNationalsScoreboard'
 import SessionEndSummaryModal from './components/SessionEndSummaryModal'
 
 const NAVY = '#1e3a8a'
@@ -214,6 +215,7 @@ function AppContent() {
             <Route path='/competition-admin-v2/:competitionId' element={<CompetitionAdmin />} />
             <Route path='/gamefish'             element={<GamefishCatchLogger />} />
             <Route path='/gamefish-scores'      element={<GamefishScoreboard />} />
+            <Route path='/tuna-nationals-scores'  element={<TunaNationalsScoreboard />} />
             <Route path='/profile'              element={<Profile />} />
             <Route path='/'                     element={<Navigate to='/dashboard' replace />} />
           </Routes>
