@@ -48,6 +48,13 @@ const CATEGORY_LABELS = {
   special:    'Special',
 }
 
+const TEAM_FORMAT_LABELS = {
+  split_boat:  'Split Boat Draw',
+  traditional: 'Own Boat (Traditional)',
+  individual:  'Individual',
+  pairs:       'Pairs',
+}
+
 const S = {
   page:    { maxWidth: 1000, margin: '0 auto', padding: '1rem', fontFamily: 'system-ui, sans-serif' },
   card:    { background: 'white', borderRadius: 8, padding: '1.25rem', boxShadow: '0 1px 4px rgba(0,0,0,0.10)', marginBottom: '1rem' },
@@ -902,7 +909,7 @@ function OverviewTab({ competition, onEditSetup }) {
         {[
           ['Tournament Director', c.td_name],
           ['Hosting Association', assocName || c.hosting_province],
-          ['Team Format',         c.team_format],
+          ['Team Format',         TEAM_FORMAT_LABELS[c.team_format] || c.team_format],
           ['Default Line Class',  c.default_line_class_kg ? `${c.default_line_class_kg}kg` : null],
           ['Fine Grid (SAN)',     c.fine_grid_number],
           ['Coarse Grid (SAN)',   c.coarse_grid_number],
