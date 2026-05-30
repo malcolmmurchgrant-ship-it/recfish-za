@@ -6,34 +6,53 @@ const NAVY  = '#1e3a8a'
 const GOLD  = '#d97706'
 const GREEN = '#16a34a'
 
-// Your Supabase user ID — always sees Enter Catches buttons
-const OWNER_ID = 'b9c5048a-b229-46af-9042-44551b162d75'
-
-// Roles that grant catch-entry access
+const OWNER_ID    = 'b9c5048a-b229-46af-9042-44551b162d75'
 const CATCH_ROLES = ['admin', 'tournament_director']
 
 // ─── Competition-specific page links ─────────────────────────────────────────
-// canEnter: whether the current user has catch-entry access for this competition
-function getLinks(comp, canEnter) {
+// Return { links, hideGenericAdmin } per competition
+function getCompConfig(comp, canEnter) {
   const id = comp.id
 
   const specific = {
-    'c8332f15-ce44-4d0b-a3ab-009fc2a2c484': [  // All Coastals 2026 — completed
-      { to: '/allcoastals-scores', label: '📊 Scoreboard',  primary: true  },
-      { to: '/allcoastals-teams',  label: '🏅 Teams',       primary: false },
-      { to: '/allcoastals-admin',  label: '⚙️ Admin',       primary: false },
-    ],
-    '3855034f-ab39-4297-9be4-ba9a7e566ce0': [  // Gamefish Nationals
-      ...(canEnter ? [{ to: '/gamefish',        label: '🎣 Enter Catches', primary: true  }] : []),
-      {                to: '/gamefish-scores',   label: '📊 Scoreboard',    primary: !canEnter },
-    ],
+    'c8332f15-ce44-4d0b-a3ab-009fc2a2c484': {  // All Coastals 2026
+      hideGenericAdmin: true,
+      links: [
+        { to: '/allcoastals-scores', label: '📊 Scoreboard', primary: true  },
+        { to: '/allcoastals-teams',  label: '🏅 Teams',      primary: false },
+        { to: '/allcoastals-admin',  label: '⚙️ Admin',      primary: false },
+      ],
+    },
+    '3855034f-ab39-4297-9be4-ba9a7e566ce0': {  // Gamefish Nationals
+      hideGenericAdmin: false,
+      links: [
+        ...(canEnter ? [{ to: '/gamefish',       label: '🎣 Enter Catches', primary: true  }] : []),
+        {               to: '/gamefish-scores',   label: '📊 Scoreboard',    primary: !canEnter },
+      ],
+    },
+    'ff6e95a9-4f9e-4b54-ad47-a913831d336c': {  // Tuna Nationals 2026
+      hideGenericAdmin: false,
+      links: [
+        { to: '/tuna-nationals-scores', label: '📊 Scoreboard', primary: true },
+      ],
+    },
+    '4a905558-8a94-4dc2-8305-bce37bfc1fe4': {  // Tuna International 2026
+      hideGenericAdmin: false,
+      links: [
+        { to: '/tuna-international-scores', label: '📊 Scoreboard', primary: true },
+      ],
+    },
   }
+
   if (specific[id]) return specific[id]
 
-  // Generic fallback — no Enter Catches for unknown competitions
-  return [
-    { to: `/competition-admin-v2/${id}`, label: '⚙️ Manage Competition', primary: true },
-  ]
+  // Generic fallback
+  return {
+    hideGenericAdmin: true,
+    links: [
+      { to: `/competition-admin-v2/${id}`, label: '⚙️ Manage Competition', primary: true },
+    ],
+  }
 }
 
 // ─── Discipline colours & labels ─────────────────────────────────────────────
@@ -49,11 +68,11 @@ const DISCIPLINE_STYLE = {
 }
 
 const STATUS_STYLE = {
-  active:            { bg: '#dcfce7', col: GREEN,      label: '🟢 Live',      border: GREEN      },
-  upcoming:          { bg: '#eff6ff', col: NAVY,       label: '🔵 Upcoming',  border: NAVY       },
-  registration_open: { bg: '#fef3c7', col: GOLD,       label: '🟡 Open',      border: GOLD       },
-  completed:         { bg: '#f3f4f6', col: '#6b7280',  label: '⚪ Completed', border: '#d1d5db'  },
-  cancelled:         { bg: '#fef2f2', col: '#dc2626',  label: '🔴 Cancelled', border: '#fca5a5'  },
+  active:            { bg: '#dcfce7', col: GREEN,     label: '🟢 Live',      border: GREEN      },
+  upcoming:          { bg: '#eff6ff', col: NAVY,      label: '🔵 Upcoming',  border: NAVY       },
+  registration_open: { bg: '#fef3c7', col: GOLD,      label: '🟡 Open',      border: GOLD       },
+  completed:         { bg: '#f3f4f6', col: '#6b7280', label: '⚪ Completed', border: '#d1d5db'  },
+  cancelled:         { bg: '#fef2f2', col: '#dc2626', label: '🔴 Cancelled', border: '#fca5a5'  },
 }
 
 const LEVEL_LABELS = {
@@ -66,46 +85,28 @@ const LEVEL_LABELS = {
   special:         'Special',
 }
 
-// Competitions that are finished and should not appear on the Hub
-const HIDDEN_IDS = new Set([
-  // All completed competitions still visible in Hub (read-only)
-])
-
 export default function Competitions() {
   const navigate = useNavigate()
-  const [competitions,  setCompetitions]  = useState([])
-  const [loading,       setLoading]       = useState(true)
-  const [filter,        setFilter]        = useState('all')
-  const [userId,        setUserId]        = useState(null)
-  const [catchAccess,   setCatchAccess]   = useState(new Set()) // competition IDs user can enter
+  const [competitions, setCompetitions] = useState([])
+  const [loading,      setLoading]      = useState(true)
+  const [filter,       setFilter]       = useState('all')
+  const [catchAccess,  setCatchAccess]  = useState(new Set())
 
   // ── Auth + roles ────────────────────────────────────────────────────────────
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       const uid = data?.user?.id || null
-      setUserId(uid)
-
       if (!uid) return
-
-      // Owner bypass — grant access to all competitions immediately
-      if (uid === OWNER_ID) {
-        setCatchAccess('all') // special sentinel
-        return
-      }
-
-      // Look up competition_user_roles for this user
+      if (uid === OWNER_ID) { setCatchAccess('all'); return }
       supabase
         .from('competition_user_roles')
         .select('competition_id, role')
         .eq('user_id', uid)
         .then(({ data: roles }) => {
           if (!roles) return
-          const ids = new Set(
-            roles
-              .filter(r => CATCH_ROLES.includes(r.role))
-              .map(r => r.competition_id)
-          )
-          setCatchAccess(ids)
+          setCatchAccess(new Set(
+            roles.filter(r => CATCH_ROLES.includes(r.role)).map(r => r.competition_id)
+          ))
         })
     })
   }, [])
@@ -123,7 +124,7 @@ export default function Competitions() {
       .not('status', 'eq', 'cancelled')
       .order('start_date', { ascending: false })
       .then(({ data }) => {
-        setCompetitions((data || []).filter(c => !HIDDEN_IDS.has(c.id)))
+        setCompetitions(data || [])
         setLoading(false)
       })
   }, [])
@@ -191,10 +192,10 @@ export default function Competitions() {
         <div style={{ textAlign: 'center', padding: '3rem', color: '#9ca3af' }}>No competitions found.</div>
       ) : (
         filtered.map(comp => {
-          const disc     = DISCIPLINE_STYLE[comp.discipline] || { bg: '#f3f4f6', col: '#6b7280', label: comp.discipline || 'Unknown' }
-          const statStyle = STATUS_STYLE[comp.status]        || STATUS_STYLE.completed
-          const links    = getLinks(comp, canEnter(comp.id))
-          const dateStr  = comp.start_date && comp.end_date
+          const disc      = DISCIPLINE_STYLE[comp.discipline] || { bg: '#f3f4f6', col: '#6b7280', label: comp.discipline || 'Unknown' }
+          const statStyle = STATUS_STYLE[comp.status]         || STATUS_STYLE.completed
+          const { links, hideGenericAdmin } = getCompConfig(comp, canEnter(comp.id))
+          const dateStr   = comp.start_date && comp.end_date
             ? `${comp.start_date} → ${comp.end_date}`
             : comp.start_date || ''
 
@@ -255,16 +256,18 @@ export default function Competitions() {
                     {link.label}
                   </button>
                 ))}
-                <button onClick={() => navigate(`/competition-admin-v2/${comp.id}`)}
-                  style={{
-                    background: 'white', color: '#6b7280',
-                    border: '1px solid #d1d5db',
-                    padding: '0.5rem 0.9rem',
-                    borderRadius: 6, cursor: 'pointer',
-                    fontWeight: 600, fontSize: '0.85rem',
-                  }}>
-                  ⚙️ Admin
-                </button>
+                {!hideGenericAdmin && (
+                  <button onClick={() => navigate(`/competition-admin-v2/${comp.id}`)}
+                    style={{
+                      background: 'white', color: '#6b7280',
+                      border: '1px solid #d1d5db',
+                      padding: '0.5rem 0.9rem',
+                      borderRadius: 6, cursor: 'pointer',
+                      fontWeight: 600, fontSize: '0.85rem',
+                    }}>
+                    ⚙️ Admin
+                  </button>
+                )}
               </div>
             </div>
           )
