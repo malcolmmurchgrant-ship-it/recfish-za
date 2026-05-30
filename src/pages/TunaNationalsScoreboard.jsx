@@ -115,11 +115,12 @@ export default function TunaNationalsScoreboard() {
     const kg     = ac.reduce((s, c) => s + parseFloat(c.weight_kg || 0), 0)
     const points = ac.reduce((s, c) => s + parseFloat(c.points || tunaPoints(c.weight_kg, c.line_class_kg)), 0)
     const team   = teamMap[a.team_id]?.team_name || a.division || ''
-    // Group catches by day
+    // Group catches by day using fishing_date
+    const dateToDay = Object.fromEntries(days.map(d => [d.date, d.day_number]))
     const byDay = {}
     ac.forEach(c => {
-      const d = dayMap[c.competition_day_id]
-      const dn = d?.day_number
+      const dn = dateToDay[c.fishing_date]
+      if (!dn) return
       if (!byDay[dn]) byDay[dn] = []
       byDay[dn].push(c)
     })
@@ -139,7 +140,7 @@ export default function TunaNationalsScoreboard() {
       ...c,
       anglerName: anglerMap[c.angler_id]?.full_name || '',
       teamName:   teamMap[c.team_id]?.team_name || '',
-      dayNumber:  dayMap[c.competition_day_id]?.day_number,
+      dayNumber:  days.find(d => d.date === c.fishing_date)?.day_number,
       pts: parseFloat(c.points || tunaPoints(c.weight_kg, c.line_class_kg)),
     }))
     .sort((a, b) => b.pts - a.pts)
