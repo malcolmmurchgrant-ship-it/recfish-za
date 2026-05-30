@@ -75,7 +75,7 @@ function SetupTab({ competition, onSaved }) {
     team_format: 'split_boat', team_size: 3, num_fishing_days: 3,
     default_line_class_kg: 6, fine_grid_number: '', coarse_grid_number: '',
     results_visible: true, catch_release_enabled: false,
-    description: '', td_name: '',
+    description: '', td_name: '', scoring_method: '',
   })
   const [saving, setSaving] = useState(false)
   const [saved,  setSaved]  = useState(false)
@@ -106,6 +106,7 @@ function SetupTab({ competition, onSaved }) {
         catch_release_enabled: competition.catch_release_enabled ?? false,
         description:           competition.description || '',
         td_name:               competition.td_name || '',
+        scoring_method:        competition.scoring_method || '',
         num_fishing_days:      competition.num_fishing_days || 3,
       }))
     }
@@ -185,7 +186,7 @@ function SetupTab({ competition, onSaved }) {
       catch_release_enabled: form.catch_release_enabled,
       description:           form.description || null,
       td_name:               form.td_name || null,
-      scoring_method:        form.scoring_method || null,
+      scoring_method:        form.scoring_method || competition?.scoring_method || 'bottomfish_percentage',
       status:                'active',
       updated_at:            new Date().toISOString(),
     }
