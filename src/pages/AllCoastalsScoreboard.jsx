@@ -516,22 +516,42 @@ export default function AllCoastalsScoreboard() {
                   return (
                     <div key={d} style={{ marginBottom: '0.75rem' }}>
                       <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', marginBottom: '0.35rem' }}>Day {d}</div>
-                      {[...dayRows].sort((a,b) => b.total_points - a.total_points).map((r, idx) => (
-                        <div key={r.angler_name} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.4rem 0.6rem', borderRadius: 6, background: r.disqualified ? '#fef2f2' : idx === 0 ? '#fefce8' : '#f9fafb', marginBottom: '0.25rem', flexWrap: 'wrap' }}>
-                          <span style={{ minWidth: 20, fontWeight: 700, color: '#6b7280' }}>{idx+1}.</span>
-                          <div style={{ flex: 1 }}>
-                            <span style={{ fontWeight: 600 }}>{r.angler_name}</span>
-                            {r.disqualified && <span style={{ fontSize: '0.7rem', fontWeight: 700, background: '#dc2626', color: 'white', padding: '1px 6px', borderRadius: 3, marginLeft: 6 }}>DQ</span>}
-                            <span style={{ fontSize: '0.78rem', color: '#6b7280', marginLeft: 6 }}>{r.team_name}</span>
-                            {r.disqualified && r.disqualified_reason && <span style={{ fontSize: '0.75rem', color: '#dc2626', marginLeft: 6 }}>— {r.disqualified_reason}</span>}
+                      {[...dayRows].sort((a,b) => b.total_points - a.total_points).map((r, idx) => {
+                        const caughtSpecies = (r.catches || []).filter(c => c.fishCount > 0)
+                        const overLine = (r.catches || []).filter(c => c.overLineCount > 0)
+                        return (
+                          <div key={r.angler_name} style={{ padding: '0.4rem 0.6rem', borderRadius: 6, background: r.disqualified ? '#fef2f2' : idx === 0 ? '#fefce8' : '#f9fafb', marginBottom: '0.25rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                              <span style={{ minWidth: 20, fontWeight: 700, color: '#6b7280' }}>{idx+1}.</span>
+                              <div style={{ flex: 1 }}>
+                                <span style={{ fontWeight: 600 }}>{r.angler_name}</span>
+                                {r.disqualified && <span style={{ fontSize: '0.7rem', fontWeight: 700, background: '#dc2626', color: 'white', padding: '1px 6px', borderRadius: 3, marginLeft: 6 }}>DQ</span>}
+                                <span style={{ fontSize: '0.78rem', color: '#6b7280', marginLeft: 6 }}>{r.team_name}</span>
+                                {r.disqualified && r.disqualified_reason && <span style={{ fontSize: '0.75rem', color: '#dc2626', marginLeft: 6 }}>— {r.disqualified_reason}</span>}
+                              </div>
+                              <span style={{ fontWeight: 800, color: r.disqualified ? '#dc2626' : NAVY, minWidth: 52, textAlign: 'right' }}>
+                                {r.disqualified ? '🚫 DQ' : r.boat_percentage != null ? `${r.boat_percentage}%` : `${r.total_points}pts`}
+                              </span>
+                              <span style={{ fontSize: '0.78rem', color: '#6b7280' }}>{r.total_fish}🐟 · {r.total_points}pts</span>
+                              {!r.disqualified && r.total_points === maxPts && <span style={{ fontSize: '0.78rem', background: '#fef9c3', padding: '0.1rem 0.4rem', borderRadius: 4 }}>Boat winner</span>}
+                            </div>
+                            {caughtSpecies.length > 0 && (
+                              <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', marginTop: '0.35rem', paddingLeft: '1.75rem' }}>
+                                {caughtSpecies.map(c => (
+                                  <span key={c.species} style={{ fontSize: '0.72rem', background: NAVY, color: 'white', padding: '0.15rem 0.5rem', borderRadius: 12, fontWeight: 600 }}>
+                                    {c.species} ×{c.fishCount}
+                                  </span>
+                                ))}
+                                {overLine.map(c => (
+                                  <span key={'ol-'+c.species} style={{ fontSize: '0.72rem', background: GOLD, color: 'white', padding: '0.15rem 0.5rem', borderRadius: 12, fontWeight: 600 }}>
+                                    {c.species} ×{c.overLineCount} OL
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                          <span style={{ fontWeight: 800, color: r.disqualified ? '#dc2626' : NAVY, minWidth: 52, textAlign: 'right' }}>
-                            {r.disqualified ? '🚫 DQ' : r.boat_percentage != null ? `${r.boat_percentage}%` : `${r.total_points}pts`}
-                          </span>
-                          <span style={{ fontSize: '0.78rem', color: '#6b7280' }}>{r.total_fish}🐟 · {r.total_points}pts</span>
-                          {!r.disqualified && r.total_points === maxPts && <span style={{ fontSize: '0.78rem', background: '#fef9c3', padding: '0.1rem 0.4rem', borderRadius: 4 }}>Boat winner</span>}
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   )
                 })}
