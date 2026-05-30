@@ -18,6 +18,10 @@ function getLinks(comp, canEnter) {
   const id = comp.id
 
   const specific = {
+    'c8332f15-ce44-4d0b-a3ab-009fc2a2c484': [  // All Coastals 2026 — completed
+      { to: '/allcoastals-scores', label: '📊 Scoreboard', primary: true  },
+      { to: '/allcoastals-teams',  label: '🏅 Teams',      primary: false },
+    ],
     '3855034f-ab39-4297-9be4-ba9a7e566ce0': [  // Gamefish Nationals
       ...(canEnter ? [{ to: '/gamefish',        label: '🎣 Enter Catches', primary: true  }] : []),
       {                to: '/gamefish-scores',   label: '📊 Scoreboard',    primary: !canEnter },
@@ -63,7 +67,7 @@ const LEVEL_LABELS = {
 
 // Competitions that are finished and should not appear on the Hub
 const HIDDEN_IDS = new Set([
-  'c8332f15-ce44-4d0b-a3ab-009fc2a2c484',  // All Coastals 2026 — completed
+  // All completed competitions still visible in Hub (read-only)
 ])
 
 export default function Competitions() {
