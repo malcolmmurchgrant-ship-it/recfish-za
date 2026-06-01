@@ -148,7 +148,7 @@ function FishRow({ fish, index, onChange, onRemove, lineClass = 10 }) {
             const isKF = sp?.kingfish || false
             if (isKF) {
               // Kingfish: always release — 5 pts, no weight
-              onChange(index, { ...fish, species: val, customSpecies: null, billfish: false, kingfish_release: true, weight_kg: '', min_weight: 3 })
+              onChange(index, { ...fish, species: val, customSpecies: null, billfish: false, kingfish_release: true, measured_400mm: false, weight_kg: '', min_weight: 3 })
             } else if (val.startsWith('Other ')) {
               onChange(index, { ...fish, species: val, customSpecies: '', billfish: val.includes('Billfish'), kingfish_release: false, min_weight: 3 })
             } else {
@@ -196,7 +196,14 @@ function FishRow({ fish, index, onChange, onRemove, lineClass = 10 }) {
         {fish.billfish ? (
           <span style={S.badge(GOLD)}>Multiplier</span>
         ) : fish.kingfish_release ? (
-          <span style={S.badge('#7c3aed')}>5 pts 📸</span>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+            <span style={S.badge(fish.measured_400mm ? '#7c3aed' : '#9ca3af')}>5 pts 📸</span>
+            <label style={{ fontSize: '0.68rem', color: fish.measured_400mm ? '#7c3aed' : '#dc2626', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 2 }}>
+              <input type='checkbox' checked={!!fish.measured_400mm}
+                onChange={e => onChange(index, { ...fish, measured_400mm: e.target.checked })} />
+              ≥400mm
+            </label>
+          </div>
         ) : (
           <div>
             <div style={{ fontWeight: 700, color: NAVY, fontSize: '1rem' }}>{pts > 0 ? pts.toFixed(2) : '—'}</div>
@@ -274,14 +281,14 @@ export default function GamefishCatchLogger() {
 
   const addFish = () => {
     if (catches.length >= 10) return
-    setCatches(prev => [...prev, { species: '', weight_kg: '', billfish: false, kingfish_release: false, min_weight: 3 }])
+    setCatches(prev => [...prev, { species: '', weight_kg: '', billfish: false, kingfish_release: false, measured_400mm: false, min_weight: 3 }])
   }
 
   const updateFish = (i, fish) => setCatches(prev => prev.map((f, idx) => idx === i ? fish : f))
   const removeFish = (i)       => setCatches(prev => prev.filter((_, idx) => idx !== i))
 
   const validCatches = catches
-    .filter(c => c.species && (c.billfish || c.kingfish_release || (parseFloat(c.weight_kg) || 0) >= c.min_weight))
+    .filter(c => c.species && (c.billfish || (c.kingfish_release && c.measured_400mm) || (parseFloat(c.weight_kg) || 0) >= c.min_weight))
     .map(c => c.customSpecies
       ? { ...c, species: c.customSpecies || c.species }
       : c
@@ -468,7 +475,7 @@ export default function GamefishCatchLogger() {
                 <div style={{ fontWeight: 700, color: NAVY, marginBottom: '0.5rem' }}>Step 3 — Record Catches</div>
                 <div style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '0.75rem' }}>
                   Enter each fish with its weighed mass. Billfish count as a multiplier species — no weight needed.
-                  Maximum 10 qualifying fish per angler per day. Kingfish must be photographed, measured and released (5 pts each, count toward bag limit).
+                  Maximum 10 qualifying fish per angler per day. Kingfish must be photographed, measured (≥400mm) and released (5 pts each, count toward bag limit). Tick the ≥400mm checkbox to validate.
                 </div>
 
                 {catches.length === 0 && (
