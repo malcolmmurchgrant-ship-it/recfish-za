@@ -59,7 +59,7 @@ const SPECIES_GROUPS = [
     ]
   },
   {
-    label: 'Kingfish & Amberjack (min 4kg)',
+    label: 'Kingfish (photographed & released — 5pts) / Amberjack (min 3kg)',
     species: [
       'Giant Kingfish (Ignobilis)',
       'Other Kingfish (Bluefin / Blacklip / Yellowspot etc.)',
@@ -67,7 +67,7 @@ const SPECIES_GROUPS = [
     ]
   },
   {
-    label: 'Other Gamefish (min 4kg)',
+    label: 'Other Gamefish (min 3kg)',
     species: [
       'Wahoo',
       'Dorado',
@@ -89,7 +89,7 @@ const SPECIES_GROUPS = [
 ]
 
 const ALL_SPECIES = SPECIES_GROUPS.flatMap(g =>
-  g.species.map(name => ({ name, billfish: !!g.billfish, minWeight: g.label.includes('5kg') ? 5 : 4 }))
+  g.species.map(name => ({ name, billfish: !!g.billfish, kingfish: g.label.toLowerCase().includes('kingfish'), minWeight: g.label.includes('5kg') ? 5 : 3 }))
 )
 
 // ─── SCORING ──────────────────────────────────────────────────────────────────
@@ -124,7 +124,7 @@ const S = {
 
 // ─── FISH ENTRY ROW ───────────────────────────────────────────────────────────
 function FishRow({ fish, index, onChange, onRemove, lineClass = 10 }) {
-  const pts = fish.billfish ? 0 : calcFishPoints(parseFloat(fish.weight_kg) || 0, lineClass)
+  const pts = fish.billfish ? 0 : fish.kingfish_release ? 5 : calcFishPoints(parseFloat(fish.weight_kg) || 0, lineClass)
 
   return (
     <div style={{
@@ -146,9 +146,10 @@ function FishRow({ fish, index, onChange, onRemove, lineClass = 10 }) {
             const val = e.target.value
             const sp  = ALL_SPECIES.find(s => s.name === val)
             if (val.startsWith('Other ')) {
-              onChange(index, { ...fish, species: val, customSpecies: '', billfish: val.includes('Billfish'), min_weight: 4 })
+              onChange(index, { ...fish, species: val, customSpecies: '', billfish: val.includes('Billfish'), kingfish_release: false, min_weight: 3 })
             } else {
-              onChange(index, { ...fish, species: val, customSpecies: null, billfish: sp?.billfish || false, min_weight: sp?.minWeight || 4 })
+              const isKF = sp?.kingfish || false
+              onChange(index, { ...fish, species: val, customSpecies: null, billfish: sp?.billfish || false, kingfish_release: isKF, weight_kg: isKF ? '' : fish.weight_kg, min_weight: sp?.minWeight || 3 })
             }
           }}
         >
@@ -177,9 +178,9 @@ function FishRow({ fish, index, onChange, onRemove, lineClass = 10 }) {
           min='0'
           placeholder='kg'
           value={fish.weight_kg}
-          disabled={fish.billfish}
+          disabled={fish.billfish || fish.kingfish_release}
           onChange={e => onChange(index, { ...fish, weight_kg: e.target.value })}
-          style={{ ...S.input, fontSize: '0.85rem', padding: '0.4rem 0.5rem', background: fish.billfish ? '#f3f4f6' : 'white' }}
+          style={{ ...S.input, fontSize: '0.85rem', padding: '0.4rem 0.5rem', background: (fish.billfish || fish.kingfish_release) ? '#f3f4f6' : 'white' }}
         />
         {fish.weight_kg && !fish.billfish && parseFloat(fish.weight_kg) < fish.min_weight && (
           <div style={{ fontSize: '0.7rem', color: RED, marginTop: 2 }}>
@@ -191,6 +192,8 @@ function FishRow({ fish, index, onChange, onRemove, lineClass = 10 }) {
       <div style={{ textAlign: 'center' }}>
         {fish.billfish ? (
           <span style={S.badge(GOLD)}>Multiplier</span>
+        ) : fish.kingfish_release ? (
+          <span style={S.badge('#7c3aed')}>5 pts 📸</span>
         ) : (
           <div>
             <div style={{ fontWeight: 700, color: NAVY, fontSize: '1rem' }}>{pts > 0 ? pts.toFixed(2) : '—'}</div>
@@ -267,15 +270,15 @@ export default function GamefishCatchLogger() {
   }, [teamName, day, saved])
 
   const addFish = () => {
-    if (catches.length >= 5) return
-    setCatches(prev => [...prev, { species: '', weight_kg: '', billfish: false, min_weight: 4 }])
+    if (catches.length >= 10) return
+    setCatches(prev => [...prev, { species: '', weight_kg: '', billfish: false, kingfish_release: false, min_weight: 3 }])
   }
 
   const updateFish = (i, fish) => setCatches(prev => prev.map((f, idx) => idx === i ? fish : f))
   const removeFish = (i)       => setCatches(prev => prev.filter((_, idx) => idx !== i))
 
   const validCatches = catches
-    .filter(c => c.species && (c.billfish || (parseFloat(c.weight_kg) || 0) >= c.min_weight))
+    .filter(c => c.species && (c.billfish || c.kingfish_release || (parseFloat(c.weight_kg) || 0) >= c.min_weight))
     .map(c => c.customSpecies
       ? { ...c, species: c.customSpecies || c.species }
       : c
@@ -283,7 +286,7 @@ export default function GamefishCatchLogger() {
 
   const totalPoints = validCatches
     .filter(c => !c.billfish)
-    .reduce((sum, c) => sum + calcFishPoints(parseFloat(c.weight_kg), lineClass), 0)
+    .reduce((sum, c) => sum + (c.kingfish_release ? 5 : calcFishPoints(parseFloat(c.weight_kg), lineClass)), 0)
 
   const speciesCount = new Set(validCatches.map(c => {
     // Group species per competition rules
@@ -443,7 +446,7 @@ export default function GamefishCatchLogger() {
                   </div>
                   <div style={{ textAlign: 'center' }}>
                     <div style={{ fontSize: '0.7rem', color: '#6b7280' }}>FISH</div>
-                    <div style={{ fontSize: '1.4rem', fontWeight: 800, color: GREEN }}>{validCatches.length}/5</div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 800, color: GREEN }}>{validCatches.length}/10</div>
                   </div>
                   <div style={{ textAlign: 'center' }}>
                     <div style={{ fontSize: '0.7rem', color: '#6b7280' }}>SPECIES</div>
@@ -462,7 +465,7 @@ export default function GamefishCatchLogger() {
                 <div style={{ fontWeight: 700, color: NAVY, marginBottom: '0.5rem' }}>Step 3 — Record Catches</div>
                 <div style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '0.75rem' }}>
                   Enter each fish with its weighed mass. Billfish count as a multiplier species — no weight needed.
-                  Maximum 5 qualifying fish per angler per day.
+                  Maximum 10 qualifying fish per angler per day. Kingfish must be photographed, measured and released (5 pts each, count toward bag limit).
                 </div>
 
                 {catches.length === 0 && (
@@ -476,14 +479,14 @@ export default function GamefishCatchLogger() {
                     onChange={updateFish} onRemove={removeFish} lineClass={lineClass} />
                 ))}
 
-                {catches.length < 5 && (
+                {catches.length < 10 && (
                   <button onClick={addFish} style={{ ...S.btn(GREEN), marginTop: '0.5rem' }}>
                     + Add Fish
                   </button>
                 )}
-                {catches.length >= 5 && (
+                {catches.length >= 10 && (
                   <div style={{ fontSize: '0.82rem', color: GOLD, fontWeight: 600, marginTop: '0.5rem' }}>
-                    ⚠ Maximum 5 fish reached for this angler today.
+                    ⚠ Maximum 10 fish reached for this angler today.
                   </div>
                 )}
               </div>

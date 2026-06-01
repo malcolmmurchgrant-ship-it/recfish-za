@@ -37,6 +37,7 @@ const TABS = [
 // Individual fish points: (weight_kg / line_class)² × 32
 function fishPoints(weightKg, lineClass = LINE_CLASS) {
   if (!weightKg || weightKg <= 0) return 0
+  if (weightKg < 3) return 0  // below minimum weight — non-scoring
   return parseFloat(((weightKg / lineClass) ** 2 * 32).toFixed(4))
 }
 
@@ -57,10 +58,11 @@ function anglerSpeciesCount(catches) {
   return species.size
 }
 
-// Angler raw points (billfish = 0 pts but count as species)
+// Angler raw points (billfish = 0 pts, kingfish_release = 5 pts flat)
 function anglerRawPoints(catches, lineClass = LINE_CLASS) {
   return (catches || []).reduce((sum, c) => {
     if (c.billfish) return sum
+    if (c.kingfish_release) return sum + 5
     return sum + fishPoints(c.weight_kg, lineClass)
   }, 0)
 }
@@ -277,7 +279,7 @@ export default function GamefishScoreboard() {
         <div>
           {/* Scoring note */}
           <div style={{ background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 6, padding: '0.6rem 1rem', marginBottom: '1rem', fontSize: '0.82rem', color: '#92400e' }}>
-            <strong>Scoring:</strong> Individual = raw pts × (species−1) · Team = sum of raw pts × (team species−1) · Billfish count as species, score 0 pts
+            <strong>Scoring:</strong> Individual = raw pts × (species−1) · Kingfish release = 5 pts flat · Min weight 3kg · Bag limit 10 fish/day · Billfish = 0 pts, count as species
           </div>
 
           {/* Tabs */}
