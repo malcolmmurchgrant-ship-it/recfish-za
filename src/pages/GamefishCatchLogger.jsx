@@ -145,11 +145,14 @@ function FishRow({ fish, index, onChange, onRemove, lineClass = 10 }) {
           onChange={e => {
             const val = e.target.value
             const sp  = ALL_SPECIES.find(s => s.name === val)
-            if (val.startsWith('Other ')) {
+            const isKF = sp?.kingfish || false
+            if (isKF) {
+              // Kingfish: always release — 5 pts, no weight
+              onChange(index, { ...fish, species: val, customSpecies: null, billfish: false, kingfish_release: true, weight_kg: '', min_weight: 3 })
+            } else if (val.startsWith('Other ')) {
               onChange(index, { ...fish, species: val, customSpecies: '', billfish: val.includes('Billfish'), kingfish_release: false, min_weight: 3 })
             } else {
-              const isKF = sp?.kingfish || false
-              onChange(index, { ...fish, species: val, customSpecies: null, billfish: sp?.billfish || false, kingfish_release: isKF, weight_kg: isKF ? '' : fish.weight_kg, min_weight: sp?.minWeight || 3 })
+              onChange(index, { ...fish, species: val, customSpecies: null, billfish: sp?.billfish || false, kingfish_release: false, weight_kg: fish.weight_kg, min_weight: sp?.minWeight || 3 })
             }
           }}
         >
