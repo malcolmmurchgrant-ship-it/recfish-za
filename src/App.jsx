@@ -21,6 +21,7 @@ import AllCoastalsTeams from './pages/AllCoastalsTeams'
 import Profile from './pages/Profile'
 import GamefishCatchLogger from './pages/GamefishCatchLogger'
 import GamefishScoreboard from './pages/GamefishScoreboard'
+import GamefishAdmin from './pages/GamefishAdmin'
 import TunaNationalsScoreboard from './pages/TunaNationalsScoreboard'
 import TunaInternationalScoreboard from './pages/TunaInternationalScoreboard'
 import SessionEndSummaryModal from './components/SessionEndSummaryModal'
@@ -92,6 +93,7 @@ function Navigation() {
       { to: '/gamefish',           label: '🎣 Gamefish Nationals — Logger' },
     ] : []),
     { to: '/gamefish-scores',           label: '📊 Gamefish Nationals — Scores'     },
+    { to: '/gamefish-admin',            label: '⚙️ Gamefish Nationals — Admin'      },
     { to: '/tuna-nationals-scores',     label: '📊 Tuna Nationals — Scores'         },
     { to: '/tuna-international-scores', label: '📊 Tuna International — Scores'     },
   ]
@@ -218,6 +220,7 @@ function AppContent() {
             <Route path='/competition-admin-v2/:competitionId' element={<CompetitionAdmin />} />
             <Route path='/gamefish'             element={<GamefishCatchLogger />} />
             <Route path='/gamefish-scores'      element={<GamefishScoreboard />} />
+            <Route path='/gamefish-admin'       element={<GamefishAdmin />} />
             <Route path='/tuna-nationals-scores'      element={<TunaNationalsScoreboard />} />
             <Route path='/tuna-international-scores'  element={<TunaInternationalScoreboard />} />
             <Route path='/profile'              element={<Profile />} />
