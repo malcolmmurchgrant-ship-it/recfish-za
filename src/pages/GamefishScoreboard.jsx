@@ -184,7 +184,7 @@ export default function GamefishScoreboard() {
     a.totalRaw  += anglerRawPoints(r.catches)
     a.totalMult += anglerMultipliedScore(r.catches)
     a.totalFish += r.fish_count || 0
-    a.totalKg   += (r.catches || []).reduce((s, c) => s + (c.weight_kg || 0), 0)
+    a.totalKg   += (r.catches || []).reduce((s, c) => s + (parseFloat(c.weight_kg) || 0), 0)
     a.daysEntered++
   })
   const anglerStandings = Object.values(anglerMap).sort((a, b) => b.totalMult - a.totalMult)
