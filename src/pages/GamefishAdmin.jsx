@@ -250,7 +250,9 @@ export default function GamefishAdmin() {
   const [activeTab,  setActiveTab]  = useState('scorecards')
   const [dayFilter,  setDayFilter]  = useState('all')
   const [teamFilter, setTeamFilter] = useState('all')
-  const [editing,    setEditing]    = useState(null)
+  const [editing,        setEditing]        = useState(null)
+  const [resultsReleased, setResultsReleased] = useState(false)
+  const [togglingRelease, setTogglingRelease] = useState(false)
 
 
   // ── Auth check ──────────────────────────────────────────────────────────────
@@ -267,6 +269,24 @@ export default function GamefishAdmin() {
         setChecking(false)
       })
   }, [user])
+
+  // ── Load results_released status ────────────────────────────────────────────
+  useEffect(() => {
+    if (!authorised) return
+    supabase.from('competitions').select('results_released')
+      .eq('id', COMPETITION_ID).single()
+      .then(({ data }) => { if (data) setResultsReleased(data.results_released || false) })
+  }, [authorised])
+
+  const toggleRelease = async () => {
+    setTogglingRelease(true)
+    const newVal = !resultsReleased
+    await supabase.from('competitions')
+      .update({ results_released: newVal })
+      .eq('id', COMPETITION_ID)
+    setResultsReleased(newVal)
+    setTogglingRelease(false)
+  }
 
   // ── Load catches ────────────────────────────────────────────────────────────
   const load = useCallback(async () => {
@@ -327,6 +347,22 @@ export default function GamefishAdmin() {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Results release toggle */}
+      <div style={{ ...S.card, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', background: resultsReleased ? '#f0fdf4' : '#fef3c7', border: `1px solid ${resultsReleased ? '#86efac' : '#fcd34d'}` }}>
+        <div>
+          <div style={{ fontWeight: 700, color: resultsReleased ? GREEN : GOLD }}>
+            {resultsReleased ? '👁 Results Visible to Public' : '🔒 Results Hidden from Public'}
+          </div>
+          <div style={{ fontSize: '0.78rem', color: GREY, marginTop: 2 }}>
+            {resultsReleased ? 'Anyone can view the scoreboard without a PIN.' : 'Scoreboard requires PIN 7749 to unlock.'}
+          </div>
+        </div>
+        <button onClick={toggleRelease} disabled={togglingRelease}
+          style={{ ...S.btn(resultsReleased ? RED : GREEN), opacity: togglingRelease ? 0.6 : 1 }}>
+          {togglingRelease ? 'Updating…' : resultsReleased ? '🔒 Lock Results' : '👁 Release Results'}
+        </button>
       </div>
 
       {/* Tabs */}
