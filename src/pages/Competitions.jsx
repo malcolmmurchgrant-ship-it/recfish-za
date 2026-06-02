@@ -42,6 +42,23 @@ function getCompConfig(comp, canEnter) {
         { to: '/tuna-international-scores', label: '📊 Scoreboard', primary: true },
       ],
     },
+    // ── 2023 historical imports — scoreboards coming soon ──────────────────
+    '346d0d52-e2af-4675-97d9-d40ad32e168e': {  // Junior Gamefish Nationals 2023
+      hideGenericAdmin: true,
+      links: [{ to: null, label: '📊 Results Coming Soon', primary: true, disabled: true }],
+    },
+    '1bc6eb85-ee59-43b5-8066-2a4ae1047c67': {  // Tuna Nationals 2023
+      hideGenericAdmin: true,
+      links: [{ to: null, label: '📊 Results Coming Soon', primary: true, disabled: true }],
+    },
+    'b8e78ab2-28d8-42fe-b063-24c1c5779478': {  // Tuna International 2023
+      hideGenericAdmin: true,
+      links: [{ to: null, label: '📊 Results Coming Soon', primary: true, disabled: true }],
+    },
+    '4838f5d2-52db-459a-9b6b-2d7ee41fa789': {  // All Inland Open 2023
+      hideGenericAdmin: true,
+      links: [{ to: null, label: '📊 Results Coming Soon', primary: true, disabled: true }],
+    },
   }
 
   if (specific[id]) return specific[id]
@@ -242,14 +259,16 @@ export default function Competitions() {
               {/* Action buttons */}
               <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
                 {links.map(link => (
-                  <button key={link.to + link.label} onClick={() => navigate(link.to)}
+                  <button key={(link.to || '') + link.label}
+                    onClick={() => link.to && navigate(link.to)}
+                    disabled={link.disabled}
                     style={{
-                      background: link.primary ? NAVY : 'white',
-                      color: link.primary ? 'white' : NAVY,
-                      border: `2px solid ${NAVY}`,
+                      background: link.disabled ? '#e5e7eb' : link.primary ? NAVY : 'white',
+                      color: link.disabled ? '#9ca3af' : link.primary ? 'white' : NAVY,
+                      border: `2px solid ${link.disabled ? '#e5e7eb' : NAVY}`,
                       padding: '0.5rem 1.1rem',
                       borderRadius: 6,
-                      cursor: 'pointer',
+                      cursor: link.disabled ? 'default' : 'pointer',
                       fontWeight: 600,
                       fontSize: '0.85rem',
                     }}>
