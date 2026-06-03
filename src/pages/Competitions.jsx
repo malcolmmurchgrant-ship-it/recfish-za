@@ -59,6 +59,22 @@ function getCompConfig(comp, canEnter) {
       hideGenericAdmin: true,
       links: [{ to: null, label: '📊 Results Coming Soon', primary: true, disabled: true }],
     },
+    'bf2a40c3-14a3-4adf-acbb-a5f904e4ca53': {  // Junior Bottomfish Nationals 2024
+      hideGenericAdmin: true,
+      links: [{ to: null, label: '📊 Results Coming Soon', primary: true, disabled: true }],
+    },
+    'b4a20da9-5eca-48fb-b181-bb9409e09d5b': {  // Bottomfish Interprovincial 2024
+      hideGenericAdmin: true,
+      links: [{ to: null, label: '📊 Results Coming Soon', primary: true, disabled: true }],
+    },
+    '262ab951-4805-4d8f-a541-0ab79762fd94': {  // All Coastals Interprovincial 2024
+      hideGenericAdmin: true,
+      links: [{ to: null, label: '📊 Results Coming Soon', primary: true, disabled: true }],
+    },
+    '5e4785fe-1382-4d25-a8be-f18c820919e0': {  // HT Billfish Nationals 2024
+      hideGenericAdmin: true,
+      links: [{ to: null, label: '📊 Results Coming Soon', primary: true, disabled: true }],
+    },
     // ── 2023 historical imports — scoreboards coming soon ──────────────────
     '346d0d52-e2af-4675-97d9-d40ad32e168e': {  // Junior Gamefish Nationals 2023
       hideGenericAdmin: true,
