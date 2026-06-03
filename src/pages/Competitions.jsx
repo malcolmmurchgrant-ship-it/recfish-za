@@ -42,6 +42,23 @@ function getCompConfig(comp, canEnter) {
         { to: '/tuna-international-scores', label: '📊 Scoreboard', primary: true },
       ],
     },
+    // ── 2024 historical imports — scoreboards coming soon ──────────────────
+    '46b59df9-87ed-47aa-b853-3dc57e2bfc56': {  // EFSA Big Game 2024
+      hideGenericAdmin: true,
+      links: [{ to: null, label: '📊 Results Coming Soon', primary: true, disabled: true }],
+    },
+    'aca2ddb4-10d6-4aa9-8a62-a81f28dd4b39': {  // HT Billfish Interprovincial 2024
+      hideGenericAdmin: true,
+      links: [{ to: null, label: '📊 Results Coming Soon', primary: true, disabled: true }],
+    },
+    '099345fd-51d0-46b9-8d59-21345047e7c4': {  // Bottomfish International 2024
+      hideGenericAdmin: true,
+      links: [{ to: null, label: '📊 Results Coming Soon', primary: true, disabled: true }],
+    },
+    'f9a2cd2b-bbee-4bd3-9961-9bb5039d28af': {  // Bottomfish Nationals 2024
+      hideGenericAdmin: true,
+      links: [{ to: null, label: '📊 Results Coming Soon', primary: true, disabled: true }],
+    },
     // ── 2023 historical imports — scoreboards coming soon ──────────────────
     '346d0d52-e2af-4675-97d9-d40ad32e168e': {  // Junior Gamefish Nationals 2023
       hideGenericAdmin: true,
