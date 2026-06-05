@@ -75,6 +75,10 @@ function getCompConfig(comp, canEnter) {
       hideGenericAdmin: true,
       links: [{ to: null, label: '📊 Results Coming Soon', primary: true, disabled: true }],
     },
+    'ec9c5e41-a41a-4f2f-b8f6-75843b3b4f77': {  // Junior Gamefish Nationals 2026
+      hideGenericAdmin: false,
+      links: [{ to: null, label: '📊 Results Coming Soon', primary: true, disabled: true }],
+    },
     // ── 2025 historical imports — scoreboards coming soon ──────────────────
     'ad8d03e7-6d4d-4cea-b96b-1007d3c6127d': { hideGenericAdmin: true, links: [{ to: null, label: '📊 Results Coming Soon', primary: true, disabled: true }] },  // All Inland Interprov 2025
     '350c759c-fa02-48b1-9c77-bf3b40fff22f': { hideGenericAdmin: true, links: [{ to: null, label: '📊 Results Coming Soon', primary: true, disabled: true }] },  // Gamefish Nationals 2025
@@ -297,7 +301,7 @@ export default function Competitions() {
               </div>
 
               {/* Description */}
-              {comp.description && (
+              {comp.description && comp.description !== 'null' && (
                 <div style={{ fontSize: '0.82rem', color: '#374151', marginBottom: '0.75rem' }}>
                   {comp.description}
                 </div>
@@ -306,7 +310,7 @@ export default function Competitions() {
               {/* Action buttons */}
               <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
                 {links.map(link => (
-                  <button key={(link.to || '') + link.label}
+                  <button key={(link.to || link.label || Math.random())}
                     onClick={() => link.to && navigate(link.to)}
                     disabled={link.disabled}
                     style={{
