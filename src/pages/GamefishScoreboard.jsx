@@ -42,18 +42,27 @@ function fishPoints(weightKg, lineClass = LINE_CLASS) {
 }
 
 // Count distinct species for an angler's catches (billfish count, 0 pts)
+// Normalise: all Kingfish variants → __KINGFISH__, Other Tuna variants → __OTHER_TUNA__
+// Named tuna (Yellowfin, Bigeye etc.) count as their own species
+function normaliseSpecies(name) {
+  if (!name) return null
+  // Kingfish are separate species for multiplier counting purposes
+  // (they are released but still count distinctly)
+  if (name === 'Giant Kingfish (Ignobilis)') return '__GIANT_KINGFISH__'
+  if (name === 'Other Kingfish (Bluefin / Blacklip / Yellowspot etc.)') return '__OTHER_KINGFISH__'
+  if (name === 'Amberjack / Tropical Yellowtail')
+    return '__AMBERJACK__'
+  if (name.toLowerCase().startsWith('other tuna') || name === 'Other Tuna')
+    return '__OTHER_TUNA__'
+  return name
+}
+
 function anglerSpeciesCount(catches) {
   const species = new Set()
   ;(catches || []).forEach(c => {
     if (!c.species) return
-    if (['Giant Kingfish (Ignobilis)', 'Other Kingfish (Bluefin / Blacklip / Yellowspot etc.)'].includes(c.species))
-      species.add('__KINGFISH__')
-    else if (c.species === 'Amberjack / Tropical Yellowtail')
-      species.add('__AMBERJACK__')
-    else if (c.species.toLowerCase().includes('tuna') || c.species === 'Other Tuna')
-      species.add('__TUNA__')
-    else
-      species.add(c.species)
+    const norm = normaliseSpecies(c.species)
+    if (norm) species.add(norm)
   })
   return species.size
 }
@@ -82,14 +91,8 @@ function teamScore(rows, lineClass = LINE_CLASS) {
   rows.forEach(r => {
     ;(r.catches || []).forEach(c => {
       if (!c.species) return
-      if (['Giant Kingfish (Ignobilis)', 'Other Kingfish (Bluefin / Blacklip / Yellowspot etc.)'].includes(c.species))
-        allSpecies.add('__KINGFISH__')
-      else if (c.species === 'Amberjack / Tropical Yellowtail')
-        allSpecies.add('__AMBERJACK__')
-      else if (c.species.toLowerCase().includes('tuna') || c.species === 'Other Tuna')
-        allSpecies.add('__TUNA__')
-      else
-        allSpecies.add(c.species)
+      const norm = normaliseSpecies(c.species)
+      if (norm) allSpecies.add(norm)
     })
   })
   const species  = allSpecies.size
@@ -184,7 +187,7 @@ export default function GamefishScoreboard() {
     a.totalRaw  += anglerRawPoints(r.catches)
     a.totalMult += anglerMultipliedScore(r.catches)
     a.totalFish += r.fish_count || 0
-    a.totalKg   += (r.catches || []).reduce((s, c) => s + (parseFloat(c.weight_kg) || 0), 0)
+    a.totalKg   += (r.catches || []).reduce((s, c) => s + (c.weight_kg || 0), 0)
     a.daysEntered++
   })
   const anglerStandings = Object.values(anglerMap).sort((a, b) => b.totalMult - a.totalMult)
