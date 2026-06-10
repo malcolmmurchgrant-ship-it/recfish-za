@@ -188,7 +188,6 @@ function EditModal({ record, onSave, onClose }) {
                     }
                   }}>
                   <option value=''>Select species…</option>
-                  <option value='No Catch'>No Catch</option>
                   {SPECIES_GROUPS.map(g => (
                     <optgroup key={g.label} label={g.label}>
                       {g.species.map(s => <option key={s} value={s}>{s}</option>)}
@@ -404,6 +403,7 @@ function NewScorecardModal({ onSave, onClose }) {
                     }
                   }}>
                   <option value=''>Select species…</option>
+                  <option value='No Catch'>No Catch</option>
                   {SPECIES_GROUPS.map(g => (
                     <optgroup key={g.label} label={g.label}>
                       {g.species.map(s => <option key={s} value={s}>{s}</option>)}
