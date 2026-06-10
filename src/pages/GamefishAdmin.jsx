@@ -240,6 +240,204 @@ function EditModal({ record, onSave, onClose }) {
   )
 }
 
+
+// ─── NEW SCORECARD MODAL ──────────────────────────────────────────────────────
+function NewScorecardModal({ onSave, onClose }) {
+  const [day,       setDay]       = useState('')
+  const [team,      setTeam]      = useState('')
+  const [angler,    setAngler]    = useState('')
+  const [boat,      setBoat]      = useState('')
+  const [catches,   setCatches]   = useState([])
+  const [dq,        setDq]        = useState(false)
+  const [dqReason,  setDqReason]  = useState('')
+  const [saving,    setSaving]    = useState(false)
+  const [error,     setError]     = useState('')
+
+  const teamAnglers = TEAMS[team]?.anglers || []
+  const teamBoat    = TEAMS[team]?.boat     || ''
+  const teamSkipper = TEAMS[team]?.skipper  || ''
+
+  // Auto-fill boat when team selected
+  const handleTeamChange = (t) => {
+    setTeam(t)
+    setAngler('')
+    setBoat(TEAMS[t]?.boat || '')
+  }
+
+  const addFish = () => {
+    if (catches.length >= 10) return
+    setCatches(prev => [...prev, { species: '', weight_kg: '', billfish: false, kingfish_release: false, measured_400mm: false, min_weight: 3 }])
+  }
+
+  const updateFish = (i, fish) => setCatches(prev => prev.map((f, idx) => idx === i ? fish : f))
+  const removeFish = (i)       => setCatches(prev => prev.filter((_, idx) => idx !== i))
+
+  const validCatches = catches.filter(c =>
+    c.species && (c.billfish || (c.kingfish_release && c.measured_400mm) || (parseFloat(c.weight_kg) || 0) >= (c.min_weight || 3))
+  )
+
+  const totalPoints = validCatches
+    .filter(c => !c.billfish)
+    .reduce((sum, c) => sum + (c.kingfish_release ? 5 : calcFishPoints(parseFloat(c.weight_kg))), 0)
+
+  const handleSave = async () => {
+    if (!day)    { setError('Please select a day.');    return }
+    if (!team)   { setError('Please select a team.');   return }
+    if (!angler) { setError('Please select an angler.'); return }
+    if (dq && !dqReason.trim()) { setError('Please enter a disqualification reason.'); return }
+    setSaving(true); setError('')
+    const { error: err } = await supabase.from('gamefish_catches').insert({
+      competition_id:      COMPETITION_ID,
+      angler_name:         angler,
+      team_name:           team,
+      boat_name:           boat,
+      day_number:          parseInt(day),
+      catches:             validCatches,
+      total_points:        parseFloat(totalPoints.toFixed(2)),
+      fish_count:          validCatches.length,
+      disqualified:        dq,
+      disqualified_reason: dq ? dqReason.trim() : null,
+    })
+    if (err) { setError(err.message); setSaving(false); return }
+    setSaving(false)
+    onSave()
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 1000, overflowY: 'auto', padding: '1rem' }}>
+      <div style={{ background: 'white', borderRadius: 10, padding: '1.5rem', maxWidth: 700, width: '100%', marginTop: '2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <div style={{ fontWeight: 700, fontSize: '1.05rem', color: NAVY }}>+ New Scorecard</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: GREY }}>✕</button>
+        </div>
+
+        {/* Day / Team / Angler selectors */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
+          <div>
+            <label style={S.label}>Day</label>
+            <select style={S.select} value={day} onChange={e => setDay(e.target.value)}>
+              <option value=''>Select day…</option>
+              {DAYS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={S.label}>Team</label>
+            <select style={S.select} value={team} onChange={e => handleTeamChange(e.target.value)}>
+              <option value=''>Select team…</option>
+              {Object.keys(TEAMS).map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={S.label}>Angler</label>
+            <select style={S.select} value={angler} onChange={e => setAngler(e.target.value)} disabled={!team}>
+              <option value=''>Select angler…</option>
+              {teamAnglers.map(a => <option key={a} value={a}>{a}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={S.label}>Boat</label>
+            <input style={S.input} value={boat} onChange={e => setBoat(e.target.value)} placeholder='Boat name…' />
+          </div>
+        </div>
+
+        {/* DQ toggle */}
+        <div style={{ background: dq ? '#fef2f2' : '#f9fafb', border: `1px solid ${dq ? '#fca5a5' : '#e5e7eb'}`, borderRadius: 8, padding: '0.75rem 1rem', marginBottom: '1rem' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: 700, color: dq ? RED : '#374151' }}>
+            <input type='checkbox' checked={dq} onChange={e => setDq(e.target.checked)} />
+            🚫 Mark as Disqualified
+          </label>
+          {dq && (
+            <input style={{ ...S.input, marginTop: '0.5rem', borderColor: RED }}
+              placeholder='Disqualification reason (required)…'
+              value={dqReason} onChange={e => setDqReason(e.target.value)} />
+          )}
+        </div>
+
+        {/* Catches */}
+        <div style={{ marginBottom: '1rem' }}>
+          <div style={{ fontWeight: 700, color: NAVY, marginBottom: '0.5rem' }}>Catches</div>
+          {catches.map((fish, i) => {
+            const sp   = ALL_SPECIES.find(s => s.name === fish.species)
+            const isKF = sp?.kingfish || fish.kingfish_release
+            const pts  = fish.billfish ? 0 : isKF ? 5 : calcFishPoints(parseFloat(fish.weight_kg) || 0)
+            return (
+              <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: '0.5rem', alignItems: 'center', padding: '0.4rem', background: '#f9fafb', borderRadius: 6, marginBottom: '0.3rem', border: '1px solid #e5e7eb' }}>
+                <select style={{ ...S.select, fontSize: '0.82rem', padding: '0.35rem 0.5rem' }}
+                  value={fish.species || ''}
+                  onChange={e => {
+                    const val = e.target.value
+                    const sp2 = ALL_SPECIES.find(s => s.name === val)
+                    const isKF2 = sp2?.kingfish || false
+                    if (isKF2) {
+                      updateFish(i, { ...fish, species: val, billfish: false, kingfish_release: true, measured_400mm: false, weight_kg: '', min_weight: 3 })
+                    } else {
+                      updateFish(i, { ...fish, species: val, billfish: sp2?.billfish || false, kingfish_release: false, weight_kg: fish.weight_kg, min_weight: sp2?.minWeight || 3 })
+                    }
+                  }}>
+                  <option value=''>Select species…</option>
+                  {SPECIES_GROUPS.map(g => (
+                    <optgroup key={g.label} label={g.label}>
+                      {g.species.map(s => <option key={s} value={s}>{s}</option>)}
+                    </optgroup>
+                  ))}
+                </select>
+                <input type='number' step='0.1' min='0' placeholder='kg'
+                  value={fish.weight_kg || ''}
+                  disabled={fish.billfish || isKF}
+                  onChange={e => updateFish(i, { ...fish, weight_kg: e.target.value })}
+                  style={{ ...S.input, fontSize: '0.85rem', padding: '0.35rem 0.5rem', background: (fish.billfish || isKF) ? '#f3f4f6' : 'white' }} />
+                <div style={{ textAlign: 'center', fontSize: '0.85rem' }}>
+                  {fish.billfish ? <span style={S.badge(GOLD)}>OB</span>
+                    : isKF ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                        <span style={S.badge(fish.measured_400mm ? '#7c3aed' : GREY)}>5 pts 📸</span>
+                        <label style={{ fontSize: '0.65rem', color: fish.measured_400mm ? '#7c3aed' : RED, display: 'flex', alignItems: 'center', gap: 2, cursor: 'pointer' }}>
+                          <input type='checkbox' checked={!!fish.measured_400mm} onChange={e => updateFish(i, { ...fish, measured_400mm: e.target.checked })} />
+                          ≥400mm
+                        </label>
+                      </div>
+                    ) : (
+                      <div>
+                        <div style={{ fontWeight: 700, color: NAVY }}>{pts > 0 ? pts.toFixed(2) : '—'}</div>
+                        <div style={{ fontSize: '0.68rem', color: GREY }}>pts</div>
+                      </div>
+                    )}
+                </div>
+                <button onClick={() => removeFish(i)} style={{ background: '#fef2f2', color: RED, border: 'none', borderRadius: 4, padding: '0.3rem 0.6rem', cursor: 'pointer' }}>✕</button>
+              </div>
+            )
+          })}
+          {catches.length < 10 && (
+            <button onClick={addFish} style={{ ...S.btn(GREEN), marginTop: '0.25rem', fontSize: '0.82rem' }}>+ Add Fish</button>
+          )}
+        </div>
+
+        {/* Summary */}
+        <div style={{ background: '#eff6ff', borderRadius: 6, padding: '0.6rem 1rem', marginBottom: '1rem', display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '0.68rem', color: GREY, textTransform: 'uppercase' }}>Fish</div>
+            <div style={{ fontWeight: 700, fontSize: '1.1rem', color: GREEN }}>{validCatches.length}</div>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '0.68rem', color: GREY, textTransform: 'uppercase' }}>Raw Pts</div>
+            <div style={{ fontWeight: 700, fontSize: '1.1rem', color: NAVY }}>{totalPoints.toFixed(2)}</div>
+          </div>
+          {dq && <span style={{ ...S.badge(RED), alignSelf: 'center', fontSize: '0.82rem' }}>🚫 DISQUALIFIED</span>}
+        </div>
+
+        {error && <div style={{ background: '#fef2f2', color: RED, padding: '0.6rem', borderRadius: 6, marginBottom: '0.75rem' }}>{error}</div>}
+
+        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={S.btn('#f3f4f6', '#374151')}>Cancel</button>
+          <button onClick={handleSave} disabled={saving} style={{ ...S.btn(), opacity: saving ? 0.6 : 1 }}>
+            {saving ? 'Saving…' : '💾 Save Scorecard'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 export default function GamefishAdmin() {
   const { user } = useAuth()
@@ -251,6 +449,7 @@ export default function GamefishAdmin() {
   const [dayFilter,  setDayFilter]  = useState('all')
   const [teamFilter, setTeamFilter] = useState('all')
   const [editing,        setEditing]        = useState(null)
+  const [creating,       setCreating]       = useState(false)
   const [resultsReleased, setResultsReleased] = useState(false)
   const [togglingRelease, setTogglingRelease] = useState(false)
 
@@ -333,6 +532,10 @@ export default function GamefishAdmin() {
           <button onClick={load} disabled={loading}
             style={{ background: 'rgba(255,255,255,0.15)', color: 'white', border: '1px solid rgba(255,255,255,0.4)', padding: '0.4rem 0.9rem', borderRadius: 6, cursor: 'pointer', fontSize: '0.82rem' }}>
             {loading ? '⟳ Loading…' : '⟳ Refresh'}
+          </button>
+          <button onClick={() => setCreating(true)}
+            style={{ background: GREEN, color: 'white', border: 'none', padding: '0.4rem 0.9rem', borderRadius: 6, cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
+            + New Scorecard
           </button>
         </div>
         <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
@@ -453,6 +656,14 @@ export default function GamefishAdmin() {
       )}
 
 
+
+      {/* New Scorecard Modal */}
+      {creating && (
+        <NewScorecardModal
+          onSave={() => { setCreating(false); load() }}
+          onClose={() => setCreating(false)}
+        />
+      )}
 
       {/* Edit Modal */}
       {editing && (
