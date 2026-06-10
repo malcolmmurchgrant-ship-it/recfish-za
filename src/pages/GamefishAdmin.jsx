@@ -35,7 +35,7 @@ const DAYS = [
 
 const SPECIES_GROUPS = [
   { label: 'Billfish (no weight points — multiplier only)', billfish: true, species: ['Black Marlin','Blue Marlin','Striped Marlin','White Marlin','Sailfish','Shortbill Spearfish','Broadbill Swordfish','Other Billfish (specify in notes)'] },
-  { label: 'Tuna (min 5kg)', species: ['Yellowfin Tuna','Bigeye Tuna','Bluefin Tuna','Dogtooth Tuna','Longfin Tuna (Albacore)','Other Tuna'] },
+  { label: 'Tuna (min 5kg)', species: ['Yellowfin Tuna','Bigeye Tuna','Bluefin Tuna','Dogtooth Tuna','Longfin Tuna (Albacore)','Skipjack Tuna','Other Tuna'] },
   { label: 'Kingfish (photographed & released — 5pts) / Amberjack (min 3kg)', species: ['Giant Kingfish (Ignobilis)','Other Kingfish (Bluefin / Blacklip / Yellowspot etc.)','Amberjack / Tropical Yellowtail'] },
   { label: 'Other Gamefish (min 3kg)', species: ['Wahoo','Dorado','Cobia (Prodigal Son)','Garrick (Leervis)','Great Barracuda','King Mackerel (Cuta)','Queen Mackerel','Queenfish','Rainbow Runner','Green Jobfish (Kakaap)','Yellowtail (Cape)','Elf / Shad','Cape Snoek','Bonito','Other Gamefish (specify in notes)'] },
 ]
@@ -65,12 +65,30 @@ const S = {
   badge:  (col) => ({ background: col, color: 'white', padding: '0.15rem 0.5rem', borderRadius: 20, fontSize: '0.72rem', fontWeight: 700 }),
 }
 
+// ── Species short display name ───────────────────────────────────────────────
+function speciesShort(name) {
+  if (!name) return ''
+  const map = {
+    'Giant Kingfish (Ignobilis)':                            'Giant Kingfish',
+    'Other Kingfish (Bluefin / Blacklip / Yellowspot etc.)': 'Other Kingfish',
+    'Amberjack / Tropical Yellowtail':                       'Amberjack',
+    'King Mackerel (Cuta)':                                  'King Mackerel',
+    'Longfin Tuna (Albacore)':                               'Longfin Tuna',
+    'Cobia (Prodigal Son)':                                  'Cobia',
+    'Garrick (Leervis)':                                     'Garrick',
+    'Other Billfish (specify in notes)':                     'Other Billfish',
+    'Other Gamefish (specify in notes)':                     'Other Gamefish',
+  }
+  return map[name] || name.replace(/ \(.*?\)$/, '').trim()
+}
+
 // ─── EDIT MODAL ───────────────────────────────────────────────────────────────
 function EditModal({ record, onSave, onClose }) {
   const [catches,    setCatches]    = useState(record.catches || [])
   const [recordNote, setRecordNote] = useState(record.record_note || '')
   const [dq,         setDq]         = useState(record.disqualified || false)
   const [dqReason,   setDqReason]   = useState(record.disqualified_reason || '')
+  const [boatName,   setBoatName]   = useState(record.boat_name || '')
   const [saving,     setSaving]     = useState(false)
   const [error,      setError]      = useState('')
 
@@ -99,6 +117,7 @@ function EditModal({ record, onSave, onClose }) {
       catches:               validCatches,
       total_points:          parseFloat(totalPoints.toFixed(2)),
       fish_count:            fishCount,
+      boat_name:             boatName.trim() || null,
       record_note:           recordNote,
       disqualified:          dq,
       disqualified_reason:   dq ? dqReason.trim() : null,
@@ -136,6 +155,14 @@ function EditModal({ record, onSave, onClose }) {
               onChange={e => setDqReason(e.target.value)}
             />
           )}
+        </div>
+
+        {/* Boat */}
+        <div style={{ marginBottom: '1rem' }}>
+          <label style={S.label}>Boat Name</label>
+          <input style={S.input} value={boatName}
+            onChange={e => setBoatName(e.target.value)}
+            placeholder='Boat name…' />
         </div>
 
         {/* Catches */}
@@ -639,7 +666,7 @@ export default function GamefishAdmin() {
                   <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
                     {c.catches.filter(f => f.species).map((f, i) => (
                       <span key={i} style={S.badge(f.billfish ? GOLD : f.kingfish_release ? '#7c3aed' : '#374151')}>
-                        {f.species.split(' ')[0]} {f.billfish ? '(OB)' : f.kingfish_release ? '📸' : `${f.weight_kg}kg`}
+                        {speciesShort(f.species)} {f.billfish ? '(OB)' : f.kingfish_release ? '📸' : `${f.weight_kg}kg`}
                       </span>
                     ))}
                   </div>

@@ -55,6 +55,7 @@ const SPECIES_GROUPS = [
       'Bluefin Tuna',
       'Dogtooth Tuna',
       'Longfin Tuna (Albacore)',
+      'Skipjack Tuna',
       'Other Tuna',
     ]
   },
