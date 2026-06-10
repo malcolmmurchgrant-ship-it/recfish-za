@@ -112,6 +112,23 @@ const S = {
 }
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
+// ── Species short display name ───────────────────────────────────────────────
+function speciesShort(name) {
+  if (!name) return ''
+  const map = {
+    'Giant Kingfish (Ignobilis)':                            'Giant Kingfish',
+    'Other Kingfish (Bluefin / Blacklip / Yellowspot etc.)': 'Other Kingfish',
+    'Amberjack / Tropical Yellowtail':                       'Amberjack',
+    'King Mackerel (Cuta)':                                  'King Mackerel',
+    'Longfin Tuna (Albacore)':                               'Longfin Tuna',
+    'Cobia (Prodigal Son)':                                  'Cobia',
+    'Garrick (Leervis)':                                     'Garrick',
+    'Other Billfish (specify in notes)':                     'Other Billfish',
+    'Other Gamefish (specify in notes)':                     'Other Gamefish',
+  }
+  return map[name] || name.replace(/ \(.*?\)$/, '').trim()
+}
+
 export default function GamefishScoreboard() {
   const [catches,        setCatches]        = useState([])
   const [sessions,       setSessions]       = useState([])
@@ -332,23 +349,6 @@ export default function GamefishScoreboard() {
           )}
 
           {/* ── ANGLER STANDINGS ── */}
-// ── Species short display name ───────────────────────────────────────────────
-function speciesShort(name) {
-  if (!name) return ''
-  const map = {
-    'Giant Kingfish (Ignobilis)':                           'Giant Kingfish',
-    'Other Kingfish (Bluefin / Blacklip / Yellowspot etc.)':'Other Kingfish',
-    'Amberjack / Tropical Yellowtail':                      'Amberjack',
-    'King Mackerel (Cuta)':                                 'King Mackerel',
-    'Longfin Tuna (Albacore)':                              'Longfin Tuna',
-    'Cobia (Prodigal Son)':                                 'Cobia',
-    'Garrick (Leervis)':                                    'Garrick',
-    'Other Billfish (specify in notes)':                    'Other Billfish',
-    'Other Gamefish (specify in notes)':                    'Other Gamefish',
-  }
-  return map[name] || name.replace(/ \(.*\)$/, '').replace(/^Other /, 'Other ')
-}
-
           {activeTab === 'angler' && (
             <div style={S.card}>
               <div style={{ fontWeight: 700, color: NAVY, marginBottom: '0.25rem' }}>Individual Angler Standings</div>
