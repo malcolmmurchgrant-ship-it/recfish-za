@@ -152,12 +152,12 @@ export default function GamefishScoreboard() {
         .eq('competition_id', COMPETITION_ID).order('day_number'),
       supabase.from('competition_fishing_sessions').select('*')
         .eq('competition_id', COMPETITION_ID),
-      supabase.from('competitions').select('results_released, scorer_pin')
+      supabase.from('competitions').select('results_visible, scorer_pin')
         .eq('id', COMPETITION_ID).single(),
     ])
     setCatches(c || [])
     setSessions(s || [])
-    if (cfg?.results_released) setResultsVisible(true)
+    if (cfg?.results_visible) setResultsVisible(true)
     setLastRefresh(new Date())
     setLoading(false)
   }, [])

@@ -496,19 +496,19 @@ export default function GamefishAdmin() {
       })
   }, [user])
 
-  // ── Load results_released status ────────────────────────────────────────────
+  // ── Load results_visible status ────────────────────────────────────────────
   useEffect(() => {
     if (!authorised) return
-    supabase.from('competitions').select('results_released')
+    supabase.from('competitions').select('results_visible')
       .eq('id', COMPETITION_ID).single()
-      .then(({ data }) => { if (data) setResultsReleased(data.results_released || false) })
+      .then(({ data }) => { if (data) setResultsReleased(data.results_visible || false) })
   }, [authorised])
 
   const toggleRelease = async () => {
     setTogglingRelease(true)
     const newVal = !resultsReleased
     await supabase.from('competitions')
-      .update({ results_released: newVal })
+      .update({ results_visible: newVal })
       .eq('id', COMPETITION_ID)
     setResultsReleased(newVal)
     setTogglingRelease(false)
