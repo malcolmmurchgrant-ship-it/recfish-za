@@ -14,12 +14,16 @@ const GREY  = '#6b7280'
 const TEAMS = {
   'Border':               { captain: 'Tim Wood',           boat: 'ROUGH RIDER',   skipper: 'Arny Nice' },
   'Southern Gauteng Red': { captain: 'Wesley Uys',         boat: 'JOY TOY',       skipper: 'Patat de Jager' },
-  'Southern Gauteng Blue':{ captain: 'Dirk Rosslee',       boat: 'PIROMERO',      skipper: 'Andries Oosthuizen' },
+  'Southern Gauteng Blue':{ captain: 'Dirk Rosslee',       boat: 'PIROMEROMI',    skipper: 'Andries Oosthuizen' },
   'SADSAA U21':           { captain: 'Francois Rossouw',   boat: 'HOWZIE',        skipper: 'Paul Howells' },
-  'Northern Gauteng':     { captain: 'Ryno Le Grange',     boat: 'WALAALAHA',     skipper: 'Riaan Odendaal' },
+  'Northern Gauteng':     { captain: 'Ryno Le Grange',     boat: 'WALAALAHA',     skipper: 'Riaan Odendaal',
+                            boats: [
+                              { boat: 'WALAALAHA',    skipper: 'Riaan Odendaal', days: [1,2,3] },
+                              { boat: 'CAPTAIN FINE', skipper: 'Michael Fourie', days: [4,5]   },
+                            ]},
   'Zululand Black':       { captain: 'Giepie Joubert',     boat: 'GIEPSTER',      skipper: 'Giepie Joubert' },
   'Zululand White':       { captain: 'Marius Botha',       boat: 'ADDICTED',      skipper: 'Marius Botha' },
-  'Natal':                { captain: 'Alex Tyldesley',     boat: 'BLOOD DIAMOND', skipper: 'Struan Blight' },
+  'Natal':                { captain: 'Alex Tyldesley',     boat: 'DWALISA',       skipper: 'Keagan le Grange' },
   'Mpumalanga':           { captain: 'Ricus van Heerden',  boat: 'PIRATE',        skipper: 'Nicky Venter' },
 }
 
@@ -209,12 +213,25 @@ export default function GamefishScoreboard() {
   })
   const anglerStandings = Object.values(anglerMap).sort((a, b) => b.totalMult - a.totalMult)
 
-  // ── Skipper standings (same order as team) ────────────────────────────────
-  const skipperStandings = teamStandings.map(t => ({
-    ...t,
-    skipper: TEAMS[t.name]?.skipper,
-    boat:    TEAMS[t.name]?.boat,
-  }))
+  // ── Skipper standings ────────────────────────────────────────────────────
+  // For teams with multiple boats (e.g. NG), split into separate skipper entries
+  const skipperStandings = (() => {
+    const entries = []
+    teamStandings.forEach(t => {
+      const info = TEAMS[t.name]
+      if (info?.boats) {
+        // Multi-boat team — one entry per boat/skipper
+        info.boats.forEach(b => {
+          const dayScores = t.dayScores.filter(d => b.days.includes(d.day))
+          const total = dayScores.reduce((s, d) => s + d.total, 0)
+          entries.push({ name: t.name, skipper: b.skipper, boat: b.boat, totalScore: total, dayScores })
+        })
+      } else {
+        entries.push({ ...t, skipper: info?.skipper, boat: info?.boat })
+      }
+    })
+    return entries.sort((a, b) => b.totalScore - a.totalScore)
+  })()
 
   // ── CPUE ──────────────────────────────────────────────────────────────────
   const cpueData = catches.map(r => {
@@ -411,7 +428,7 @@ export default function GamefishScoreboard() {
               {skipperStandings.map((t, i) => {
                 const pos = i + 1
                 return (
-                  <div key={t.name} style={{ ...S.medal(pos), borderRadius: 8, padding: '0.75rem 1rem', marginBottom: '0.4rem' }}>
+                  <div key={`${t.name}-${t.skipper}`} style={{ ...S.medal(pos), borderRadius: 8, padding: '0.75rem 1rem', marginBottom: '0.4rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                       <span style={{ fontWeight: 700, minWidth: 28 }}>{S.icon(pos)}</span>
                       <div style={{ flex: 1, minWidth: 140 }}>
