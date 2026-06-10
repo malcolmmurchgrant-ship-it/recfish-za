@@ -188,6 +188,7 @@ function EditModal({ record, onSave, onClose }) {
                     }
                   }}>
                   <option value=''>Select species…</option>
+                  <option value='No Catch'>No Catch</option>
                   {SPECIES_GROUPS.map(g => (
                     <optgroup key={g.label} label={g.label}>
                       {g.species.map(s => <option key={s} value={s}>{s}</option>)}
@@ -300,7 +301,7 @@ function NewScorecardModal({ onSave, onClose }) {
   const removeFish = (i)       => setCatches(prev => prev.filter((_, idx) => idx !== i))
 
   const validCatches = catches.filter(c =>
-    c.species && (c.billfish || (c.kingfish_release && c.measured_400mm) || (parseFloat(c.weight_kg) || 0) >= (c.min_weight || 3))
+    c.species && c.species !== 'No Catch' && (c.billfish || (c.kingfish_release && c.measured_400mm) || (parseFloat(c.weight_kg) || 0) >= (c.min_weight || 3))
   )
 
   const totalPoints = validCatches
@@ -311,6 +312,7 @@ function NewScorecardModal({ onSave, onClose }) {
     if (!day)    { setError('Please select a day.');    return }
     if (!team)   { setError('Please select a team.');   return }
     if (!angler) { setError('Please select an angler.'); return }
+    if (!dq && catches.length === 0) { setError('Add at least one catch, or mark as DQ for empty scorecards.'); return }
     if (dq && !dqReason.trim()) { setError('Please enter a disqualification reason.'); return }
     setSaving(true); setError('')
     const { error: err } = await supabase.from('gamefish_catches').insert({
