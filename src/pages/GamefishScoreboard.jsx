@@ -187,7 +187,7 @@ export default function GamefishScoreboard() {
     a.totalRaw  += anglerRawPoints(r.catches)
     a.totalMult += anglerMultipliedScore(r.catches)
     a.totalFish += r.fish_count || 0
-    a.totalKg   += (r.catches || []).reduce((s, c) => s + (c.weight_kg || 0), 0)
+    a.totalKg   += (r.catches || []).reduce((s, c) => s + (parseFloat(c.weight_kg) || 0), 0)
     a.daysEntered++
   })
   const anglerStandings = Object.values(anglerMap).sort((a, b) => b.totalMult - a.totalMult)
@@ -332,6 +332,23 @@ export default function GamefishScoreboard() {
           )}
 
           {/* ── ANGLER STANDINGS ── */}
+// ── Species short display name ───────────────────────────────────────────────
+function speciesShort(name) {
+  if (!name) return ''
+  const map = {
+    'Giant Kingfish (Ignobilis)':                           'Giant Kingfish',
+    'Other Kingfish (Bluefin / Blacklip / Yellowspot etc.)':'Other Kingfish',
+    'Amberjack / Tropical Yellowtail':                      'Amberjack',
+    'King Mackerel (Cuta)':                                 'King Mackerel',
+    'Longfin Tuna (Albacore)':                              'Longfin Tuna',
+    'Cobia (Prodigal Son)':                                 'Cobia',
+    'Garrick (Leervis)':                                    'Garrick',
+    'Other Billfish (specify in notes)':                    'Other Billfish',
+    'Other Gamefish (specify in notes)':                    'Other Gamefish',
+  }
+  return map[name] || name.replace(/ \(.*\)$/, '').replace(/^Other /, 'Other ')
+}
+
           {activeTab === 'angler' && (
             <div style={S.card}>
               <div style={{ fontWeight: 700, color: NAVY, marginBottom: '0.25rem' }}>Individual Angler Standings</div>
@@ -461,7 +478,7 @@ export default function GamefishScoreboard() {
                                   <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', marginTop: 4 }}>
                                     {r.catches.filter(c => c.species).map((c, ci) => (
                                       <span key={ci} style={S.badge(c.billfish ? GOLD : '#374151')}>
-                                        {c.species.split(' ')[0]} {c.billfish ? '(OB)' : `${c.weight_kg}kg`}
+                                        {speciesShort(c.species)} {c.billfish ? '(OB)' : c.kingfish_release ? '📸' : `${c.weight_kg}kg`}
                                       </span>
                                     ))}
                                   </div>
