@@ -123,7 +123,7 @@ export default function LogCatch() {
         speciesName = `${speciesName} (${sexVariant})`
       }
       
-      const formula = await getFormulaByCatalogueName(supabase, speciesName, lengthType)
+      const formula = await getFormulaByCatalogueName(supabase, speciesName, lengthType, selectedSpecies?.scientific_name)
 
       if (!formula) {
         setAutoWeight(null)
@@ -185,7 +185,8 @@ export default function LogCatch() {
           `catalogue_name.ilike.%${searchTerm}%,` +
           `common_name.ilike.%${searchTerm}%,` +
           `scientific_name.ilike.%${searchTerm}%,` +
-          `afrikaans_name.ilike.%${searchTerm}%`
+          `afrikaans_name.ilike.%${searchTerm}%,` +
+          `other_names.cs.["${searchTerm}"]`
         )
         .limit(20)
 

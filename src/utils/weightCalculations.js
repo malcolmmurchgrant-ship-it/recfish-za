@@ -89,31 +89,64 @@ export async function getFormulaForSpecies(supabase, scientificName, measureType
  * @param {string} measureType - Measurement type (TL, FL, etc.)
  * @returns {object|null} Formula object or null
  */
-export async function getFormulaByCatalogueName(supabase, catalogueName, measureType = 'TL') {
-  console.log('🔍 getFormulaByCatalogueName called with:', { catalogueName, measureType });
+export async function getFormulaByCatalogueName(supabase, catalogueName, measureType = 'TL', scientificName = null) {
+  console.log('🔍 getFormulaByCatalogueName called with:', { catalogueName, measureType, scientificName });
   
   try {
+    // ── Primary lookup: by catalogue name ──────────────────────────────────
     const { data, error } = await supabase
       .from('length_weight_formulas')
       .select('*')
       .eq('catalogue_name', catalogueName)
       .eq('measure_type', measureType)
-      .maybeSingle(); // Use maybeSingle() instead of single() to avoid 406 errors
+      .maybeSingle();
     
-    console.log('📊 Supabase response:', { data, error });
+    console.log('📊 Supabase response (catalogue name):', { data, error });
     
-    if (error) {
-      console.warn(`⚠️ No formula found for ${catalogueName} (${measureType}):`, error);
-      return null;
+    if (!error && data) {
+      console.log('✅ Formula found by catalogue name:', data);
+      return data;
     }
-    
-    if (!data) {
-      console.warn(`⚠️ No data returned for ${catalogueName} (${measureType})`);
-      return null;
+
+    // ── Fallback: by scientific name ────────────────────────────────────────
+    // Triggered when catalogue name lookup returns null or errors — e.g. when
+    // the length_weight_formulas catalogue_name doesn't exactly match the
+    // species table catalogue_name (capitalisation, spacing, abbreviation).
+    if (scientificName) {
+      console.warn(`⚠️ No formula for catalogue name "${catalogueName}" (${measureType}) — trying scientific name fallback: ${scientificName}`);
+      
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('length_weight_formulas')
+        .select('*')
+        .eq('scientific_name', scientificName)
+        .eq('measure_type', measureType)
+        .maybeSingle();
+      
+      if (!fallbackError && fallbackData) {
+        console.log('✅ Formula found by scientific name fallback:', fallbackData);
+        return fallbackData;
+      }
+
+      // ── Second fallback: any measure type for this scientific name ────────
+      // If the requested measure type (e.g. FL) has no formula but TL does,
+      // return the best available rather than nothing.
+      console.warn(`⚠️ No formula for ${scientificName} (${measureType}) — trying any measure type`);
+      const { data: anyMeasureData, error: anyMeasureError } = await supabase
+        .from('length_weight_formulas')
+        .select('*')
+        .eq('scientific_name', scientificName)
+        .order('measure_type') // TL sorts before FL — prefer TL
+        .limit(1)
+        .maybeSingle();
+
+      if (!anyMeasureError && anyMeasureData) {
+        console.warn(`ℹ️ Using ${anyMeasureData.measure_type} formula as fallback for requested ${measureType}`);
+        return { ...anyMeasureData, _fallbackMeasureType: anyMeasureData.measure_type };
+      }
     }
-    
-    console.log('✅ Formula found successfully:', data);
-    return data;
+
+    console.warn(`⚠️ No formula found for "${catalogueName}" / "${scientificName}" (${measureType})`);
+    return null;
   } catch (err) {
     console.error('❌ Error fetching formula:', err);
     return null;
