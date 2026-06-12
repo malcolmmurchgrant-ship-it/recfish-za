@@ -50,7 +50,8 @@ export default function SpeciesLookup() {
           `catalogue_name.ilike.%${searchTerm}%,` +
           `common_name.ilike.%${searchTerm}%,` +
           `scientific_name.ilike.%${searchTerm}%,` +
-          `afrikaans_name.ilike.%${searchTerm}%`
+          `afrikaans_name.ilike.%${searchTerm}%,` +
+          `other_names.cs.["${searchTerm}"]`
         )
       }
 
@@ -59,6 +60,18 @@ export default function SpeciesLookup() {
       if (error) throw error
 
       let results = data || []
+
+      // Also catch partial matches inside other_names (Supabase cs only matches exact elements)
+      if (searchTerm) {
+        const term = searchTerm.toLowerCase()
+        const fromOtherNames = (data || []).filter(sp =>
+          Array.isArray(sp.other_names) &&
+          sp.other_names.some(n => n.toLowerCase().includes(term))
+        )
+        // Merge without duplicates
+        const ids = new Set(results.map(s => s.id))
+        fromOtherNames.forEach(sp => { if (!ids.has(sp.id)) results.push(sp) })
+      }
 
       if (showFavoritesOnly && user) {
         results = results.filter(sp => favorites.has(sp.id))
@@ -384,7 +397,7 @@ export default function SpeciesLookup() {
       <div style={{ marginBottom: '2rem' }}>
         <input
           type="text"
-          placeholder="Search by name (English, Afrikaans, scientific)..."
+          placeholder="Search by name (English, Afrikaans, other common names, scientific)..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           style={{
@@ -495,11 +508,18 @@ export default function SpeciesLookup() {
                   }}>
                     {sp.scientific_name}
                   </p>
-                  {sp.common_name && sp.catalogue_name && sp.common_name !== sp.catalogue_name && (
-                    <p style={{ fontSize: '0.875rem', color: '#6366f1' }}>
-                      Also: {sp.common_name}
-                    </p>
-                  )}
+                  {(() => {
+                    const altNames = []
+                    if (sp.common_name && sp.catalogue_name && sp.common_name !== sp.catalogue_name)
+                      altNames.push(sp.common_name)
+                    if (Array.isArray(sp.other_names))
+                      altNames.push(...sp.other_names)
+                    return altNames.length > 0 ? (
+                      <p style={{ fontSize: '0.875rem', color: '#6366f1', marginBottom: '0.25rem' }}>
+                        Also: {altNames.join(', ')}
+                      </p>
+                    ) : null
+                  })()}
                   {sp.afrikaans_name && (
                     <p style={{ fontSize: '0.875rem', color: '#059669' }}>
                       {sp.afrikaans_name}
@@ -621,8 +641,14 @@ export default function SpeciesLookup() {
             )}
 
             {selectedSpecies.afrikaans_name && (
-              <p style={{ marginBottom: '1rem', color: '#059669' }}>
+              <p style={{ marginBottom: '0.5rem', color: '#059669' }}>
                 <strong>Afrikaans:</strong> {selectedSpecies.afrikaans_name}
+              </p>
+            )}
+
+            {Array.isArray(selectedSpecies.other_names) && selectedSpecies.other_names.length > 0 && (
+              <p style={{ marginBottom: '1rem', color: '#6366f1' }}>
+                <strong>Other Names:</strong> {selectedSpecies.other_names.join(', ')}
               </p>
             )}
 
