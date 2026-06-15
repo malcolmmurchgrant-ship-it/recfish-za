@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation, useParams } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { AuthProvider } from './contexts/AuthContext'
 import { SessionProvider, useSession } from './contexts/SessionContext'
@@ -12,7 +12,7 @@ import CatchMap from './pages/CatchMap'
 import Sessions from './pages/Sessions'
 import SpeciesLookup from './pages/SpeciesLookup'
 import Competitions from './pages/Competitions'
-import CompetitionAdmin from './pages/CompetitionAdmin'
+import CompetitionAdmin from './components/CompetitionAdmin'
 import CompetitionCatchLogger from './pages/CompetitionCatchLogger'
 import AllCoastalsCatchLogger from './pages/AllCoastalsCatchLogger'
 import AllCoastalsScoreboard from './pages/AllCoastalsScoreboard'
@@ -193,6 +193,12 @@ function Navigation() {
   )
 }
 
+// Wrapper reads :competitionId from URL and passes it as a prop
+function CompetitionAdminPage() {
+  const { competitionId } = useParams()
+  return <CompetitionAdmin competitionId={competitionId} />
+}
+
 function AppContent() {
   const { lastEndedSession, clearLastEndedSession } = useSession()
   return (
@@ -216,8 +222,8 @@ function AppContent() {
             <Route path='/allcoastals-scores'   element={<AllCoastalsScoreboard />} />
             <Route path='/allcoastals-admin'    element={<AllCoastalsAdmin />} />
             <Route path='/allcoastals-teams'    element={<AllCoastalsTeams />} />
-            <Route path='/competition-admin-v2' element={<CompetitionAdmin />} />
-            <Route path='/competition-admin-v2/:competitionId' element={<CompetitionAdmin />} />
+            <Route path='/competition-admin-v2' element={<CompetitionAdminPage />} />
+            <Route path='/competition-admin-v2/:competitionId' element={<CompetitionAdminPage />} />
             <Route path='/gamefish'             element={<GamefishCatchLogger />} />
             <Route path='/gamefish-scores'      element={<GamefishScoreboard />} />
             <Route path='/gamefish-admin'       element={<GamefishAdmin />} />
