@@ -5,7 +5,7 @@
 // For now renders standings directly from catches + participants.
 
 import { useState, useMemo } from 'react'
-import { buildIndividualStandings, aggregateTeamScores } from './utils/scoringEngine'
+import { buildIndividualStandings, aggregateTeamScores } from '../utils/scoringEngine'
 
 const NAVY  = '#1e3a8a'
 const GREY  = '#6b7280'

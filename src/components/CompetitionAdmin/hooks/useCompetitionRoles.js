@@ -4,8 +4,8 @@
 // (competition level) to determine effective permissions.
 
 import { useState, useEffect } from 'react'
-import { supabase } from '../../lib/supabase'
-import { useAuth } from '../../contexts/AuthContext'
+import { supabase } from '../../../lib/supabase'
+import { useAuth } from '../../../contexts/AuthContext'
 
 const ADMIN_EMAILS = ['malcolmmurchgrant@gmail.com', 'mpca99@telkomsa.net']
 

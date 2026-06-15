@@ -4,7 +4,7 @@
 // All CompetitionAdmin tabs consume this hook.
 
 import { useState, useEffect } from 'react'
-import { supabase } from '../../lib/supabase'
+import { supabase } from '../../../lib/supabase'
 
 export function useCompetitionConfig(competitionId) {
   const [competition,    setCompetition]    = useState(null)

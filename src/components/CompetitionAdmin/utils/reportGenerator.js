@@ -149,7 +149,7 @@ function buildPrizeSheet(standings, catches, config) {
 // ── PDF via Supabase Edge Function ────────────────────────────────────────────
 export async function downloadPDF(competitionId, reportType = 'full_results') {
   try {
-    const { data, error } = await import('../../lib/supabase').then(m => m.supabase)
+    const { data, error } = await import('../../../lib/supabase').then(m => m.supabase)
       .functions.invoke('generate-competition-pdf', {
         body: { competition_id: competitionId, report_type: reportType },
       })

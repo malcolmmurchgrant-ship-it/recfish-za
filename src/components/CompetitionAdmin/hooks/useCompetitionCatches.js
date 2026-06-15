@@ -3,7 +3,7 @@
 // Reads from competition_catches (universal table).
 
 import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '../../lib/supabase'
+import { supabase } from '../../../lib/supabase'
 
 export function useCompetitionCatches(competitionId) {
   const [catches,  setCatches]  = useState([])
