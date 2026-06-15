@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { calculateCatchPoints } from '../utils/scoringEngine'
+import { calculateCatchPoints } from './utils/scoringEngine'
 
 const NAVY  = '#1e3a8a'
 const GREY  = '#6b7280'
