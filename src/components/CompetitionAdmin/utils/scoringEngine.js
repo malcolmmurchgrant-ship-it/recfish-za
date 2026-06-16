@@ -144,7 +144,10 @@ export function buildIndividualStandings(catches, participants) {
   const byParticipant = {}
 
   for (const p of participants) {
-    byParticipant[p.id] = {
+    // Key by user_id (matches angler_id in competition_catches)
+    // Fall back to p.id for new-style participants
+    const key = p.user_id || p.id
+    byParticipant[key] = {
       participantId:  p.id,
       anglerNumber:   p.angler_number,
       displayName:    p.full_name,

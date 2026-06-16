@@ -15,18 +15,14 @@ export function useCompetitionCatches(competitionId) {
     setLoading(true)
     setError(null)
     try {
+      // Load catches with teams (direct FK exists)
+      // Participants joined separately since angler_id → auth.users not competition_participants
       const { data, error: err } = await supabase
         .from('competition_catches')
         .select(`
           *,
-          competition_participants (
-            id, full_name, angler_number, team_id,
-            line_class_kg, is_captain, category, division,
-            competition_teams ( id, team_name, province, team_type, team_suffix )
-          ),
-          competition_days (
-            id, day_number, date, session_status
-          )
+          competition_teams ( id, team_name, province, team_type, team_suffix ),
+          competition_days ( id, day_number, date, session_status )
         `)
         .eq('competition_id', competitionId)
         .order('created_at', { ascending: false })

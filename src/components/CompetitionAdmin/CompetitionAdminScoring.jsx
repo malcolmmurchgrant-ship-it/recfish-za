@@ -49,7 +49,7 @@ export default function CompetitionAdminScoring({
   // ── Filter catches ───────────────────────────────────────────────────────
   const filtered = catches.filter(c => {
     if (dayFilter !== 'all' && c.competition_days?.day_number !== parseInt(dayFilter)) return false
-    if (teamFilter !== 'all' && c.competition_participants?.competition_teams?.team_name !== teamFilter) return false
+    if (teamFilter !== 'all' && c.competition_teams?.team_name !== teamFilter) return false
     if (search) {
       const name = c.competition_participants?.full_name?.toLowerCase() || ''
       const sp   = (c.species_name || '').toLowerCase()
