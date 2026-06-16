@@ -39,13 +39,11 @@ export default function CompetitionAdminParticipants({ competition, config, isAd
   })
 
   useEffect(() => { 
-    console.log('Participants: competition prop =', competition?.id, competition?.name)
     if (competition?.id) load() 
   }, [competition?.id])
 
   async function load() {
-    if (!competition?.id) { console.log('load() skipped — no competition.id'); return }
-    console.log('load() called with competition.id =', competition.id)
+    if (!competition?.id) return
     setLoading(true)
     const [{ data: parts }, { data: tms }] = await Promise.all([
       supabase.from('competition_participants')
