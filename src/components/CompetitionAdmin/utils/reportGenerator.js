@@ -1,11 +1,9 @@
 // ─── reportGenerator.js ──────────────────────────────────────────────────────
-// Generates CSV and XLSX reports from competition standings.
-// Uses SheetJS (xlsx) — already available in the React environment.
+// Generates CSV and XLSX-compatible HTML reports from competition standings.
+// No external packages required — uses only browser built-ins.
 // PDF generation is handled server-side via Supabase Edge Function.
 
-import * as XLSX from 'xlsx'
-
-// ── CSV download (simple, universal) ─────────────────────────────────────────
+// ── CSV download ──────────────────────────────────────────────────────────────
 export function downloadCSV(standings, competition, config) {
   const fields = config?.reporting?.csv_fields || [
     'rank','angler_number','display_name','team_name',
@@ -18,14 +16,14 @@ export function downloadCSV(standings, competition, config) {
   const rows = standings.map(s => fields.map(f => {
     switch (f) {
       case 'rank':               return s.rank
-      case 'angler_number':      return s.anglerNumber
+      case 'angler_number':      return s.anglerNumber || ''
       case 'display_name':       return s.displayName
       case 'team_name':          return s.teamName || ''
       case 'team_suffix':        return s.teamSuffix || ''
-      case 'total_points':       return s.totalPoints?.toFixed(2)
-      case 'total_weight_kg':    return s.totalWeightKg?.toFixed(3)
-      case 'species_count':      return s.speciesCount
-      case 'catch_count':        return s.catchCount
+      case 'total_points':       return (s.totalPoints || 0).toFixed(2)
+      case 'total_weight_kg':    return (s.totalWeightKg || 0).toFixed(3)
+      case 'species_count':      return s.speciesCount || 0
+      case 'catch_count':        return s.catchCount || 0
       case 'best_fish_species':  return s.bestFish?.species_name || ''
       case 'best_fish_weight_kg':return s.bestFish?.weight_kg || ''
       case 'line_class':         return s.lineClass ? `${s.lineClass}kg` : ''
@@ -35,141 +33,181 @@ export function downloadCSV(standings, competition, config) {
   }))
 
   const csvContent = [headers, ...rows]
-    .map(row => row.map(cell => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(','))
+    .map(row => row.map(cell =>
+      `"${String(cell ?? '').replace(/"/g, '""')}"`
+    ).join(','))
     .join('\n')
 
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-  triggerDownload(blob, `${competition.name || 'Results'}_Results.csv`)
+  triggerDownload(
+    new Blob([csvContent], { type: 'text/csv;charset=utf-8;' }),
+    `${sanitiseName(competition.name)}_Results.csv`
+  )
 }
 
-// ── XLSX download ─────────────────────────────────────────────────────────────
+// ── XLSX-compatible HTML download ─────────────────────────────────────────────
 export function downloadXLSX(standings, catches, competition, config, mode = 'multi_sheet') {
-  const wb = XLSX.utils.book_new()
+  const name = sanitiseName(competition.name)
 
   if (mode === 'single_sheet') {
-    // All info on one worksheet
-    const ws = buildStandingsSheet(standings, config)
-    XLSX.utils.book_append_sheet(wb, ws, 'Results')
+    const html = buildSingleSheetHTML(standings, catches, competition, config)
+    triggerDownload(
+      new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' }),
+      `${name}_Results.xls`
+    )
   } else {
-    // Multi-sheet: Standings / All Catches / Prize Winners
-    const standingsWS = buildStandingsSheet(standings, config)
-    XLSX.utils.book_append_sheet(wb, standingsWS, 'Standings')
-
-    const catchesWS = buildCatchesSheet(catches)
-    XLSX.utils.book_append_sheet(wb, catchesWS, 'All Catches')
-
-    const prizeWS = buildPrizeSheet(standings, catches, config)
-    XLSX.utils.book_append_sheet(wb, prizeWS, 'Prize Winners')
+    const html = buildMultiSheetHTML(standings, catches, competition, config)
+    triggerDownload(
+      new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' }),
+      `${name}_Full.xls`
+    )
   }
-
-  const filename = `${competition.name || 'Results'}_${mode === 'single_sheet' ? 'Results' : 'Full'}.xlsx`
-  XLSX.writeFile(wb, filename)
 }
 
-// ── Sheet builders ────────────────────────────────────────────────────────────
-function buildStandingsSheet(standings, config) {
-  const rows = standings.map(s => ({
-    'Rank':             s.rank,
-    'Angler No.':       s.anglerNumber || '',
-    'Name':             s.displayName,
-    'Team':             s.teamName || '',
-    'Province':         s.province || '',
-    'Line Class (kg)':  s.lineClass || '',
-    'Category':         s.category || '',
-    'Total Points':     parseFloat((s.totalPoints || 0).toFixed(2)),
-    'Total Weight (kg)':parseFloat((s.totalWeightKg || 0).toFixed(3)),
-    'Species':          s.speciesCount || 0,
-    'Catches':          s.catchCount || 0,
-    'Best Fish':        s.bestFish?.species_name || '',
-    'Best Fish (kg)':   parseFloat(s.bestFish?.weight_kg || 0),
-  }))
-
-  return XLSX.utils.json_to_sheet(rows)
+function buildSingleSheetHTML(standings, catches, competition, config) {
+  const prizeRows = buildPrizeRows(standings, catches, config)
+  return `<html xmlns:o="urn:schemas-microsoft-com:office:office"
+    xmlns:x="urn:schemas-microsoft-com:office:excel"
+    xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="UTF-8">
+<style>
+  body { font-family: Arial, sans-serif; font-size: 11pt; }
+  h2 { color: #1e3a8a; }
+  table { border-collapse: collapse; width: 100%; margin-bottom: 24pt; }
+  th { background: #1e3a8a; color: white; padding: 6px 10px; text-align: left; font-size: 10pt; }
+  td { padding: 5px 10px; border-bottom: 1px solid #e5e7eb; font-size: 10pt; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  .section { margin-top: 20pt; }
+</style>
+</head><body>
+<h2>${competition.name || 'Results'}</h2>
+<p>${competition.venue || ''} · ${competition.start_date || ''}</p>
+<div class="section"><h3>Standings</h3>${standingsTable(standings)}</div>
+<div class="section"><h3>All Catches</h3>${catchesTable(catches)}</div>
+${prizeRows.length ? `<div class="section"><h3>Prize Categories</h3>${prizeTable(prizeRows)}</div>` : ''}
+</body></html>`
 }
 
-function buildCatchesSheet(catches) {
-  const rows = catches
-    .filter(c => c.data_quality !== 'rejected')
-    .map(c => ({
-      'Angler':         c.competition_participants?.full_name || '',
-      'Angler No.':     c.competition_participants?.angler_number || '',
-      'Team':           c.competition_participants?.competition_teams?.display_name || '',
-      'Day':            c.competition_days?.day_number || '',
-      'Date':           c.fishing_date || '',
-      'Species':        c.species_name || '',
-      'Weight (kg)':    parseFloat(c.weight_kg || 0),
-      'Length (cm)':    parseFloat(c.length_cm || 0),
-      'Line Class (kg)':c.line_class_kg || '',
-      'Points':         parseFloat(c.points || 0),
-      'Status':         c.data_quality || 'unverified',
-      'Grid':           c.fine_grid_id || '',
-      'Notes':          c.notes || '',
-    }))
-
-  return XLSX.utils.json_to_sheet(rows)
+function buildMultiSheetHTML(standings, catches, competition, config) {
+  const prizeRows = buildPrizeRows(standings, catches, config)
+  const sheets = [
+    { name: 'Standings',   content: standingsTable(standings) },
+    { name: 'All Catches', content: catchesTable(catches) },
+    ...(prizeRows.length ? [{ name: 'Prize Winners', content: prizeTable(prizeRows) }] : []),
+  ]
+  return `<html xmlns:o="urn:schemas-microsoft-com:office:office"
+    xmlns:x="urn:schemas-microsoft-com:office:excel"
+    xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="UTF-8">
+<style>
+  body { font-family: Arial, sans-serif; font-size: 11pt; }
+  h2 { color: #1e3a8a; }
+  table { border-collapse: collapse; width: 100%; page-break-after: always; margin-bottom: 24pt; }
+  th { background: #1e3a8a; color: white; padding: 6px 10px; text-align: left; font-size: 10pt; }
+  td { padding: 5px 10px; border-bottom: 1px solid #e5e7eb; font-size: 10pt; }
+  tr:nth-child(even) td { background: #f8fafc; }
+</style>
+</head><body>
+<h2>${competition.name || 'Results'}</h2>
+<p>${competition.venue || ''} · ${competition.start_date || ''}</p>
+${sheets.map(s => `<h3>${s.name}</h3>${s.content}`).join('\n')}
+</body></html>`
 }
 
-function buildPrizeSheet(standings, catches, config) {
+function standingsTable(standings) {
+  const headers = ['Rank','Angler No.','Name','Team','Category','LC (kg)','Points','Weight (kg)','Species','Catches','Best Fish','Best Fish (kg)']
+  const rows = standings.map(s => [
+    s.rank, s.anglerNumber || '', s.displayName, s.teamName || '',
+    s.category || '', s.lineClass || '',
+    (s.totalPoints || 0).toFixed(2), (s.totalWeightKg || 0).toFixed(3),
+    s.speciesCount || 0, s.catchCount || 0,
+    s.bestFish?.species_name || '', s.bestFish?.weight_kg || '',
+  ])
+  return htmlTable(headers, rows)
+}
+
+function catchesTable(catches) {
+  const active = catches.filter(c => c.data_quality !== 'rejected')
+  const headers = ['Angler','Angler No.','Team','Day','Date','Species','Weight (kg)','Length (cm)','LC (kg)','Points','Status','Notes']
+  const rows = active.map(c => [
+    c.competition_participants?.full_name || '',
+    c.competition_participants?.angler_number || '',
+    c.competition_participants?.competition_teams?.display_name || '',
+    c.competition_days?.day_number || '', c.fishing_date || '',
+    c.species_name || '',
+    c.weight_kg ? parseFloat(c.weight_kg).toFixed(3) : '',
+    c.length_cm ? parseFloat(c.length_cm).toFixed(1) : '',
+    c.line_class_kg || '',
+    c.data_quality === 'disqualified' ? '0' : parseFloat(c.points || 0).toFixed(2),
+    c.data_quality || 'unverified', c.notes || '',
+  ])
+  return htmlTable(headers, rows)
+}
+
+function prizeTable(prizeRows) {
+  return htmlTable(['Category','Winner','Team','Value'], prizeRows)
+}
+
+function buildPrizeRows(standings, catches, config) {
   const categories = config?.reporting?.prize_categories || []
-  const rows = []
-
-  for (const cat of categories) {
-    let winner = null
-
-    if (cat.criteria === 'max_total_weight' && cat.eligible === 'individual') {
+  return categories.map(cat => {
+    let winner = null, value = ''
+    if (cat.criteria === 'max_total_weight') {
       winner = [...standings].sort((a, b) => b.totalWeightKg - a.totalWeightKg)[0]
-    } else if (cat.criteria === 'max_total_points' && cat.eligible === 'individual') {
-      winner = standings[0] // already sorted by points
+      if (winner) value = `${winner.totalWeightKg.toFixed(3)} kg`
+    } else if (cat.criteria === 'max_total_points') {
+      winner = standings[0]
+      if (winner) value = `${winner.totalPoints.toFixed(2)} pts`
+    } else if (cat.criteria === 'max_species_count') {
+      winner = [...standings].sort((a, b) => b.speciesCount - a.speciesCount)[0]
+      if (winner) value = `${winner.speciesCount} species`
     } else if (cat.criteria === 'max_species_weight' && cat.species_id) {
-      const speciesCatches = catches.filter(c =>
-        c.species_id === cat.species_id && c.data_quality !== 'rejected'
-      ).sort((a, b) => b.weight_kg - a.weight_kg)
-      if (speciesCatches.length) {
-        const top = speciesCatches[0]
+      const top = catches
+        .filter(c => c.species_id === cat.species_id && c.data_quality !== 'rejected')
+        .sort((a, b) => b.weight_kg - a.weight_kg)[0]
+      if (top) {
         winner = standings.find(s => s.participantId === top.angler_id)
-        if (winner) winner = { ...winner, winningCatch: top }
+        value = `${parseFloat(top.weight_kg).toFixed(3)} kg`
       }
     }
-
-    rows.push({
-      'Category':   cat.label,
-      'Winner':     winner?.displayName || 'TBD',
-      'Team':       winner?.teamName || '',
-      'Value':      winner?.winningCatch
-                      ? `${winner.winningCatch.weight_kg}kg`
-                      : winner
-                        ? `${winner.totalPoints?.toFixed(2)} pts`
-                        : '',
-    })
-  }
-
-  return XLSX.utils.json_to_sheet(rows.length ? rows : [{ 'Note': 'No prize categories configured' }])
+    return [cat.label || '', winner?.displayName || 'TBD', winner?.teamName || '', value]
+  })
 }
 
-// ── PDF via Supabase Edge Function ────────────────────────────────────────────
+function htmlTable(headers, rows) {
+  const ths = headers.map(h => `<th>${h}</th>`).join('')
+  const trs = rows.map(row =>
+    `<tr>${row.map(cell => `<td>${String(cell ?? '')}</td>`).join('')}</tr>`
+  ).join('\n')
+  return `<table><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table>`
+}
+
 export async function downloadPDF(competitionId, reportType = 'full_results') {
   try {
-    const { data, error } = await import('../../../lib/supabase').then(m => m.supabase)
-      .functions.invoke('generate-competition-pdf', {
-        body: { competition_id: competitionId, report_type: reportType },
-      })
-
+    const { supabase } = await import('../../../lib/supabase')
+    const { data, error } = await supabase.functions.invoke(
+      'generate-competition-pdf',
+      { body: { competition_id: competitionId, report_type: reportType } }
+    )
     if (error) throw error
-
-    const blob = new Blob([data], { type: 'application/pdf' })
-    triggerDownload(blob, `${reportType}_${competitionId}.pdf`)
+    triggerDownload(
+      new Blob([data], { type: 'application/pdf' }),
+      `${reportType}_${competitionId}.pdf`
+    )
   } catch (err) {
     console.error('PDF generation error:', err)
     throw err
   }
 }
 
-// ── Helper ────────────────────────────────────────────────────────────────────
 function triggerDownload(blob, filename) {
-  const url  = URL.createObjectURL(blob)
+  const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
-  link.href     = url
+  link.href = url
   link.download = filename
   link.click()
   URL.revokeObjectURL(url)
+}
+
+function sanitiseName(name) {
+  return (name || 'Results').replace(/[^a-zA-Z0-9_\- ]/g, '').replace(/\s+/g, '_')
 }
