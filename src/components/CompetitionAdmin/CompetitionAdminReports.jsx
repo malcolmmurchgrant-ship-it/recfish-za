@@ -6,8 +6,8 @@
 
 import { useState, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
-import { downloadCSV, downloadXLSX, downloadPDF } from '../utils/reportGenerator'
-import { buildIndividualStandings } from '../utils/scoringEngine'
+import { downloadCSV, downloadXLSX, downloadPDF } from './utils/reportGenerator'
+import { buildIndividualStandings } from './utils/scoringEngine'
 
 const NAVY  = '#1e3a8a'
 const GREY  = '#6b7280'
