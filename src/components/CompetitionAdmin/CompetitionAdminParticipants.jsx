@@ -47,9 +47,9 @@ export default function CompetitionAdminParticipants({ competition, config, isAd
     setLoading(true)
     const [{ data: parts }, { data: tms }] = await Promise.all([
       supabase.from('competition_participants')
-        .select('*, competition_teams(id, team_name, team_suffix, display_name)')
+        .select('*, competition_teams(id, team_name, province, team_type)')
         .eq('competition_id', competition.id)
-        .order('angler_number'),
+        .order('full_name'),
       supabase.from('competition_teams')
         .select('*')
         .eq('competition_id', competition.id)
@@ -185,7 +185,7 @@ export default function CompetitionAdminParticipants({ competition, config, isAd
                     <select style={S.select} value={newAngler.team_id}
                       onChange={e => setNewAngler(a => ({ ...a, team_id: e.target.value }))}>
                       <option value="">— No team —</option>
-                      {teams.map(t => <option key={t.id} value={t.id}>{t.display_name || t.team_name}</option>)}
+                      {teams.map(t => <option key={t.id} value={t.id}>{t.team_name || t.province}</option>)}
                     </select>
                   </div>
                 )}
@@ -246,7 +246,7 @@ export default function CompetitionAdminParticipants({ competition, config, isAd
                     {p.angler_number && <span style={{ color: GREY, fontWeight: 400, fontSize: '0.85rem' }}>#{p.angler_number}</span>}
                   </div>
                   <div style={{ fontSize: '0.82rem', color: GREY, marginTop: 2 }}>
-                    {p.competition_teams?.display_name || p.competition_teams?.team_name || ''}
+                    {p.competition_teams?.team_name || p.competition_teams?.province || ''}
                     {p.category && ` · ${p.category}`}
                     {p.line_class_kg && ` · ${p.line_class_kg}kg LC`}
                   </div>
