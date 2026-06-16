@@ -22,7 +22,7 @@ export function useCompetitionCatches(competitionId) {
           competition_participants (
             id, full_name, angler_number, team_id,
             line_class_kg, is_captain, category, division,
-            competition_teams ( id, team_name, team_suffix, display_name )
+            competition_teams ( id, team_name, province, team_type, team_suffix )
           ),
           competition_days (
             id, day_number, date, session_status

@@ -288,7 +288,7 @@ export default function CompetitionAdminParticipants({ competition, config, isAd
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
                   <div>
                     <div style={{ fontWeight: 700, color: NAVY }}>
-                      {team.display_name || `${team.team_name}${team.team_suffix ? ` ${team.team_suffix}` : ''}`}
+                      {team.team_name || team.province || ''}
                     </div>
                     <div style={{ fontSize: '0.8rem', color: GREY }}>{members.length} members · {dqCount > 0 ? `${dqCount} DQ'd` : 'All eligible'}</div>
                   </div>

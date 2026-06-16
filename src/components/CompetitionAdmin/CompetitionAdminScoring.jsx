@@ -106,7 +106,7 @@ export default function CompetitionAdminScoring({
             <label style={S.label}>Team</label>
             <select style={S.select} value={teamFilter} onChange={e => setTeamFilter(e.target.value)}>
               <option value="all">All Teams</option>
-              {teams.map(t => <option key={t.id} value={t.team_name}>{t.display_name || t.team_name}</option>)}
+              {teams.map(t => <option key={t.id} value={t.team_name}>{t.team_name || t.province}</option>)}
             </select>
           </div>
         )}
@@ -139,7 +139,7 @@ export default function CompetitionAdminScoring({
                 </div>
                 <div style={{ fontSize: '0.8rem', color: GREY, marginTop: 2 }}>
                   {participant?.full_name}
-                  {team && ` · ${team.display_name || team.team_name}`}
+                  {team && ` · ${team.team_name || team.province}`}
                   {` · Day ${c.competition_days?.day_number || '?'}`}
                   {c.line_class_kg && ` · ${c.line_class_kg}kg LC`}
                 </div>

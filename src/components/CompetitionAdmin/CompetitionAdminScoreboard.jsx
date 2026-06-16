@@ -57,7 +57,7 @@ export default function CompetitionAdminScoreboard({
         const team = teams?.find(t => t.id === s.teamId)
         byTeam[s.teamId] = {
           teamId:      s.teamId,
-          teamName:    team?.display_name || team?.team_name || 'Unknown',
+          teamName:    team?.team_name || team?.province || 'Unknown',
           totalPoints: 0,
           totalWeight: 0,
           memberCount: 0,
