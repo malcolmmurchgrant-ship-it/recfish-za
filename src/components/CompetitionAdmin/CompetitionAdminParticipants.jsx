@@ -38,7 +38,9 @@ export default function CompetitionAdminParticipants({ competition, config, isAd
     full_name: '', angler_number: '', team_id: '', line_class_kg: '', category: 'open', is_captain: false,
   })
 
-  useEffect(() => { load() }, [competition?.id])
+  useEffect(() => { 
+    if (competition?.id) load() 
+  }, [competition?.id])
 
   async function load() {
     if (!competition?.id) return
@@ -77,7 +79,8 @@ export default function CompetitionAdminParticipants({ competition, config, isAd
     setNewAngler({ full_name: '', angler_number: '', team_id: '', line_class_kg: '', category: 'open', is_captain: false })
     setAddingAngler(false)
     setSaving(false)
-    load()
+    // Small delay to ensure DB write is committed before re-fetching
+    setTimeout(() => load(), 300)
   }
 
   // ── DQ angler ─────────────────────────────────────────────────────────────
