@@ -143,17 +143,17 @@ export default function UniversalCatchLogger({ competitionId }) {
   const [activeTab, setActiveTab] = useState('entry')
   const [summaryRows, setSummaryRows] = useState([])
 
-  const splitBoatFormat = !isTraditional(config?.team_config)
-  const speciesPicker = useMemo(() => buildSpeciesPicker(config?.species_config), [config])
+  const splitBoatFormat = !isTraditional(config?.team)
+  const speciesPicker = useMemo(() => buildSpeciesPicker(config?.species), [config])
 
   // Split eligible species by entry_mode once, since each draft array is
   // built/rendered independently.
   const measuredSpecies = useMemo(
-    () => (config?.species_config?.eligible_species || []).filter(s => (s.entry_mode || 'measured') !== 'unit_count'),
+    () => (config?.species?.eligible_species || []).filter(s => (s.entry_mode || 'measured') !== 'unit_count'),
     [config]
   )
   const unitCountSpecies = useMemo(
-    () => (config?.species_config?.eligible_species || []).filter(s => s.entry_mode === 'unit_count'),
+    () => (config?.species?.eligible_species || []).filter(s => s.entry_mode === 'unit_count'),
     [config]
   )
   const hasMeasured = measuredSpecies.length > 0
@@ -203,7 +203,7 @@ export default function UniversalCatchLogger({ competitionId }) {
       // species config entry (or has no config match at all — preserve it
       // rather than silently drop data if species_config changes later).
       const measuredRows = rows.filter(r => {
-        const cfg = findSpeciesConfig(config?.species_config, r.species_name)
+        const cfg = findSpeciesConfig(config?.species, r.species_name)
         return !cfg || (cfg.entry_mode || 'measured') !== 'unit_count'
       })
       setMeasuredDraft(measuredRows.map(rowToMeasuredDraft))
@@ -233,7 +233,7 @@ export default function UniversalCatchLogger({ competitionId }) {
   }, [splitBoatFormat, boatId, teamId, selectedDay, saved, loadBoatDayCatches, loadTeamDayCatches])
 
   // ── Measured draft mutators ──────────────────────────────────────────────────
-  const measuredBagLimit = config?.scoring_config?.bag_limit || 10
+  const measuredBagLimit = config?.scoring?.bag_limit || 10
 
   const addMeasuredFish = () => {
     if (measuredDraft.length >= measuredBagLimit) return
@@ -246,7 +246,7 @@ export default function UniversalCatchLogger({ competitionId }) {
   const removeMeasuredFish = (i) => setMeasuredDraft(prev => prev.filter((_, idx) => idx !== i))
 
   const onMeasuredSpeciesChange = (i, speciesName) => {
-    const cfg = findSpeciesConfig(config?.species_config, speciesName)
+    const cfg = findSpeciesConfig(config?.species, speciesName)
     updateMeasuredFish(i, {
       ...measuredDraft[i],
       species: speciesName,
@@ -299,16 +299,16 @@ export default function UniversalCatchLogger({ competitionId }) {
   }
 
   // ── Live scoring ──────────────────────────────────────────────────────────────
-  const scoringMethod = config?.scoring_config?.method || 'percentage'
-  const usesMultiplier = !!config?.scoring_config?.species_multiplier
+  const scoringMethod = config?.scoring?.method || 'percentage'
+  const usesMultiplier = !!config?.scoring?.species_multiplier
 
   const scoredMeasured = useMemo(() => {
     const seenSpecies = new Set()
     return measuredDraft.map(fish => {
-      const cfg = findSpeciesConfig(config?.species_config, fish.species)
+      const cfg = findSpeciesConfig(config?.species, fish.species)
       const isFirstOfSpecies = fish.species && !seenSpecies.has(fish.species)
       if (fish.species) seenSpecies.add(fish.species)
-      const scored = scoreDraftFish({ ...fish, isFirstOfSpecies }, cfg, config?.scoring_config)
+      const scored = scoreDraftFish({ ...fish, isFirstOfSpecies }, cfg, config?.scoring)
       const warning = validateDraftFish(fish, cfg)
       return { ...fish, _cfg: cfg, _scored: scored, _warning: warning }
     })
@@ -316,9 +316,9 @@ export default function UniversalCatchLogger({ competitionId }) {
 
   const scoredUnitCount = useMemo(() => {
     return unitCountDraft.map(row => {
-      const cfg = findSpeciesConfig(config?.species_config, row.species)
+      const cfg = findSpeciesConfig(config?.species, row.species)
       const isFirstOfSpecies = row.fishCount > 0 // each species is its own row here, so "first" = "has any"
-      const scored = scoreDraftFish({ ...row, isFirstOfSpecies }, cfg, config?.scoring_config)
+      const scored = scoreDraftFish({ ...row, isFirstOfSpecies }, cfg, config?.scoring)
       const warning = validateDraftFish(row, cfg)
       return { ...row, _cfg: cfg, _scored: scored, _warning: warning }
     })
@@ -329,7 +329,7 @@ export default function UniversalCatchLogger({ competitionId }) {
       ...measuredDraft,
       ...unitCountDraft.filter(r => r.fishCount > 0),
     ]
-    return computeSpeciesMultiplier(combined, config?.species_config)
+    return computeSpeciesMultiplier(combined, config?.species)
   }, [measuredDraft, unitCountDraft, config])
 
   const measuredRawPoints = scoredMeasured.reduce((sum, f) => sum + (f._warning ? 0 : f._scored.points), 0)
@@ -439,7 +439,7 @@ export default function UniversalCatchLogger({ competitionId }) {
       const fresh = await loadAnglerDayCatches(participant, selectedDay.id)
       setOriginalRows(fresh)
       const freshMeasured = fresh.filter(r => {
-        const cfg = findSpeciesConfig(config?.species_config, r.species_name)
+        const cfg = findSpeciesConfig(config?.species, r.species_name)
         return !cfg || (cfg.entry_mode || 'measured') !== 'unit_count'
       })
       setMeasuredDraft(freshMeasured.map(rowToMeasuredDraft))
