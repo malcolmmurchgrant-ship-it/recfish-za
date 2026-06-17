@@ -58,6 +58,34 @@ function getTotalFishingHours(days) {
   return active.reduce((s, d) => s + getFishingHours(d), 0)
 }
 
+// ── Species multiplier scoring (SADSAA Gamefish) ─────────────────────────────
+// Used when scoringConfig.species_multiplier_enabled === true.
+// Raw points are summed per day, then multiplied by max(1, speciesCount - 1)
+// for that day, then days are summed. Applied separately for teams and anglers.
+function getDayNumber(c, dateToDay) {
+  return c.competition_days?.day_number || dateToDay[c.fishing_date] || null
+}
+
+// Calculates multiplied total points for a set of catches, grouped by day.
+// catches: array of catch rows already scoped to one team or one angler.
+function calcMultipliedPoints(catches, scoringConfig, dateToDay) {
+  const byDay = {}
+  for (const c of catches) {
+    const dn = getDayNumber(c, dateToDay)
+    if (dn === null) continue
+    if (!byDay[dn]) byDay[dn] = []
+    byDay[dn].push(c)
+  }
+  let total = 0
+  for (const dayCatches of Object.values(byDay)) {
+    const raw = dayCatches.reduce((s, c) => s + calcPoints(c, scoringConfig), 0)
+    const species = new Set(dayCatches.map(c => c.species_name).filter(Boolean)).size
+    const mult = Math.max(1, species - 1)
+    total += raw * mult
+  }
+  return total
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function UniversalScoreboard({ competitionId, embedded = false, isAdmin = false }) {
   const [competition,  setCompetition]  = useState(null)
@@ -162,11 +190,14 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
       })
 
   // ── Team standings ────────────────────────────────────────────────────────
+  const useMultiplier = !!scoringConfig?.species_multiplier_enabled
   const teamStandings = teams
     .filter(t => !t.is_disqualified)
     .map(t => {
       const tc     = filteredCatches.filter(c => c.team_id === t.id)
-      const pts    = tc.reduce((s, c) => s + calcPoints(c, scoringConfig), 0)
+      const pts    = useMultiplier
+        ? calcMultipliedPoints(tc, scoringConfig, dateToDay)
+        : tc.reduce((s, c) => s + calcPoints(c, scoringConfig), 0)
       const kg     = tc.reduce((s, c) => s + parseFloat(c.weight_kg || 0), 0)
       const boat   = boatMap[t.boat_id] || {}
       return {
@@ -192,7 +223,9 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
     .map(p => {
       const uid  = p.user_id || p.id
       const ac   = filteredCatches.filter(c => c.angler_id === uid)
-      const pts  = ac.reduce((s, c) => s + calcPoints(c, scoringConfig), 0)
+      const pts  = useMultiplier
+        ? calcMultipliedPoints(ac, scoringConfig, dateToDay)
+        : ac.reduce((s, c) => s + calcPoints(c, scoringConfig), 0)
       const kg   = ac.reduce((s, c) => s + parseFloat(c.weight_kg || 0), 0)
       const team = teamMap[p.team_id]
       const byDay = {}
@@ -443,11 +476,18 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
                   <div style={{ marginTop: '0.4rem', paddingLeft: '2.25rem', display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
                     {fishingDays.map(d => {
                       const dc   = a.byDay[d.day_number] || []
-                      const dPts = dc.reduce((s, c) => s + calcPoints(c, scoringConfig), 0)
+                      const dRaw = dc.reduce((s, c) => s + calcPoints(c, scoringConfig), 0)
+                      const dSp  = new Set(dc.map(c => c.species_name).filter(Boolean)).size
+                      const dMult= Math.max(1, dSp - 1)
+                      const dPts = useMultiplier ? dRaw * dMult : dRaw
                       const dKg  = dc.reduce((s, c) => s + parseFloat(c.weight_kg || 0), 0)
                       return (
                         <span key={d.id} style={{ fontSize: '0.73rem', background: dc.length > 0 ? '#eff6ff' : '#f9fafb', color: dc.length > 0 ? NAVY : GREY, padding: '0.2rem 0.5rem', borderRadius: 4 }}>
-                          D{d.day_number}: {dc.length > 0 ? `${dc.length}🐟 ${dKg.toFixed(1)}kg ${dPts.toFixed(0)}pts` : 'NC'}
+                          D{d.day_number}: {dc.length > 0
+                            ? useMultiplier
+                              ? `${dc.length}🐟 ${dKg.toFixed(1)}kg ${dRaw.toFixed(1)}×${dMult}=${dPts.toFixed(0)}pts`
+                              : `${dc.length}🐟 ${dKg.toFixed(1)}kg ${dPts.toFixed(0)}pts`
+                            : 'NC'}
                         </span>
                       )
                     })}
