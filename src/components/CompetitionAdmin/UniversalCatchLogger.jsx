@@ -356,7 +356,7 @@ export default function UniversalCatchLogger({ competitionId }) {
         angler_id: participant.user_id,
         team_id: teamId || participant.competition_teams?.id || null,
         boat_id: splitBoatFormat ? (boatId || null) : null,
-        fishing_date: selectedDay.fishing_date || selectedDay.date || null,
+        fishing_date: selectedDay.date || null,
         entered_by: user?.id,
         data_quality: 'unverified',
       }
@@ -478,7 +478,11 @@ export default function UniversalCatchLogger({ competitionId }) {
         <div style={{ fontWeight: 700, color: NAVY, marginBottom: '0.75rem' }}>Step 1 — Select Day</div>
         <select style={S.select} value={day} onChange={e => setDay(e.target.value)}>
           <option value=''>Select day…</option>
-          {days.map(d => <option key={d.id} value={d.id}>{d.label || `Day ${d.day_number}`}</option>)}
+          {days.map(d => (
+            <option key={d.id} value={d.id}>
+              Day {d.day_number}{d.date ? ` — ${new Date(d.date).toLocaleDateString('en-ZA', { weekday: 'long', day: 'numeric', month: 'long' })}` : ''}{d.cancelled ? ' (Cancelled)' : ''}
+            </option>
+          ))}
         </select>
       </div>
 
