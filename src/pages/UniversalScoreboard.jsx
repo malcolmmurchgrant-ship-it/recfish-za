@@ -255,11 +255,18 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
     .sort((a, b) => b.points - a.points || b.fish - a.fish)
 
   // ── Skipper standings ─────────────────────────────────────────────────────
+  // competition_boats has no team_id column — the link runs the other way:
+  // competition_teams.boat_id -> competition_boats.id. So match catches to a
+  // boat via the team that boat belongs to.
   const skipperStandings = boats.map(b => {
-    const tc   = filteredCatches.filter(c => c.boat_id === b.id || c.team_id === b.team_id)
-    const pts  = tc.reduce((s, c) => s + calcPoints(c, scoringConfig), 0)
+    const team = teams.find(t => t.boat_id === b.id)
+    const tc   = team
+      ? filteredCatches.filter(c => c.team_id === team.id)
+      : []
+    const pts  = useMultiplier
+      ? calcMultipliedPoints(tc, scoringConfig, dateToDay)
+      : tc.reduce((s, c) => s + calcPoints(c, scoringConfig), 0)
     const kg   = tc.reduce((s, c) => s + parseFloat(c.weight_kg || 0), 0)
-    const team = teamMap[b.team_id]
     return {
       id: b.id,
       skipper: b.skipper_name || '',
