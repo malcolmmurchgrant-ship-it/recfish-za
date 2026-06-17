@@ -14,6 +14,7 @@ import SpeciesLookup from './pages/SpeciesLookup'
 import Competitions from './pages/Competitions'
 import CompetitionAdmin from './components/CompetitionAdmin'
 import UniversalScoreboard from './pages/UniversalScoreboard'
+import UniversalCatchLogger from './components/CompetitionAdmin/UniversalCatchLogger'
 import CompetitionCatchLogger from './pages/CompetitionCatchLogger'
 import AllCoastalsCatchLogger from './pages/AllCoastalsCatchLogger'
 import AllCoastalsScoreboard from './pages/AllCoastalsScoreboard'
@@ -206,6 +207,12 @@ function CompetitionAdminPage() {
   return <CompetitionAdmin competitionId={competitionId} />
 }
 
+// Catch Logger wrapper reads :competitionId from URL and passes it as a prop
+function CatchLoggerPage() {
+  const { competitionId } = useParams()
+  return <UniversalCatchLogger competitionId={competitionId} />
+}
+
 function AppContent() {
   const { lastEndedSession, clearLastEndedSession } = useSession()
   return (
@@ -232,6 +239,7 @@ function AppContent() {
             <Route path='/scoreboard/:competitionId' element={<ScoreboardPage />} />
             <Route path='/competition-admin-v2' element={<CompetitionAdminPage />} />
             <Route path='/competition-admin-v2/:competitionId' element={<CompetitionAdminPage />} />
+            <Route path='/competition-catch-logger/:competitionId' element={<CatchLoggerPage />} />
             <Route path='/gamefish'             element={<GamefishCatchLogger />} />
             <Route path='/gamefish-scores'      element={<GamefishScoreboard />} />
             <Route path='/gamefish-admin'       element={<GamefishAdmin />} />
