@@ -139,12 +139,18 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
   const cancelledDays   = days.filter(d => d.cancelled)
 
   // ── Filter catches ────────────────────────────────────────────────────────
+  // Note: catches can have null weight_kg (e.g. photo-measure-release species
+  // like Kingfish, scored on a flat points basis, not weight) — these must
+  // still count as catches/species, just not toward total weight.
   const scoringCatches = catches.filter(c => {
     if (c.data_quality === 'rejected') return false
-    if (c.data_quality === 'disqualified') return false
+    if (c.scoring === false) return false
     if (!showPending && c.data_quality === 'unverified' && !isAdmin) return false
     if (c.species_name === 'No Catch') return false
-    if (!c.weight_kg || parseFloat(c.weight_kg) <= 0) return false
+    // Exclude only genuinely empty/zero entries with no points either
+    const hasWeight = c.weight_kg && parseFloat(c.weight_kg) > 0
+    const hasPoints = c.points && parseFloat(c.points) > 0
+    if (!hasWeight && !hasPoints) return false
     return true
   })
 
@@ -207,7 +213,7 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
         kg: Math.round(kg * 1000) / 1000,
         points: Math.round(pts * 100) / 100,
         speciesCount: new Set(ac.map(c => c.species_name).filter(Boolean)).size,
-        bestFish: [...ac].sort((a, b) => parseFloat(b.weight_kg) - parseFloat(a.weight_kg))[0],
+        bestFish: [...ac].sort((a, b) => (parseFloat(b.weight_kg) || 0) - (parseFloat(a.weight_kg) || 0))[0],
         kghr: totalHours > 0 ? Math.round(kg / totalHours * 100) / 100 : 0,
         fhr:  totalHours > 0 ? Math.round(ac.length / totalHours * 100) / 100 : 0,
         byDay,
@@ -450,7 +456,7 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
                 {/* Best fish */}
                 {a.bestFish && (
                   <div style={{ marginTop: '0.3rem', paddingLeft: '2.25rem', fontSize: '0.75rem', color: GREY }}>
-                    Best: {a.bestFish.species_name} {parseFloat(a.bestFish.weight_kg).toFixed(2)}kg
+                    Best: {a.bestFish.species_name} {a.bestFish.weight_kg ? `${parseFloat(a.bestFish.weight_kg).toFixed(2)}kg` : '(released)'}
                     {a.bestFish.line_class_kg && ` · ${a.bestFish.line_class_kg}kg LC`}
                   </div>
                 )}
@@ -505,7 +511,7 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
                   <div style={{ fontSize: '0.68rem', color: GREY, textTransform: 'uppercase' }}>Species</div>
                   <div style={{ fontWeight: 500, fontSize: '0.85rem' }}>{c.species_name}</div>
                 </div>
-                <StatPill label="Weight" val={`${parseFloat(c.weight_kg).toFixed(2)} kg`} col={GOLD} />
+                <StatPill label="Weight" val={c.weight_kg ? `${parseFloat(c.weight_kg).toFixed(2)} kg` : 'Released'} col={GOLD} />
                 {c.line_class_kg && <StatPill label="Line" val={`${c.line_class_kg}kg`} col={GREY} />}
                 <StatPill label="Points" val={c.pts.toLocaleString('en-ZA', { minimumFractionDigits: 2 })} col={NAVY} />
               </div>
@@ -548,7 +554,7 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
                       </span>
                     </div>
                     <span style={S.badge('#374151')}>{c.species_name}</span>
-                    <span style={{ fontWeight: 600, color: GOLD, fontSize: '0.85rem' }}>{parseFloat(c.weight_kg).toFixed(2)}kg</span>
+                    <span style={{ fontWeight: 600, color: GOLD, fontSize: '0.85rem' }}>{c.weight_kg ? `${parseFloat(c.weight_kg).toFixed(2)}kg` : '📸 Released'}</span>
                     {c.line_class_kg && <span style={{ fontSize: '0.78rem', color: GREY }}>{c.line_class_kg}kg LC</span>}
                     <span style={{ fontWeight: 700, color: NAVY, minWidth: 60, textAlign: 'right', fontSize: '0.85rem' }}>
                       {calcPoints(c, scoringConfig).toFixed(2)}pts
