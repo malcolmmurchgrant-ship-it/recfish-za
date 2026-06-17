@@ -7,7 +7,7 @@
 // Usage (embedded):    <UniversalScoreboard competitionId="uuid" embedded={true} isAdmin={true} />
 
 import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '../../lib/supabase'
+import { supabase } from '../lib/supabase'
 
 const NAVY  = '#1e3a8a'
 const GOLD  = '#d97706'
