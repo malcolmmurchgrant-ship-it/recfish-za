@@ -13,6 +13,7 @@ import Sessions from './pages/Sessions'
 import SpeciesLookup from './pages/SpeciesLookup'
 import Competitions from './pages/Competitions'
 import CompetitionAdmin from './components/CompetitionAdmin'
+import UniversalScoreboard from './pages/UniversalScoreboard'
 import CompetitionCatchLogger from './pages/CompetitionCatchLogger'
 import AllCoastalsCatchLogger from './pages/AllCoastalsCatchLogger'
 import AllCoastalsScoreboard from './pages/AllCoastalsScoreboard'
@@ -193,6 +194,12 @@ function Navigation() {
   )
 }
 
+// Scoreboard wrapper
+function ScoreboardPage() {
+  const { competitionId } = useParams()
+  return <UniversalScoreboard competitionId={competitionId} />
+}
+
 // Wrapper reads :competitionId from URL and passes it as a prop
 function CompetitionAdminPage() {
   const { competitionId } = useParams()
@@ -222,6 +229,7 @@ function AppContent() {
             <Route path='/allcoastals-scores'   element={<AllCoastalsScoreboard />} />
             <Route path='/allcoastals-admin'    element={<AllCoastalsAdmin />} />
             <Route path='/allcoastals-teams'    element={<AllCoastalsTeams />} />
+            <Route path='/scoreboard/:competitionId' element={<ScoreboardPage />} />
             <Route path='/competition-admin-v2' element={<CompetitionAdminPage />} />
             <Route path='/competition-admin-v2/:competitionId' element={<CompetitionAdminPage />} />
             <Route path='/gamefish'             element={<GamefishCatchLogger />} />
