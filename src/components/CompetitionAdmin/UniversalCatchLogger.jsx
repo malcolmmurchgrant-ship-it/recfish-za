@@ -89,7 +89,15 @@ function rowToMeasuredDraft(row) {
     weight_kg: row.weight_kg != null ? String(row.weight_kg) : '',
     length_cm: row.length_cm != null ? String(row.length_cm) : '',
     line_class_kg: row.line_class_kg || '',
-    measured_min_size: !!row.measured_min_size,
+    // measured_min_size didn't exist as a column until the schema migration
+    // that added it — every row saved before that defaults to false
+    // regardless of what actually happened on the water. A row that
+    // already has real points recorded was clearly scored as a valid
+    // release under whatever rules applied at save time, so treat it as
+    // confirmed rather than retroactively flagging historical catches as
+    // unconfirmed. Only a genuinely fresh row (no points yet) needs the
+    // angler to actively tick the box.
+    measured_min_size: !!row.measured_min_size || (parseFloat(row.points) > 0),
     weightSource: 'saved',
     notes: row.notes || '',
   }
@@ -220,7 +228,14 @@ export default function UniversalCatchLogger({ competitionId }) {
       // (one row per fish, consistent with the rest of the table).
       setUnitCountDraft(unitCountSpecies.map(sp => aggregateUnitCountRows(rows, sp.name)))
 
-      setRecordNote(rows.find(r => r.notes)?.notes || '')
+      // Only surface genuine free-text angler notes as the Record/PB claim —
+      // not auto-generated scoring-detail text like the kingfish release
+      // explainer, which lives in `notes` for historical rows because that
+      // was the only text field available before this UI existed. A simple
+      // heuristic: scoring-detail notes always start with the species hint
+      // text pattern; anything else is treated as a real angler note.
+      const realNote = rows.find(r => r.notes && !/^[A-Za-z]+ photo-release —/.test(r.notes))
+      setRecordNote(realNote?.notes || '')
       setLoadingCard(false)
     })
     return () => { cancelled = true }
@@ -368,8 +383,15 @@ export default function UniversalCatchLogger({ competitionId }) {
       }
 
       // Measured rows: one row per fish
+      let recordNoteAttached = false
       for (const fish of scoredMeasured) {
         if (!fish.species || fish._warning) continue
+        // recordNote is a single card-level field (the angler's PB/record
+        // claim for the day) — attach it to just the first fish rather than
+        // overwriting every row's own notes with the same text, which would
+        // both duplicate it and destroy any per-row notes already present.
+        const noteForThisRow = !recordNoteAttached && recordNote ? recordNote : (fish.notes || null)
+        if (!recordNoteAttached && recordNote) recordNoteAttached = true
         const payload = {
           ...baseFields,
           species_name: fish.species,
@@ -379,7 +401,7 @@ export default function UniversalCatchLogger({ competitionId }) {
           retained: !fish._cfg?.kingfish_release,
           measured_min_size: !!fish.measured_min_size,
           points: fish._scored.points,
-          notes: recordNote || fish.notes || null,
+          notes: noteForThisRow,
         }
         if (fish._id) {
           const { error: err } = await supabase.from('competition_catches').update(payload).eq('id', fish._id)
@@ -413,6 +435,8 @@ export default function UniversalCatchLogger({ competitionId }) {
         const existingIds = row._rowIds || []
         for (let i = 0; i < row.fishCount; i++) {
           const isOverLine = i < (row.overLineCount || 0)
+          const noteForThisRow = !recordNoteAttached && recordNote ? recordNote : null
+          if (!recordNoteAttached && recordNote) recordNoteAttached = true
           const payload = {
             ...baseFields,
             species_name: row.species,
@@ -422,7 +446,7 @@ export default function UniversalCatchLogger({ competitionId }) {
             retained: true,
             is_over_line: isOverLine,
             points: i === 0 ? row._scored.points : 0,
-            notes: recordNote || null,
+            notes: noteForThisRow,
           }
           if (i < existingIds.length) {
             const { error: err } = await supabase.from('competition_catches').update(payload).eq('id', existingIds[i])
