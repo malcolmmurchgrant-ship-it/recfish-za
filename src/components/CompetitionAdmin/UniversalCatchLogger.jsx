@@ -111,7 +111,13 @@ function aggregateUnitCountRows(rows, speciesName) {
   }
 }
 
-const isTraditional = (teamConfig) => (teamConfig?.team_format || 'traditional') !== 'split_boat'
+// competition_templates.team_format is constrained to one of:
+// 'split_boat' | 'full_boat' | 'individual' | 'pairs'. The catch logger's
+// only real branch is: does the team stay on one boat (full_boat —
+// shows a Team picker) or get redrawn across boats daily (split_boat —
+// shows a Boat picker)? 'individual'/'pairs' competitions have no boat
+// concept either and are treated the same as full_boat here.
+const isTeamBased = (teamConfig) => (teamConfig?.team_format || 'full_boat') !== 'split_boat'
 
 export default function UniversalCatchLogger({ competitionId }) {
   const { user } = useAuth()
@@ -143,7 +149,7 @@ export default function UniversalCatchLogger({ competitionId }) {
   const [activeTab, setActiveTab] = useState('entry')
   const [summaryRows, setSummaryRows] = useState([])
 
-  const splitBoatFormat = !isTraditional(config?.team)
+  const splitBoatFormat = !isTeamBased(config?.team)
   const speciesPicker = useMemo(() => buildSpeciesPicker(config?.species), [config])
 
   // Split eligible species by entry_mode once, since each draft array is
