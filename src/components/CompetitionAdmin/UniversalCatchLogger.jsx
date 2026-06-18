@@ -379,7 +379,7 @@ export default function UniversalCatchLogger({ competitionId }) {
         boat_id: splitBoatFormat ? (boatId || null) : null,
         fishing_date: selectedDay.date || null,
         entered_by: user?.id,
-        data_quality: 'unverified',
+        data_quality: 'self_reported',
       }
 
       // Measured rows: one row per fish
