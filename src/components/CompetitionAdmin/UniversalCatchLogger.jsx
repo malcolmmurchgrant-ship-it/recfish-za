@@ -897,12 +897,18 @@ function groupRowsForBadges(rows) {
 
 
 function SummaryTab({ splitBoatFormat, team, boat, selectedDay, anglers, summaryRows, usesMultiplier }) {
+  // Group by angler_id when present (registered anglers); fall back to
+  // participant_id for unregistered anglers, whose rows always have
+  // angler_id = null. Without this fallback every unregistered angler's
+  // catches would collapse into a single null bucket instead of being
+  // correctly attributed per-person.
   const byAngler = new Map()
   for (const row of summaryRows) {
-    if (!byAngler.has(row.angler_id)) byAngler.set(row.angler_id, [])
-    byAngler.get(row.angler_id).push(row)
+    const key = row.angler_id || row.participant_id
+    if (!byAngler.has(key)) byAngler.set(key, [])
+    byAngler.get(key).push(row)
   }
-  const rowsForAngler = (angler) => byAngler.get(angler.user_id) || []
+  const rowsForAngler = (angler) => byAngler.get(angler.user_id || angler.id) || []
 
   const teamTotalPts = summaryRows.reduce((s, r) => s + parseFloat(r.points || 0), 0)
   const teamSpeciesCount = new Set(summaryRows.map(r => r.species_name)).size

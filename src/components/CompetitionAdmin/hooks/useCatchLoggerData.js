@@ -92,13 +92,23 @@ export function useCatchLoggerData(competitionId) {
   // ── Load one angler's existing catches for one day ──────────────────────────
   const loadAnglerDayCatches = useCallback(async (participant, competitionDayId) => {
     if (!participant || !competitionDayId) return []
-    const { data, error } = await supabase
+    // Registered anglers (have a user_id) are matched by angler_id, the
+    // long-term correct anchor. Unregistered anglers (no RecFish ZA
+    // account — e.g. historical competitions scored entirely by a
+    // designated scorer) have no angler_id at all on their rows, so they
+    // must be matched by participant_id instead — the stable anchor that
+    // exists from roster setup regardless of registration status.
+    const query = supabase
       .from('competition_catches')
       .select('*')
       .eq('competition_id', competitionId)
       .eq('competition_day_id', competitionDayId)
-      .eq('angler_id', participant.user_id)
       .order('catch_time', { ascending: true })
+
+    const { data, error } = participant.user_id
+      ? await query.eq('angler_id', participant.user_id)
+      : await query.eq('participant_id', participant.id)
+
     if (error) {
       console.error('Error loading angler catches:', error)
       return []
