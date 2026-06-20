@@ -15,14 +15,6 @@ function getCompConfig(comp, canEnter) {
   const id = comp.id
 
   const specific = {
-    'c8332f15-ce44-4d0b-a3ab-009fc2a2c484': {  // All Coastals 2026
-      hideGenericAdmin: true,
-      links: [
-        { to: '/allcoastals-scores', label: '📊 Scoreboard', primary: true  },
-        { to: '/allcoastals-teams',  label: '🏅 Teams',      primary: false },
-        { to: '/allcoastals-admin',  label: '⚙️ Admin',      primary: false },
-      ],
-    },
     '3855034f-ab39-4297-9be4-ba9a7e566ce0': {  // Gamefish Nationals
       hideGenericAdmin: false,
       links: [

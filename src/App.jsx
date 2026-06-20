@@ -16,12 +16,7 @@ import CompetitionAdmin from './components/CompetitionAdmin'
 import UniversalScoreboard from './pages/UniversalScoreboard'
 import UniversalCatchLogger from './components/CompetitionAdmin/UniversalCatchLogger'
 import CompetitionCatchLogger from './pages/CompetitionCatchLogger'
-import AllCoastalsCatchLogger from './pages/AllCoastalsCatchLogger'
-import AllCoastalsScoreboard from './pages/AllCoastalsScoreboard'
-import AllCoastalsAdmin from './pages/AllCoastalsAdmin'
-import AllCoastalsTeams from './pages/AllCoastalsTeams'
 import Profile from './pages/Profile'
-import GamefishCatchLogger from './pages/GamefishCatchLogger'
 import GamefishScoreboard from './pages/GamefishScoreboard'
 import GamefishAdmin from './pages/GamefishAdmin'
 import TunaNationalsScoreboard from './pages/TunaNationalsScoreboard'
@@ -90,10 +85,6 @@ function Navigation() {
   const competitionItems = [
     { to: '/competitions',         label: '🏆 Competitions Hub'          },
     { to: '/competition-admin-v2', label: '⚙️ Competition Admin'          },
-    ...(canEnterGamefish ? [
-      { divider: true },
-      { to: '/gamefish',           label: '🎣 Gamefish Nationals — Logger' },
-    ] : []),
     { to: '/gamefish-scores',           label: '📊 Gamefish Nationals — Scores'     },
     { to: '/gamefish-admin',            label: '⚙️ Gamefish Nationals — Admin'      },
     { to: '/tuna-nationals-scores',     label: '📊 Tuna Nationals — Scores'         },
@@ -232,15 +223,10 @@ function AppContent() {
             <Route path='/competitions'         element={<Competitions />} />
             <Route path='/competition-admin'    element={<CompetitionAdmin />} />
             <Route path='/competition'          element={<CompetitionCatchLogger />} />
-            <Route path='/allcoastals'          element={<AllCoastalsCatchLogger />} />
-            <Route path='/allcoastals-scores'   element={<AllCoastalsScoreboard />} />
-            <Route path='/allcoastals-admin'    element={<AllCoastalsAdmin />} />
-            <Route path='/allcoastals-teams'    element={<AllCoastalsTeams />} />
             <Route path='/scoreboard/:competitionId' element={<ScoreboardPage />} />
             <Route path='/competition-admin-v2' element={<CompetitionAdminPage />} />
             <Route path='/competition-admin-v2/:competitionId' element={<CompetitionAdminPage />} />
             <Route path='/competition-catch-logger/:competitionId' element={<CatchLoggerPage />} />
-            <Route path='/gamefish'             element={<GamefishCatchLogger />} />
             <Route path='/gamefish-scores'      element={<GamefishScoreboard />} />
             <Route path='/gamefish-admin'       element={<GamefishAdmin />} />
             <Route path='/tuna-nationals-scores'      element={<TunaNationalsScoreboard />} />
