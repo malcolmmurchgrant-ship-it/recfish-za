@@ -59,7 +59,7 @@ function getTotalFishingHours(days) {
 }
 
 // ── Species multiplier scoring (SADSAA Gamefish) ─────────────────────────────
-// Used when scoringConfig.species_multiplier_enabled === true.
+// Used when scoringConfig.species_multiplier === true.
 // Raw points are summed per day, then multiplied by max(1, speciesCount - 1)
 // for that day, then days are summed. Applied separately for teams and anglers.
 function getDayNumber(c, dateToDay) {
@@ -190,7 +190,7 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
       })
 
   // ── Team standings ────────────────────────────────────────────────────────
-  const useMultiplier = !!scoringConfig?.species_multiplier_enabled
+  const useMultiplier = !!scoringConfig?.species_multiplier
   const teamStandings = teams
     .filter(t => !t.is_disqualified)
     .map(t => {
