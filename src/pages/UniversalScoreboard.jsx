@@ -88,7 +88,6 @@ function calcMultipliedPoints(catches, scoringConfig, dateToDay) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function UniversalScoreboard({ competitionId, embedded = false, isAdmin = false }) {
-  console.log('[DEBUG UniversalScoreboard] COMPONENT RENDERED — competitionId:', competitionId, '| embedded:', embedded, '| isAdmin:', isAdmin)
   const [competition,  setCompetition]  = useState(null)
   const [template,     setTemplate]     = useState(null)
   const [catches,      setCatches]      = useState([])
@@ -103,11 +102,7 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
   const [showPending,  setShowPending]  = useState(false)
 
   const load = useCallback(async () => {
-    console.log('[DEBUG UniversalScoreboard] load() called with competitionId =', competitionId, '| typeof:', typeof competitionId, '| embedded:', embedded)
-    if (!competitionId) {
-      console.log('[DEBUG UniversalScoreboard] competitionId is falsy — load() exiting early, NO FETCH WILL HAPPEN')
-      return
-    }
+    if (!competitionId) return
     setLoading(true)
     const [
       { data: compData },
@@ -227,7 +222,7 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
     .filter(p => p.status !== 'disqualified')
     .map(p => {
       const uid  = p.user_id || p.id
-      const ac   = filteredCatches.filter(c => c.angler_id === uid)
+      const ac   = filteredCatches.filter(c => c.angler_id === uid || c.participant_id === p.id)
       const pts  = useMultiplier
         ? calcMultipliedPoints(ac, scoringConfig, dateToDay)
         : ac.reduce((s, c) => s + calcPoints(c, scoringConfig), 0)
@@ -289,7 +284,7 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
   const topCatches = [...filteredCatches]
     .map(c => ({
       ...c,
-      anglerName: anglerMap[c.angler_id]?.full_name || '',
+      anglerName: anglerMap[c.angler_id || c.participant_id]?.full_name || '',
       teamName:   c.competition_teams?.team_name || teamMap[c.team_id]?.team_name || '',
       dayNum:     c.competition_days?.day_number || dateToDay[c.fishing_date] || '?',
       pts:        calcPoints(c, scoringConfig),
@@ -600,7 +595,7 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
                 ) : [...dc].sort((a, b) => calcPoints(b, scoringConfig) - calcPoints(a, scoringConfig)).map((c, ci) => (
                   <div key={c.id} style={{ display: 'flex', gap: '0.75rem', padding: '0.35rem 0.5rem', borderRadius: 5, background: ci % 2 === 0 ? '#f8fafc' : 'white', alignItems: 'center', flexWrap: 'wrap' }}>
                     <div style={{ flex: 1, fontSize: '0.85rem' }}>
-                      <span style={{ fontWeight: 600 }}>{anglerMap[c.angler_id]?.full_name || '—'}</span>
+                      <span style={{ fontWeight: 600 }}>{anglerMap[c.angler_id || c.participant_id]?.full_name || '—'}</span>
                       <span style={{ color: GREY, marginLeft: '0.4rem', fontSize: '0.78rem' }}>
                         {c.competition_teams?.team_name || teamMap[c.team_id]?.team_name || ''}
                       </span>
