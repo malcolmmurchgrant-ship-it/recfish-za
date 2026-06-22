@@ -88,6 +88,7 @@ function calcMultipliedPoints(catches, scoringConfig, dateToDay) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function UniversalScoreboard({ competitionId, embedded = false, isAdmin = false }) {
+  console.log('[DEBUG UniversalScoreboard] COMPONENT RENDERED — competitionId:', competitionId, '| embedded:', embedded, '| isAdmin:', isAdmin)
   const [competition,  setCompetition]  = useState(null)
   const [template,     setTemplate]     = useState(null)
   const [catches,      setCatches]      = useState([])
@@ -102,7 +103,11 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
   const [showPending,  setShowPending]  = useState(false)
 
   const load = useCallback(async () => {
-    if (!competitionId) return
+    console.log('[DEBUG UniversalScoreboard] load() called with competitionId =', competitionId, '| typeof:', typeof competitionId, '| embedded:', embedded)
+    if (!competitionId) {
+      console.log('[DEBUG UniversalScoreboard] competitionId is falsy — load() exiting early, NO FETCH WILL HAPPEN')
+      return
+    }
     setLoading(true)
     const [
       { data: compData },
