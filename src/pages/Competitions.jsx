@@ -74,7 +74,6 @@ function getCompConfig(comp, canEnter) {
     // ── 2025 historical imports — scoreboards coming soon ──────────────────
     'ad8d03e7-6d4d-4cea-b96b-1007d3c6127d': { hideGenericAdmin: true, links: [{ to: null, label: '📊 Results Coming Soon', primary: true, disabled: true }] },  // All Inland Interprov 2025
     '350c759c-fa02-48b1-9c77-bf3b40fff22f': { hideGenericAdmin: true, links: [{ to: null, label: '📊 Results Coming Soon', primary: true, disabled: true }] },  // Gamefish Nationals 2025
-    '25fc4dbc-9ed8-420d-9d09-c5ebb10b7b69': { hideGenericAdmin: true, links: [{ to: null, label: '📊 Results Coming Soon', primary: true, disabled: true }] },  // Tuna Interprov 2025
     'b5d55428-53fc-4ce6-ad76-f098f757701a': { hideGenericAdmin: true, links: [{ to: null, label: '📊 Results Coming Soon', primary: true, disabled: true }] },  // All Coastals 2025
     '0a099402-0bc5-46b0-b94d-0f94129758f0': { hideGenericAdmin: true, links: [{ to: null, label: '📊 Results Coming Soon', primary: true, disabled: true }] },  // Junior U16 Gamefish 2025
     '82dbbca2-fbea-4eb7-931c-a60072a136c1': { hideGenericAdmin: true, links: [{ to: null, label: '📊 Results Coming Soon', primary: true, disabled: true }] },  // Junior U19 Gamefish 2025
