@@ -16,8 +16,36 @@ export function useCompetitionRoles(competitionId) {
   const [loading,       setLoading]       = useState(true)
 
   useEffect(() => {
-    if (!user || !competitionId) return
-    checkRoles()
+    if (!competitionId) return
+
+    let settled = false
+
+    // Hard safety net: never let this hook hang the page forever, no matter
+    // what's happening with auth/network upstream. If checkRoles() hasn't
+    // finished within 8s, force loading to clear so the page can render
+    // (with whatever permission flags we have so far — worst case, a brief
+    // under-permissioned flash that self-corrects once the real check lands).
+    const timeout = setTimeout(() => {
+      if (!settled) {
+        console.warn('useCompetitionRoles: role check timed out after 8s — clearing loading state defensively')
+        setLoading(false)
+      }
+    }, 8000)
+
+    if (!user) {
+      // No user yet — nothing to check, but don't hang forever waiting.
+      // If user arrives later, this effect re-runs (user is a dependency)
+      // and checkRoles() will run properly then.
+      setLoading(false)
+      return () => clearTimeout(timeout)
+    }
+
+    checkRoles().finally(() => {
+      settled = true
+      clearTimeout(timeout)
+    })
+
+    return () => clearTimeout(timeout)
   }, [user, competitionId])
 
   async function checkRoles() {
