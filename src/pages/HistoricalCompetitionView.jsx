@@ -178,7 +178,10 @@ export default function HistoricalCompetitionView({ competitionId }) {
         <div style={{ fontSize: '0.85rem', color: '#92400e' }}>
           This is a historical record imported from an official post-event catch return.
           No scoring protocol was applied to this competition, so no points or rankings
-          are shown — only the catches themselves. Anglers can claim their catches from
+          are shown — only the catches themselves. Some original catch returns did not
+          record anglers who fished but caught nothing ("blanked"), so a team showing
+          fewer anglers than expected may not reflect its actual full roster — only the
+          anglers who recorded a catch. Anglers can claim their catches from
           the <strong>My Catches</strong> page.
         </div>
       </div>
