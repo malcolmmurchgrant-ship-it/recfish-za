@@ -13,6 +13,7 @@ import Sessions from './pages/Sessions'
 import SpeciesLookup from './pages/SpeciesLookup'
 import Competitions from './pages/Competitions'
 import CompetitionAdmin from './components/CompetitionAdmin'
+import HistoricalCompetitionView from './pages/HistoricalCompetitionView'
 import UniversalScoreboard from './pages/UniversalScoreboard'
 import UniversalCatchLogger from './components/CompetitionAdmin/UniversalCatchLogger'
 import CompetitionCatchLogger from './pages/CompetitionCatchLogger'
@@ -192,10 +193,47 @@ function ScoreboardPage() {
   return <UniversalScoreboard competitionId={competitionId} />
 }
 
-// Wrapper reads :competitionId from URL and passes it as a prop
+// Wrapper reads :competitionId from URL and decides which admin view to
+// render: the full live-competition CompetitionAdmin suite, or the simple
+// read-only HistoricalCompetitionView for competitions imported from a
+// standardized post-event catch return (no scoring protocol applied).
 function CompetitionAdminPage() {
   const { competitionId } = useParams()
-  return <CompetitionAdmin competitionId={competitionId} />
+  const [isHistorical, setIsHistorical] = useState(null) // null = still checking
+  const [checkError,   setCheckError]   = useState(null)
+
+  useEffect(() => {
+    if (!competitionId) { setIsHistorical(false); return }
+    let cancelled = false
+    supabase
+      .from('competitions')
+      .select('is_historical_import')
+      .eq('id', competitionId)
+      .single()
+      .then(({ data, error }) => {
+        if (cancelled) return
+        if (error) {
+          // If the flag can't be checked for any reason, fail safe to the
+          // normal live-competition view rather than blocking the page —
+          // a missing/unreadable flag should never be worse than the
+          // pre-existing behavior.
+          console.error('CompetitionAdminPage: could not check is_historical_import', error)
+          setCheckError(error.message)
+          setIsHistorical(false)
+          return
+        }
+        setIsHistorical(!!data?.is_historical_import)
+      })
+    return () => { cancelled = true }
+  }, [competitionId])
+
+  if (isHistorical === null) {
+    return <div style={{ maxWidth: 960, margin: '0 auto', padding: '2rem', textAlign: 'center', color: '#6b7280' }}>Loading…</div>
+  }
+
+  return isHistorical
+    ? <HistoricalCompetitionView competitionId={competitionId} />
+    : <CompetitionAdmin competitionId={competitionId} />
 }
 
 // Catch Logger wrapper reads :competitionId from URL and passes it as a prop
