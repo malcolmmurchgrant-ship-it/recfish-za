@@ -117,6 +117,14 @@ export default function HistoricalCompetitionView({ competitionId }) {
   const realCatches = catches.filter(isRealCatch)
   const totalFish   = realCatches.length
 
+  // Unit-count competitions (no weight recorded on any real catch) tally
+  // distinct species caught, not individual measured fish — "13 species"
+  // is the accurate description, not "13 fish". Detect by checking
+  // whether every real catch lacks a weight; a measured/percentage-style
+  // competition will have real weight_kg values throughout.
+  const isUnitCountFormat = realCatches.length > 0 && realCatches.every(c => c.weight_kg == null)
+  const catchUnitLabel = isUnitCountFormat ? 'species' : 'fish'
+
   const anglersPerBoatDay = {}
   for (const c of catches) {
     const boatName = c.competition_boats?.boat_name
@@ -186,7 +194,7 @@ export default function HistoricalCompetitionView({ competitionId }) {
           <div>
             <div style={{ ...S.label, color: 'rgba(255,255,255,0.7)' }}>Competition CPUE</div>
             <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#fbbf24' }}>
-              {cpue != null ? `${cpue.toFixed(4)} fish/angler-hr` : '—'}
+              {cpue != null ? `${cpue.toFixed(4)} ${catchUnitLabel}/angler-hr` : '—'}
             </div>
           </div>
         </div>
@@ -248,7 +256,7 @@ export default function HistoricalCompetitionView({ competitionId }) {
           <div key={teamName} style={S.card}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.75rem' }}>
               <div style={{ fontWeight: 800, fontSize: '1.05rem', color: NAVY }}>{teamName}</div>
-              <div style={{ fontSize: '0.8rem', color: GREY }}>{anglerNames.length} anglers · {teamFishCount} fish</div>
+              <div style={{ fontSize: '0.8rem', color: GREY }}>{anglerNames.length} anglers · {teamFishCount} {catchUnitLabel}</div>
             </div>
 
             {anglerNames.map(anglerName => {
@@ -271,7 +279,7 @@ export default function HistoricalCompetitionView({ competitionId }) {
                 <div key={anglerName} style={{ marginBottom: '0.9rem' }}>
                   <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#374151', marginBottom: '0.35rem' }}>
                     {anglerName}
-                    <span style={{ fontWeight: 400, color: GREY, marginLeft: 6 }}>({anglerCatches.length} fish)</span>
+                    <span style={{ fontWeight: 400, color: GREY, marginLeft: 6 }}>({anglerCatches.length} {catchUnitLabel})</span>
                   </div>
                   <div style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
@@ -279,7 +287,7 @@ export default function HistoricalCompetitionView({ competitionId }) {
                         <tr style={{ background: '#f3f4f6' }}>
                           <th style={{ ...S.th, color: '#374151' }}>Day</th>
                           <th style={{ ...S.th, color: '#374151' }}>Species</th>
-                          <th style={{ ...S.th, color: '#374151' }}>Weight (kg)</th>
+                          {!isUnitCountFormat && <th style={{ ...S.th, color: '#374151' }}>Weight (kg)</th>}
                           <th style={{ ...S.th, color: '#374151' }}>Boat</th>
                         </tr>
                       </thead>
@@ -288,7 +296,7 @@ export default function HistoricalCompetitionView({ competitionId }) {
                           <tr key={c.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
                             <td style={S.td}>Day {c.competition_days?.day_number ?? '—'}</td>
                             <td style={S.td}>{c.species_name}</td>
-                            <td style={S.td}>{c.weight_kg != null ? parseFloat(c.weight_kg).toFixed(2) : '—'}</td>
+                            {!isUnitCountFormat && <td style={S.td}>{c.weight_kg != null ? parseFloat(c.weight_kg).toFixed(2) : '—'}</td>}
                             <td style={{ ...S.td, color: GREY }}>{c.competition_boats?.boat_name || '—'}</td>
                           </tr>
                         ))}
