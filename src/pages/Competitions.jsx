@@ -14,6 +14,20 @@ const CATCH_ROLES = ['admin', 'tournament_director']
 function getCompConfig(comp, canEnter) {
   const id = comp.id
 
+  // Historical-import competitions (no live scoring — browse + claim only)
+  // always get this treatment, regardless of whether an old hardcoded
+  // entry exists below for them. This must run BEFORE the specific[id]
+  // lookup, since most of the historical batch still has a leftover
+  // "Results Coming Soon" block from before is_historical_import existed.
+  if (comp.is_historical_import) {
+    return {
+      hideGenericAdmin: true,
+      links: [
+        { to: `/competition-admin-v2/${id}`, label: '📋 Catch Results', primary: true },
+      ],
+    }
+  }
+
   const specific = {
     '3855034f-ab39-4297-9be4-ba9a7e566ce0': {  // Gamefish Nationals
       hideGenericAdmin: false,
@@ -178,7 +192,7 @@ export default function Competitions() {
         id, name, short_name, venue, start_date, end_date,
         status, discipline, level, category, description,
         team_size, default_line_class_kg, hosting_province,
-        federation_id, association_id
+        federation_id, association_id, is_historical_import
       `)
       .not('status', 'eq', 'cancelled')
       .order('start_date', { ascending: false })
