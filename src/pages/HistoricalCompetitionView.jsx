@@ -40,6 +40,7 @@ export default function HistoricalCompetitionView({ competitionId }) {
   const [competition, setCompetition] = useState(null)
   const [sessions,    setSessions]    = useState([])
   const [catches,     setCatches]     = useState([])
+  const [participants,setParticipants]= useState([])
   const [loading,     setLoading]     = useState(true)
   const [error,       setError]       = useState(null)
 
@@ -56,6 +57,7 @@ export default function HistoricalCompetitionView({ competitionId }) {
         { data: comp,    error: compErr },
         { data: sess,    error: sessErr },
         { data: cs,      error: catchErr },
+        { data: parts,   error: partsErr },
       ] = await Promise.all([
         supabase.from('competitions').select('*').eq('id', competitionId).single(),
         supabase.from('competition_fishing_sessions').select('*').eq('competition_id', competitionId).order('day_number'),
@@ -68,15 +70,22 @@ export default function HistoricalCompetitionView({ competitionId }) {
             competition_days ( id, day_number )
           `)
           .eq('competition_id', competitionId),
+        supabase
+          .from('competition_participants')
+          .select('id, full_name, competition_teams ( id, team_name )')
+          .eq('competition_id', competitionId)
+          .order('full_name'),
       ])
 
       if (compErr) throw compErr
       if (sessErr) throw sessErr
       if (catchErr) throw catchErr
+      if (partsErr) throw partsErr
 
       setCompetition(comp)
       setSessions(sess || [])
       setCatches(cs || [])
+      setParticipants(parts || [])
     } catch (err) {
       console.error('HistoricalCompetitionView load error:', err)
       setError(err.message || 'Failed to load competition data')
@@ -128,8 +137,19 @@ export default function HistoricalCompetitionView({ competitionId }) {
 
   const cpue = totalAnglerHours > 0 ? totalFish / totalAnglerHours : null
 
-  // ── Group catches by team, then angler ──────────────────────────────────
+  // ── Group by team, then angler — starting from the FULL roster ──────────
+  // Every participant must appear, even if they never caught anything —
+  // selectors and the anglers themselves need to see who actually fished,
+  // not just who scored a fish. An angler with zero real catches still
+  // shows on their team, with an explicit "no catch recorded" note rather
+  // than being silently omitted.
   const byTeam = {}
+  for (const p of participants) {
+    const teamName   = p.competition_teams?.team_name || 'Unassigned'
+    const anglerName = p.full_name || 'Unknown angler'
+    if (!byTeam[teamName]) byTeam[teamName] = {}
+    if (!byTeam[teamName][anglerName]) byTeam[teamName][anglerName] = []
+  }
   for (const c of realCatches) {
     const teamName   = c.competition_participants?.competition_teams?.team_name || 'Unassigned'
     const anglerName = c.competition_participants?.full_name || 'Unknown angler'
@@ -235,6 +255,18 @@ export default function HistoricalCompetitionView({ competitionId }) {
               const anglerCatches = anglers[anglerName].sort((a, b) =>
                 (a.competition_days?.day_number || 0) - (b.competition_days?.day_number || 0)
               )
+              if (anglerCatches.length === 0) {
+                return (
+                  <div key={anglerName} style={{ marginBottom: '0.9rem' }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#374151', marginBottom: '0.35rem' }}>
+                      {anglerName}
+                    </div>
+                    <div style={{ fontSize: '0.82rem', color: GREY, fontStyle: 'italic', padding: '0.4rem 0' }}>
+                      Participated — no catch recorded.
+                    </div>
+                  </div>
+                )
+              }
               return (
                 <div key={anglerName} style={{ marginBottom: '0.9rem' }}>
                   <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#374151', marginBottom: '0.35rem' }}>
