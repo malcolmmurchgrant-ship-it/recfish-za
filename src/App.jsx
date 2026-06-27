@@ -13,6 +13,7 @@ import Sessions from './pages/Sessions'
 import SpeciesLookup from './pages/SpeciesLookup'
 import Competitions from './pages/Competitions'
 import CompetitionAdmin from './components/CompetitionAdmin'
+import CompetitionSetupWizard from './pages/CompetitionSetupWizard'
 import HistoricalCompetitionView from './pages/HistoricalCompetitionView'
 import UniversalScoreboard from './pages/UniversalScoreboard'
 import UniversalCatchLogger from './components/CompetitionAdmin/UniversalCatchLogger'
@@ -85,6 +86,7 @@ function Navigation() {
 
   const competitionItems = [
     { to: '/competitions',         label: '🏆 Competitions Hub'          },
+    { to: '/setup-wizard',         label: '🧭 Set Up a Competition'      },
     { to: '/competition-admin-v2', label: '⚙️ Competition Admin'          },
     { to: '/gamefish-scores',           label: '📊 Gamefish Nationals — Scores'     },
     { to: '/gamefish-admin',            label: '⚙️ Gamefish Nationals — Admin'      },
@@ -264,6 +266,8 @@ function AppContent() {
             <Route path='/scoreboard/:competitionId' element={<ScoreboardPage />} />
             <Route path='/competition-admin-v2' element={<CompetitionAdminPage />} />
             <Route path='/competition-admin-v2/:competitionId' element={<CompetitionAdminPage />} />
+            <Route path='/setup-wizard'         element={<CompetitionSetupWizard />} />
+            <Route path='/setup-wizard/:competitionId' element={<CompetitionSetupWizard />} />
             <Route path='/competition-catch-logger/:competitionId' element={<CatchLoggerPage />} />
             <Route path='/gamefish-scores'      element={<GamefishScoreboard />} />
             <Route path='/gamefish-admin'       element={<GamefishAdmin />} />
