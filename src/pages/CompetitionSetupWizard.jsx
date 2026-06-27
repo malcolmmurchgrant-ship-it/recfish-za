@@ -191,6 +191,27 @@ function CompetitionStep({ competition, onSaved, recentComps, onPickExisting }) 
     } else {
       const { data, error } = await supabase.from('competitions').insert(payload).select()
       saveError = error; savedData = data?.[0] || null
+
+      // A brand-new competition has no rows in competition_user_roles yet —
+      // and every other table's RLS policy (teams, boats, sessions, etc.)
+      // requires the acting user to already hold 'admin' or
+      // 'tournament_director' on THIS competition_id. A direct client-side
+      // insert into competition_user_roles can't satisfy this itself, since
+      // that table has no INSERT policy at all (read-only to clients) — so
+      // this calls a SECURITY DEFINER database function instead, which is
+      // narrowly allowed to grant the FIRST role on a competition (and
+      // permanently a no-op for that competition once any role exists).
+      if (!saveError && savedData) {
+        const { error: roleError } = await supabase.rpc('claim_first_competition_role', {
+          p_competition_id: savedData.id,
+        })
+        if (roleError) {
+          // Don't block the save over this — the competition row itself
+          // saved fine — but surface it clearly, since silently failing
+          // here just relocates today's exact bug to the next step.
+          setError(`Competition saved, but couldn't grant yourself Tournament Director access automatically (${roleError.message}). You may need to be granted access manually before adding teams or boats.`)
+        }
+      }
     }
     if (saveError) { setError(saveError.message); setSaving(false); return }
     setSaving(false); setSaved(true)
