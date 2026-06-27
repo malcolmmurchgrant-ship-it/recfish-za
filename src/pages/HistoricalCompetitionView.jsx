@@ -39,6 +39,7 @@ const isRealCatch = (c) => c.species_name && !/no catch/i.test(c.species_name)
 export default function HistoricalCompetitionView({ competitionId }) {
   const [competition, setCompetition] = useState(null)
   const [sessions,    setSessions]    = useState([])
+  const [days,        setDays]        = useState([])
   const [catches,     setCatches]     = useState([])
   const [participants,setParticipants]= useState([])
   const [loading,     setLoading]     = useState(true)
@@ -54,13 +55,15 @@ export default function HistoricalCompetitionView({ competitionId }) {
     setError(null)
     try {
       const [
-        { data: comp,    error: compErr },
-        { data: sess,    error: sessErr },
-        { data: cs,      error: catchErr },
-        { data: parts,   error: partsErr },
+        { data: comp,     error: compErr },
+        { data: sess,     error: sessErr },
+        { data: dayRows,  error: daysErr },
+        { data: cs,       error: catchErr },
+        { data: parts,    error: partsErr },
       ] = await Promise.all([
         supabase.from('competitions').select('*').eq('id', competitionId).single(),
         supabase.from('competition_fishing_sessions').select('*').eq('competition_id', competitionId).order('day_number'),
+        supabase.from('competition_days').select('day_number, date').eq('competition_id', competitionId).order('day_number'),
         supabase
           .from('competition_catches')
           .select(`
@@ -79,11 +82,13 @@ export default function HistoricalCompetitionView({ competitionId }) {
 
       if (compErr) throw compErr
       if (sessErr) throw sessErr
+      if (daysErr) throw daysErr
       if (catchErr) throw catchErr
       if (partsErr) throw partsErr
 
       setCompetition(comp)
       setSessions(sess || [])
+      setDays(dayRows || [])
       setCatches(cs || [])
       setParticipants(parts || [])
     } catch (err) {
@@ -144,6 +149,27 @@ export default function HistoricalCompetitionView({ competitionId }) {
   }
 
   const cpue = totalAnglerHours > 0 ? totalFish / totalAnglerHours : null
+
+  // ── Day number → real calendar date lookup, for the Fishing Sessions table ──
+  const dateByDayNumber = {}
+  for (const d of days) {
+    dateByDayNumber[d.day_number] = d.date
+  }
+  function formatDate(isoDate) {
+    if (!isoDate) return '—'
+    const d = new Date(isoDate + 'T00:00:00')
+    return d.toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })
+  }
+
+  // ── Total Species Caught — distinct species across the whole competition,
+  // with fish counts, sorted most-caught first. Same isRealCatch filter as
+  // everywhere else, so "No Catch" placeholder rows never appear here.
+  const speciesCounts = {}
+  for (const c of realCatches) {
+    const sp = c.species_name || 'Unknown'
+    speciesCounts[sp] = (speciesCounts[sp] || 0) + 1
+  }
+  const speciesSorted = Object.entries(speciesCounts).sort((a, b) => b[1] - a[1])
 
   // ── Group by team, then angler — starting from the FULL roster ──────────
   // Every participant must appear, even if they never caught anything —
@@ -222,9 +248,9 @@ export default function HistoricalCompetitionView({ competitionId }) {
             <thead>
               <tr style={{ background: NAVY }}>
                 <th style={S.th}>Day</th>
+                <th style={S.th}>Date</th>
                 <th style={S.th}>Boat</th>
-                <th style={S.th}>Lines In</th>
-                <th style={S.th}>Lines Up</th>
+                <th style={S.th}>Skipper</th>
                 <th style={S.th}>Hours</th>
               </tr>
             </thead>
@@ -232,14 +258,43 @@ export default function HistoricalCompetitionView({ competitionId }) {
               {sessions.map((s, i) => (
                 <tr key={s.id} style={{ background: i % 2 === 0 ? 'white' : '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
                   <td style={S.td}>Day {s.day_number}</td>
+                  <td style={S.td}>{formatDate(dateByDayNumber[s.day_number])}</td>
                   <td style={{ ...S.td, fontWeight: 600 }}>{s.boat_name}</td>
-                  <td style={S.td}>{s.lines_in}</td>
-                  <td style={S.td}>{s.lines_up}</td>
+                  <td style={S.td}>{s.skipper_name || '—'}</td>
                   <td style={S.td}>{s.fishing_hours}</td>
                 </tr>
               ))}
               {sessions.length === 0 && (
                 <tr><td colSpan={5} style={{ ...S.td, textAlign: 'center', color: GREY, fontStyle: 'italic' }}>No session data recorded.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ── Total Species Caught ─────────────────────────────────────── */}
+      <div style={S.card}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.75rem' }}>
+          <div style={{ fontWeight: 700, color: NAVY }}>Total Species Caught</div>
+          <div style={{ fontSize: '0.8rem', color: GREY }}>{speciesSorted.length} species</div>
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+            <thead>
+              <tr style={{ background: NAVY }}>
+                <th style={S.th}>Species</th>
+                <th style={{ ...S.th, textAlign: 'right' }}>{isUnitCountFormat ? 'Fish' : 'Catches'}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {speciesSorted.map(([species, count], i) => (
+                <tr key={species} style={{ background: i % 2 === 0 ? 'white' : '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                  <td style={S.td}>{species}</td>
+                  <td style={{ ...S.td, textAlign: 'right', fontWeight: 600 }}>{count}</td>
+                </tr>
+              ))}
+              {speciesSorted.length === 0 && (
+                <tr><td colSpan={2} style={{ ...S.td, textAlign: 'center', color: GREY, fontStyle: 'italic' }}>No species recorded.</td></tr>
               )}
             </tbody>
           </table>
