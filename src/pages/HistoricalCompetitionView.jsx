@@ -330,6 +330,35 @@ export default function HistoricalCompetitionView({ competitionId }) {
                   </div>
                 )
               }
+
+              // Unit-count competitions (e.g. Bottomfish): every fish of a species is
+              // functionally identical with no individual weight, so showing 56 separate
+              // "Carpenter" rows is just noise — collapse to one row per species per day
+              // with a fish-count column instead. Weight-based competitions keep one row
+              // per individual fish, since each fish's own measured weight is real
+              // information that aggregation would destroy.
+              let displayRows
+              if (isUnitCountFormat) {
+                const grouped = {}
+                for (const c of anglerCatches) {
+                  const day = c.competition_days?.day_number ?? '—'
+                  const key = `${day}|${c.species_name}`
+                  if (!grouped[key]) {
+                    grouped[key] = { day, species: c.species_name, count: 0, boat: c.competition_boats?.boat_name || '—' }
+                  }
+                  grouped[key].count += 1
+                }
+                displayRows = Object.values(grouped).sort((a, b) => (a.day || 0) - (b.day || 0))
+              } else {
+                displayRows = anglerCatches.map(c => ({
+                  key: c.id,
+                  day: c.competition_days?.day_number ?? '—',
+                  species: c.species_name,
+                  weight: c.weight_kg,
+                  boat: c.competition_boats?.boat_name || '—',
+                }))
+              }
+
               return (
                 <div key={anglerName} style={{ marginBottom: '0.9rem' }}>
                   <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#374151', marginBottom: '0.35rem' }}>
@@ -342,19 +371,29 @@ export default function HistoricalCompetitionView({ competitionId }) {
                         <tr style={{ background: '#f3f4f6' }}>
                           <th style={{ ...S.th, color: '#374151' }}>Day</th>
                           <th style={{ ...S.th, color: '#374151' }}>Species</th>
+                          {isUnitCountFormat && <th style={{ ...S.th, color: '#374151', textAlign: 'right' }}>Fish</th>}
                           {!isUnitCountFormat && <th style={{ ...S.th, color: '#374151' }}>Weight (kg)</th>}
                           <th style={{ ...S.th, color: '#374151' }}>Boat</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {anglerCatches.map(c => (
-                          <tr key={c.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                            <td style={S.td}>Day {c.competition_days?.day_number ?? '—'}</td>
-                            <td style={S.td}>{c.species_name}</td>
-                            {!isUnitCountFormat && <td style={S.td}>{c.weight_kg != null ? parseFloat(c.weight_kg).toFixed(2) : '—'}</td>}
-                            <td style={{ ...S.td, color: GREY }}>{c.competition_boats?.boat_name || '—'}</td>
-                          </tr>
-                        ))}
+                        {isUnitCountFormat
+                          ? displayRows.map((row, i) => (
+                              <tr key={`${row.day}|${row.species}|${i}`} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                                <td style={S.td}>Day {row.day}</td>
+                                <td style={S.td}>{row.species}</td>
+                                <td style={{ ...S.td, textAlign: 'right', fontWeight: 600 }}>{row.count}</td>
+                                <td style={{ ...S.td, color: GREY }}>{row.boat}</td>
+                              </tr>
+                            ))
+                          : displayRows.map(row => (
+                              <tr key={row.key} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                                <td style={S.td}>Day {row.day}</td>
+                                <td style={S.td}>{row.species}</td>
+                                <td style={S.td}>{row.weight != null ? parseFloat(row.weight).toFixed(2) : '—'}</td>
+                                <td style={{ ...S.td, color: GREY }}>{row.boat}</td>
+                              </tr>
+                            ))}
                       </tbody>
                     </table>
                   </div>
@@ -364,6 +403,7 @@ export default function HistoricalCompetitionView({ competitionId }) {
           </div>
         )
       })}
+
 
       {teamNames.length === 0 && (
         <div style={{ ...S.card, textAlign: 'center', color: GREY, fontStyle: 'italic' }}>
