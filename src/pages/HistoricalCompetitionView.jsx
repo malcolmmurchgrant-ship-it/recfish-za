@@ -72,7 +72,17 @@ export default function HistoricalCompetitionView({ competitionId }) {
             competition_boats ( id, boat_name ),
             competition_days ( id, day_number )
           `)
-          .eq('competition_id', competitionId),
+          .eq('competition_id', competitionId)
+          // PostgREST defaults to a 1000-row cap with no error or warning when
+          // exceeded — silently dropping whichever rows fall past row 1000 in
+          // server-side order. A historical competition with one row per
+          // individual fish (rather than one row per species) can comfortably
+          // exceed 1000 (Bottomfish Nationals 2024 has 1,384), so this MUST be
+          // set explicitly above any plausible competition size, or anglers
+          // whose rows land past the cutoff will silently appear to have
+          // caught nothing. 9999 is comfortably above any realistic catch
+          // count for a single competition.
+          .range(0, 9999),
         supabase
           .from('competition_participants')
           .select('id, full_name, competition_teams ( id, team_name )')
