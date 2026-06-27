@@ -122,13 +122,16 @@ export default function HistoricalCompetitionView({ competitionId }) {
   const realCatches = catches.filter(isRealCatch)
   const totalFish   = realCatches.length
 
-  // Unit-count competitions (no weight recorded on any real catch) tally
-  // distinct species caught, not individual measured fish — "13 species"
-  // is the accurate description, not "13 fish". Detect by checking
-  // whether every real catch lacks a weight; a measured/percentage-style
-  // competition will have real weight_kg values throughout.
+  // Unit-count competitions (no weight recorded on any real catch) have no
+  // individual measured weight per fish, unlike measured/percentage-style
+  // competitions where every real catch has a real weight_kg. This still
+  // matters for which columns to show (Weight makes no sense without a
+  // weight to show) — but it does NOT mean every row is "a species" rather
+  // than "a fish": this component is shared across historical imports with
+  // different original shapes, so fish-count and species-count are tracked
+  // and labeled separately everywhere below, rather than collapsed into one
+  // ambiguous label.
   const isUnitCountFormat = realCatches.length > 0 && realCatches.every(c => c.weight_kg == null)
-  const catchUnitLabel = isUnitCountFormat ? 'species' : 'fish'
 
   const anglersPerBoatDay = {}
   for (const c of catches) {
@@ -220,7 +223,7 @@ export default function HistoricalCompetitionView({ competitionId }) {
           <div>
             <div style={{ ...S.label, color: 'rgba(255,255,255,0.7)' }}>Competition CPUE</div>
             <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#fbbf24' }}>
-              {cpue != null ? `${cpue.toFixed(4)} ${catchUnitLabel}/angler-hr` : '—'}
+              {cpue != null ? `${cpue.toFixed(4)} fish/angler-hr` : '—'}
             </div>
           </div>
         </div>
@@ -306,12 +309,18 @@ export default function HistoricalCompetitionView({ competitionId }) {
         const anglers = byTeam[teamName]
         const anglerNames = Object.keys(anglers).sort()
         const teamFishCount = anglerNames.reduce((n, a) => n + anglers[a].length, 0)
+        const teamSpeciesCount = isUnitCountFormat
+          ? new Set(anglerNames.flatMap(a => anglers[a].map(c => c.species_name))).size
+          : null
 
         return (
           <div key={teamName} style={S.card}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.75rem' }}>
               <div style={{ fontWeight: 800, fontSize: '1.05rem', color: NAVY }}>{teamName}</div>
-              <div style={{ fontSize: '0.8rem', color: GREY }}>{anglerNames.length} anglers · {teamFishCount} {catchUnitLabel}</div>
+              <div style={{ fontSize: '0.8rem', color: GREY }}>
+                {anglerNames.length} anglers · {teamFishCount} fish
+                {teamSpeciesCount != null ? ` · ${teamSpeciesCount} species` : ''}
+              </div>
             </div>
 
             {anglerNames.map(anglerName => {
@@ -359,11 +368,17 @@ export default function HistoricalCompetitionView({ competitionId }) {
                 }))
               }
 
+              const anglerSpeciesCount = isUnitCountFormat
+                ? new Set(anglerCatches.map(c => c.species_name)).size
+                : null
+
               return (
                 <div key={anglerName} style={{ marginBottom: '0.9rem' }}>
                   <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#374151', marginBottom: '0.35rem' }}>
                     {anglerName}
-                    <span style={{ fontWeight: 400, color: GREY, marginLeft: 6 }}>({anglerCatches.length} {catchUnitLabel})</span>
+                    <span style={{ fontWeight: 400, color: GREY, marginLeft: 6 }}>
+                      ({anglerSpeciesCount != null ? `${anglerSpeciesCount} species · ` : ''}{anglerCatches.length} fish)
+                    </span>
                   </div>
                   <div style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem' }}>
