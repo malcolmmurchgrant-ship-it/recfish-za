@@ -896,9 +896,13 @@ function BoatDrawStep({ competition }) {
     setError(''); load()
   }
 
-  const saveTeamDraw = async (teamId, dayNum, boatId) => {
+  // Writes one team's boat for one day. Does NOT reload state itself —
+  // callers that save multiple days in a row (the 'fixed' mode dropdown)
+  // should await each call in sequence and reload once at the end, rather
+  // than each call reloading independently and showing flickering,
+  // partially-saved intermediate state.
+  const saveTeamDrawRaw = async (teamId, dayNum, boatId) => {
     const teamAnglers = participants.filter(p => p.team_id === teamId)
-    setSaving(true)
     for (const p of teamAnglers) {
       const dateStr = datesForDays[dayNum]
       const existing = findDraw(p.id, dayNum)
@@ -906,6 +910,11 @@ function BoatDrawStep({ competition }) {
       if (existing) await supabase.from('competition_boat_draws').update(payload).eq('id', existing.id)
       else await supabase.from('competition_boat_draws').insert(payload)
     }
+  }
+
+  const saveTeamDraw = async (teamId, dayNum, boatId) => {
+    setSaving(true)
+    await saveTeamDrawRaw(teamId, dayNum, boatId)
     setSaving(false)
     load()
   }
@@ -935,7 +944,20 @@ function BoatDrawStep({ competition }) {
               <div key={team.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem 0', borderBottom: '1px solid #f0f0f0' }}>
                 <span style={{ fontWeight: 700, flex: 1 }}>{team.team_name}</span>
                 <select style={{ ...S.select, maxWidth: 280 }} value={existing?.boat_id || ''}
-                  onChange={e => days.forEach(d => saveTeamDraw(team.id, d, e.target.value))}>
+                  onChange={async e => {
+                    const boatId = e.target.value
+                    setSaving(true)
+                    // Sequential — each day's findDraw() check still reads the
+                    // same in-memory `draws` snapshot until we reload at the
+                    // end, but since this is a brand-new boat assignment for
+                    // every day at once, every day is an INSERT regardless of
+                    // order, so this is safe even without an interim reload.
+                    for (const d of days) {
+                      await saveTeamDrawRaw(team.id, d, boatId)
+                    }
+                    setSaving(false)
+                    load()
+                  }}>
                   {boatOptions}
                 </select>
               </div>
