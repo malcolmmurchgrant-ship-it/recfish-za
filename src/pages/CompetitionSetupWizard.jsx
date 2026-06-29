@@ -697,7 +697,8 @@ function SessionsStep({ competition }) {
   const [sessions, setSessions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [saving, setSaving] = useState(null) // `${dayNum}|${boatName}` of the row currently saving
+  const [saving, setSaving] = useState(null) // day number currently saving, or null
+  const [savedDay, setSavedDay] = useState(null) // day number just successfully saved, briefly shown
 
   const numDays = competition?.num_fishing_days || 0
   const startDate = competition?.start_date
@@ -743,23 +744,31 @@ function SessionsStep({ competition }) {
     setDraft(prev => ({ ...prev, [key]: { ...rowFor(dayNum, boat), ...patch } }))
   }
 
-  const handleSaveRow = async (dayNum, boat) => {
-    const row = rowFor(dayNum, boat)
-    const key = keyOf(dayNum, boat.boat_name)
-    setSaving(key)
-    const fishing_hours = hoursBetween(row.lines_in, row.lines_up) || null
-    const payload = {
-      competition_id: competition.id, day_number: dayNum, boat_name: boat.boat_name,
-      skipper_name: boat.skipper_name, lines_in: row.lines_in || null, lines_up: row.lines_up || null,
-      fishing_hours, day_cancelled: !!row.day_cancelled, cancellation_reason: row.cancellation_reason || null,
+  const handleSaveDay = async (dayNum) => {
+    setSaving(dayNum); setSavedDay(null)
+    let firstError = null
+    // Sequential, not parallel — same discipline as the boat draw fix earlier
+    // today: each save re-checks "does this boat/day row already exist"
+    // against `sessions` state, so racing writes for the same day could read
+    // stale data and double-insert. One day's worth of boats is a small loop.
+    for (const boat of boats) {
+      const row = rowFor(dayNum, boat)
+      const fishing_hours = hoursBetween(row.lines_in, row.lines_up) || null
+      const payload = {
+        competition_id: competition.id, day_number: dayNum, boat_name: boat.boat_name,
+        skipper_name: boat.skipper_name, lines_in: row.lines_in || null, lines_up: row.lines_up || null,
+        fishing_hours, day_cancelled: !!row.day_cancelled, cancellation_reason: row.cancellation_reason || null,
+      }
+      const existing = sessions.find(s => s.day_number === dayNum && s.boat_name === boat.boat_name)
+      const { error: err } = existing
+        ? await supabase.from('competition_fishing_sessions').update(payload).eq('id', existing.id)
+        : await supabase.from('competition_fishing_sessions').insert(payload)
+      if (err && !firstError) firstError = err
     }
-    const existing = sessions.find(s => s.day_number === dayNum && s.boat_name === boat.boat_name)
-    const { error: err } = existing
-      ? await supabase.from('competition_fishing_sessions').update(payload).eq('id', existing.id)
-      : await supabase.from('competition_fishing_sessions').insert(payload)
     setSaving(null)
-    if (err) { setError(err.message); return }
-    setError(''); load()
+    if (firstError) { setError(firstError.message); return }
+    setError(''); await load(); setSavedDay(dayNum)
+    setTimeout(() => setSavedDay(d => d === dayNum ? null : d), 2500)
   }
 
   if (!competition?.id) return (
@@ -792,20 +801,27 @@ function SessionsStep({ competition }) {
       {error && <div style={{ background: '#fef2f2', color: RED, padding: '0.75rem', borderRadius: 6, marginBottom: '0.75rem' }}>{error}</div>}
 
       {days.map(dayNum => (
-        <div key={dayNum} style={{ marginBottom: '1.25rem' }}>
-          <div style={{ fontWeight: 700, color: NAVY, marginBottom: '0.5rem' }}>
-            Day {dayNum} {startDate && <span style={{ color: GREY, fontWeight: 400, fontSize: '0.85rem' }}>— {dateForDay(dayNum)}</span>}
+        <div key={dayNum} style={{ marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.6rem' }}>
+            <div style={{ fontWeight: 700, color: NAVY }}>
+              Day {dayNum} {startDate && <span style={{ color: GREY, fontWeight: 400, fontSize: '0.85rem' }}>— {dateForDay(dayNum)}</span>}
+            </div>
+            <button onClick={() => handleSaveDay(dayNum)} style={{ ...S.btnSm(GREEN), opacity: saving === dayNum ? 0.6 : 1 }} disabled={saving === dayNum}>
+              {saving === dayNum ? 'Saving…' : `💾 Save Day ${dayNum}`}
+            </button>
+            {savedDay === dayNum && (
+              <span style={{ color: GREEN, fontWeight: 600, fontSize: '0.85rem' }}>✅ Day {dayNum} saved</span>
+            )}
           </div>
           {boats.map(boat => {
             const row = rowFor(dayNum, boat)
             const hours = hoursBetween(row.lines_in, row.lines_up)
-            const key = keyOf(dayNum, boat.boat_name)
             return (
               <div key={boat.id} style={{ padding: '0.6rem 0', borderBottom: '1px solid #f0f0f0' }}>
                 <div style={{ fontWeight: 600, marginBottom: '0.4rem' }}>
                   {boat.boat_name} <span style={{ color: GREY, fontWeight: 400 }}>— {boat.skipper_name}</span>
                 </div>
-                <div style={S.grid3}>
+                <div style={S.grid2}>
                   <div>
                     <label style={S.label}>Lines In</label>
                     <input style={S.input} type='time' value={row.lines_in || ''}
@@ -815,11 +831,6 @@ function SessionsStep({ competition }) {
                     <label style={S.label}>Lines Up</label>
                     <input style={S.input} type='time' value={row.lines_up || ''}
                       onChange={e => updateRow(dayNum, boat, { lines_up: e.target.value })} disabled={row.day_cancelled} />
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-                    <button onClick={() => handleSaveRow(dayNum, boat)} style={{ ...S.btnSm(GREEN), opacity: saving === key ? 0.6 : 1 }} disabled={saving === key}>
-                      {saving === key ? 'Saving…' : '💾 Save'}
-                    </button>
                   </div>
                 </div>
                 <div style={{ ...S.row, marginTop: '0.5rem' }}>
@@ -1135,6 +1146,18 @@ function ReviewStep({ competition }) {
             <span style={{ color: c.ok ? '#111827' : GREY }}>{c.label}</span>
           </div>
         ))}
+      </div>
+
+      <div style={{ ...S.card, background: '#eff6ff', borderLeft: `4px solid ${NAVY}` }}>
+        <div style={{ fontWeight: 700, color: NAVY, marginBottom: '0.4rem' }}>Once fishing starts</div>
+        <div style={{ fontSize: '0.85rem', color: '#374151', marginBottom: '0.75rem' }}>
+          This wizard is just for setup. Once the competition is underway, catches are logged on a
+          separate page — pick a boat, see the anglers aboard it, and log each fish one angler at a
+          time.
+        </div>
+        <a href={`/competition-catch-logger/${competition.id}`} style={{ ...S.btn(NAVY), textDecoration: 'none', display: 'inline-block' }}>
+          🎣 Go to Catch Logger
+        </a>
       </div>
 
       <div style={S.card}>
