@@ -687,19 +687,30 @@ function Sidebar({ activeStep, setActiveStep, status }) {
 }
 
 // ─── STEP 5: FISHING SESSIONS ───────────────────────────────────────────────────
+// ─── STEP 5: FISHING SESSIONS ───────────────────────────────────────────────────
+// One row per BOAT per fishing day — matching the real schema (boat_name is
+// NOT NULL, with a unique constraint on competition_id+day_number+boat_name).
+// A first version of this step incorrectly assumed one row per day overall;
+// fixed after checking the schema directly rather than guessing from memory.
 function SessionsStep({ competition }) {
+  const [boats, setBoats] = useState([])
   const [sessions, setSessions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [saving, setSaving] = useState(null) // `${dayNum}|${boatName}` of the row currently saving
 
   const numDays = competition?.num_fishing_days || 0
   const startDate = competition?.start_date
+  const days = Array.from({ length: numDays }, (_, i) => i + 1)
 
   const load = useCallback(async () => {
     if (!competition?.id) return
     setLoading(true)
-    const { data } = await supabase.from('competition_fishing_sessions').select('*').eq('competition_id', competition.id).order('day_number')
-    setSessions(data || []); setLoading(false)
+    const [{ data: b }, { data: s }] = await Promise.all([
+      supabase.from('competition_boats').select('*').eq('competition_id', competition.id).order('boat_name'),
+      supabase.from('competition_fishing_sessions').select('*').eq('competition_id', competition.id),
+    ])
+    setBoats(b || []); setSessions(s || []); setLoading(false)
   }, [competition?.id])
 
   useEffect(() => { load() }, [load])
@@ -711,35 +722,42 @@ function SessionsStep({ competition }) {
     return d.toISOString().slice(0, 10)
   }
 
-  const rowsByDay = {}
-  for (let i = 1; i <= numDays; i++) {
-    const existing = sessions.find(s => s.day_number === i)
-    rowsByDay[i] = existing || {
-      day_number: i, date: dateForDay(i), lines_in: '', lines_up: '',
-      day_cancelled: false, cancellation_reason: '',
+  // Local, editable copy of each boat/day's session — seeded from whatever's
+  // already saved, or sensible blank defaults if this boat/day combination
+  // has never been saved before.
+  const [draft, setDraft] = useState({})
+  const keyOf = (dayNum, boatName) => `${dayNum}|${boatName}`
+
+  const rowFor = (dayNum, boat) => {
+    const key = keyOf(dayNum, boat.boat_name)
+    if (draft[key]) return draft[key]
+    const existing = sessions.find(s => s.day_number === dayNum && s.boat_name === boat.boat_name)
+    return existing || {
+      day_number: dayNum, boat_name: boat.boat_name, skipper_name: boat.skipper_name,
+      lines_in: '', lines_up: '', day_cancelled: false, cancellation_reason: '',
     }
   }
 
-  const updateRow = (dayNum, patch) => {
-    setSessions(prev => {
-      const existing = prev.find(s => s.day_number === dayNum)
-      if (existing) return prev.map(s => s.day_number === dayNum ? { ...s, ...patch } : s)
-      return [...prev, { ...rowsByDay[dayNum], ...patch }]
-    })
+  const updateRow = (dayNum, boat, patch) => {
+    const key = keyOf(dayNum, boat.boat_name)
+    setDraft(prev => ({ ...prev, [key]: { ...rowFor(dayNum, boat), ...patch } }))
   }
 
-  const handleSaveDay = async (dayNum) => {
-    const row = sessions.find(s => s.day_number === dayNum) || rowsByDay[dayNum]
+  const handleSaveRow = async (dayNum, boat) => {
+    const row = rowFor(dayNum, boat)
+    const key = keyOf(dayNum, boat.boat_name)
+    setSaving(key)
     const fishing_hours = hoursBetween(row.lines_in, row.lines_up) || null
     const payload = {
-      competition_id: competition.id, day_number: dayNum, date: row.date || null,
-      lines_in: row.lines_in || null, lines_up: row.lines_up || null,
-      fishing_hours, day_cancelled: !!row.day_cancelled,
-      cancellation_reason: row.cancellation_reason || null,
+      competition_id: competition.id, day_number: dayNum, boat_name: boat.boat_name,
+      skipper_name: boat.skipper_name, lines_in: row.lines_in || null, lines_up: row.lines_up || null,
+      fishing_hours, day_cancelled: !!row.day_cancelled, cancellation_reason: row.cancellation_reason || null,
     }
-    const { error: err } = row.id
-      ? await supabase.from('competition_fishing_sessions').update(payload).eq('id', row.id)
+    const existing = sessions.find(s => s.day_number === dayNum && s.boat_name === boat.boat_name)
+    const { error: err } = existing
+      ? await supabase.from('competition_fishing_sessions').update(payload).eq('id', existing.id)
       : await supabase.from('competition_fishing_sessions').insert(payload)
+    setSaving(null)
     if (err) { setError(err.message); return }
     setError(''); load()
   }
@@ -755,62 +773,74 @@ function SessionsStep({ competition }) {
     </div>
   )
   if (loading) return <div style={{ color: GREY }}>Loading…</div>
+  if (boats.length === 0) return (
+    <div style={{ ...S.card, color: GREY, fontStyle: 'italic' }}>
+      Add boats on the Boats step first — each fishing day is recorded per boat.
+    </div>
+  )
 
   return (
     <div style={S.card}>
       <div style={{ fontWeight: 700, color: NAVY, marginBottom: '0.5rem' }}>Fishing Sessions</div>
       <div style={{ fontSize: '0.85rem', color: GREY, marginBottom: '1rem' }}>
-        One row per fishing day. Hours fished are worked out automatically from lines-in and lines-up.
-        If a day is cancelled (e.g. bad weather), tick the box and add a short reason — that day's hours
-        won't count toward anyone's catch-per-hour figures.
+        One entry per boat, per fishing day. Hours fished are worked out automatically from lines-in
+        and lines-up. If a boat didn't fish on a particular day (e.g. bad weather, mechanical issue),
+        tick "cancelled" and add a short reason — that boat's hours that day won't count toward
+        anyone's catch-per-hour figures.
       </div>
 
       {error && <div style={{ background: '#fef2f2', color: RED, padding: '0.75rem', borderRadius: 6, marginBottom: '0.75rem' }}>{error}</div>}
 
-      {Object.keys(rowsByDay).map(dayNumStr => {
-        const dayNum = parseInt(dayNumStr)
-        const row = sessions.find(s => s.day_number === dayNum) || rowsByDay[dayNum]
-        const hours = hoursBetween(row.lines_in, row.lines_up)
-        return (
-          <div key={dayNum} style={{ padding: '0.85rem 0', borderBottom: '1px solid #f0f0f0' }}>
-            <div style={{ fontWeight: 700, color: NAVY, marginBottom: '0.5rem' }}>Day {dayNum}</div>
-            <div style={S.grid3}>
-              <div>
-                <label style={S.label}>Date</label>
-                <input style={S.input} type='date' value={row.date || ''}
-                  onChange={e => updateRow(dayNum, { date: e.target.value })} />
-              </div>
-              <div>
-                <label style={S.label}>Lines In</label>
-                <input style={S.input} type='time' value={row.lines_in || ''}
-                  onChange={e => updateRow(dayNum, { lines_in: e.target.value })} disabled={row.day_cancelled} />
-              </div>
-              <div>
-                <label style={S.label}>Lines Up</label>
-                <input style={S.input} type='time' value={row.lines_up || ''}
-                  onChange={e => updateRow(dayNum, { lines_up: e.target.value })} disabled={row.day_cancelled} />
-              </div>
-            </div>
-            <div style={{ ...S.row, marginTop: '0.5rem' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
-                <input type='checkbox' checked={!!row.day_cancelled}
-                  onChange={e => updateRow(dayNum, { day_cancelled: e.target.checked })} />
-                <span style={{ fontSize: '0.85rem' }}>Day cancelled</span>
-              </label>
-              {row.day_cancelled && (
-                <input style={{ ...S.input, flex: 1, maxWidth: 300 }} placeholder='Reason (e.g. bad weather)'
-                  value={row.cancellation_reason || ''} onChange={e => updateRow(dayNum, { cancellation_reason: e.target.value })} />
-              )}
-              {!row.day_cancelled && hours && (
-                <span style={{ fontSize: '0.82rem', color: GREY }}>{hours} hours fished</span>
-              )}
-              <button onClick={() => handleSaveDay(dayNum)} style={{ ...S.btnSm(GREEN), marginLeft: 'auto' }}>
-                💾 Save Day {dayNum}
-              </button>
-            </div>
+      {days.map(dayNum => (
+        <div key={dayNum} style={{ marginBottom: '1.25rem' }}>
+          <div style={{ fontWeight: 700, color: NAVY, marginBottom: '0.5rem' }}>
+            Day {dayNum} {startDate && <span style={{ color: GREY, fontWeight: 400, fontSize: '0.85rem' }}>— {dateForDay(dayNum)}</span>}
           </div>
-        )
-      })}
+          {boats.map(boat => {
+            const row = rowFor(dayNum, boat)
+            const hours = hoursBetween(row.lines_in, row.lines_up)
+            const key = keyOf(dayNum, boat.boat_name)
+            return (
+              <div key={boat.id} style={{ padding: '0.6rem 0', borderBottom: '1px solid #f0f0f0' }}>
+                <div style={{ fontWeight: 600, marginBottom: '0.4rem' }}>
+                  {boat.boat_name} <span style={{ color: GREY, fontWeight: 400 }}>— {boat.skipper_name}</span>
+                </div>
+                <div style={S.grid3}>
+                  <div>
+                    <label style={S.label}>Lines In</label>
+                    <input style={S.input} type='time' value={row.lines_in || ''}
+                      onChange={e => updateRow(dayNum, boat, { lines_in: e.target.value })} disabled={row.day_cancelled} />
+                  </div>
+                  <div>
+                    <label style={S.label}>Lines Up</label>
+                    <input style={S.input} type='time' value={row.lines_up || ''}
+                      onChange={e => updateRow(dayNum, boat, { lines_up: e.target.value })} disabled={row.day_cancelled} />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                    <button onClick={() => handleSaveRow(dayNum, boat)} style={{ ...S.btnSm(GREEN), opacity: saving === key ? 0.6 : 1 }} disabled={saving === key}>
+                      {saving === key ? 'Saving…' : '💾 Save'}
+                    </button>
+                  </div>
+                </div>
+                <div style={{ ...S.row, marginTop: '0.5rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
+                    <input type='checkbox' checked={!!row.day_cancelled}
+                      onChange={e => updateRow(dayNum, boat, { day_cancelled: e.target.checked })} />
+                    <span style={{ fontSize: '0.85rem' }}>Didn't fish this day</span>
+                  </label>
+                  {row.day_cancelled && (
+                    <input style={{ ...S.input, flex: 1, maxWidth: 280 }} placeholder='Reason (e.g. bad weather)'
+                      value={row.cancellation_reason || ''} onChange={e => updateRow(dayNum, boat, { cancellation_reason: e.target.value })} />
+                  )}
+                  {!row.day_cancelled && hours && (
+                    <span style={{ fontSize: '0.82rem', color: GREY }}>{hours} hours fished</span>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      ))}
     </div>
   )
 }
@@ -940,9 +970,13 @@ function BoatDrawStep({ competition }) {
           <div style={{ fontSize: '0.82rem', color: GREY, marginBottom: '0.75rem' }}>One boat per team, applied to every fishing day automatically.</div>
           {teams.map(team => {
             const existing = findDraw(participants.find(p => p.team_id === team.id)?.id, days[0])
+            const teamHasAnglers = participants.some(p => p.team_id === team.id)
             return (
               <div key={team.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem 0', borderBottom: '1px solid #f0f0f0' }}>
                 <span style={{ fontWeight: 700, flex: 1 }}>{team.team_name}</span>
+                {!teamHasAnglers ? (
+                  <span style={{ color: GREY, fontStyle: 'italic', fontSize: '0.85rem' }}>Add an angler to this team first</span>
+                ) : (
                 <select style={{ ...S.select, maxWidth: 280 }} value={existing?.boat_id || ''}
                   onChange={async e => {
                     const boatId = e.target.value
@@ -960,6 +994,7 @@ function BoatDrawStep({ competition }) {
                   }}>
                   {boatOptions}
                 </select>
+                )}
               </div>
             )
           })}
@@ -976,10 +1011,16 @@ function BoatDrawStep({ competition }) {
               </tr>
             </thead>
             <tbody>
-              {teams.map(team => (
+              {teams.map(team => {
+                const teamHasAnglers = participants.some(p => p.team_id === team.id)
+                return (
                 <tr key={team.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
                   <td style={{ padding: '0.5rem', fontWeight: 700 }}>{team.team_name}</td>
-                  {days.map(d => {
+                  {!teamHasAnglers ? (
+                    <td colSpan={days.length} style={{ padding: '0.5rem', color: GREY, fontStyle: 'italic' }}>
+                      Add at least one angler to this team on the Teams &amp; Anglers step first.
+                    </td>
+                  ) : days.map(d => {
                     const existing = findDraw(participants.find(p => p.team_id === team.id)?.id, d)
                     return (
                       <td key={d} style={{ padding: '0.4rem' }}>
@@ -991,7 +1032,8 @@ function BoatDrawStep({ competition }) {
                     )
                   })}
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -1071,13 +1113,15 @@ function ReviewStep({ competition }) {
   const numDays = competition.num_fishing_days || 0
   const expectedDrawRows = participants.length * numDays
   const drawComplete = draws.filter(d => d.boat_id).length
+  const expectedSessionRows = numDays * boats.length
+  const sessionsWithRealData = sessions.filter(s => s.day_cancelled || (s.lines_in && s.lines_up)).length
 
   const checks = [
     { label: 'Competition details saved', ok: !!(competition.name && competition.start_date) },
     { label: `${teams.length} team${teams.length === 1 ? '' : 's'}, ${participants.length} angler${participants.length === 1 ? '' : 's'}`, ok: teams.length > 0 && participants.length > 0 },
     { label: `${boats.length} boat${boats.length === 1 ? '' : 's'} registered`, ok: boats.length > 0 },
     { label: 'Boat draw mode chosen', ok: !!competition.boat_draw_mode },
-    { label: `${sessions.length} of ${numDays} fishing day${numDays === 1 ? '' : 's'} set up`, ok: sessions.length >= numDays && numDays > 0 },
+    { label: `Fishing sessions: ${sessionsWithRealData} of ${expectedSessionRows} boat-days set up`, ok: expectedSessionRows > 0 && sessionsWithRealData >= expectedSessionRows },
     { label: `Boat draw: ${drawComplete} of ${expectedDrawRows} angler-days assigned`, ok: expectedDrawRows > 0 && drawComplete >= expectedDrawRows },
   ]
 
@@ -1191,13 +1235,14 @@ export default function CompetitionSetupWizard() {
 
   const numDays = competition?.num_fishing_days || 0
   const expectedDrawRows = counts.anglers * numDays
+  const expectedSessionRows = counts.boats * numDays
 
   const status = {
     competition: competition?.id ? 'done' : 'empty',
     teams:       counts.teams === 0 ? 'empty' : counts.anglers > 0 ? 'done' : 'partial',
     boats:       counts.boats > 0 ? 'done' : 'empty',
     draw_mode:   competition?.boat_draw_mode ? 'done' : 'empty',
-    sessions:    numDays === 0 ? 'empty' : counts.sessionsSaved >= numDays ? 'done' : counts.sessionsSaved > 0 ? 'partial' : 'empty',
+    sessions:    expectedSessionRows === 0 ? 'empty' : counts.sessionsSaved >= expectedSessionRows ? 'done' : counts.sessionsSaved > 0 ? 'partial' : 'empty',
     boat_draw:   expectedDrawRows === 0 ? 'empty' : counts.drawRowsFilled >= expectedDrawRows ? 'done' : counts.drawRowsFilled > 0 ? 'partial' : 'empty',
     review:      'empty',
   }
