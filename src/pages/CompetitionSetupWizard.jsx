@@ -879,13 +879,13 @@ function BoatDrawStep({ competition }) {
     return draws.find(d => d.participant_id === participantId && d.fishing_date === dateStr)
   }
 
-  const saveDraw = async (participantId, teamId, dayNum, boatId) => {
+  const saveDraw = async (participantId, dayNum, boatId) => {
     const dateStr = datesForDays[dayNum]
     if (!dateStr) return
     setSaving(true)
     const existing = findDraw(participantId, dayNum)
     const payload = {
-      competition_id: competition.id, participant_id: participantId, team_id: teamId,
+      competition_id: competition.id, participant_id: participantId,
       boat_id: boatId || null, fishing_date: dateStr,
     }
     const { error: err } = existing
@@ -902,7 +902,7 @@ function BoatDrawStep({ competition }) {
     for (const p of teamAnglers) {
       const dateStr = datesForDays[dayNum]
       const existing = findDraw(p.id, dayNum)
-      const payload = { competition_id: competition.id, participant_id: p.id, team_id: teamId, boat_id: boatId || null, fishing_date: dateStr }
+      const payload = { competition_id: competition.id, participant_id: p.id, boat_id: boatId || null, fishing_date: dateStr }
       if (existing) await supabase.from('competition_boat_draws').update(payload).eq('id', existing.id)
       else await supabase.from('competition_boat_draws').insert(payload)
     }
@@ -997,7 +997,7 @@ function BoatDrawStep({ competition }) {
                       return (
                         <td key={d} style={{ padding: '0.4rem' }}>
                           <select style={S.select} value={existing?.boat_id || ''}
-                            onChange={e => saveDraw(p.id, p.team_id, d, e.target.value)}>
+                            onChange={e => saveDraw(p.id, d, e.target.value)}>
                             {boatOptions}
                           </select>
                         </td>
