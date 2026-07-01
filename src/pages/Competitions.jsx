@@ -29,6 +29,14 @@ function getCompConfig(comp, canEnter) {
   }
 
   const specific = {
+    '93a243c5-607a-4935-b7d8-83f3eeb2d02f': {  // Junior Gamefish Interprovincial 2026 — cancelled
+      hideGenericAdmin: true,
+      links: [{ to: null, label: '❌ Cancelled: Insufficient Entries', primary: true, disabled: true }],
+    },
+    '85057f74-0afb-414c-9688-6eb057326374': {  // Border Bonanza 2026 — fictitious test event
+      hideGenericAdmin: true,
+      links: [{ to: null, label: '🧪 Test Event Only', primary: true, disabled: true }],
+    },
     'c8332f15-ce44-4d0b-a3ab-009fc2a2c484': {  // All Coastal Bottomfish IP 2026
       hideGenericAdmin: false,
       links: [
@@ -94,12 +102,12 @@ function getCompConfig(comp, canEnter) {
     'ad8d03e7-6d4d-4cea-b96b-1007d3c6127d': { hideGenericAdmin: true, links: [{ to: null, label: '📊 Results Coming Soon', primary: true, disabled: true }] },  // All Inland Interprov 2025
     '350c759c-fa02-48b1-9c77-bf3b40fff22f': { hideGenericAdmin: true, links: [{ to: null, label: '📊 Results Coming Soon', primary: true, disabled: true }] },  // Gamefish Nationals 2025
     'b5d55428-53fc-4ce6-ad76-f098f757701a': { hideGenericAdmin: true, links: [{ to: null, label: '📊 Results Coming Soon', primary: true, disabled: true }] },  // All Coastals 2025
-    '0a099402-0bc5-46b0-b94d-0f94129758f0': { hideGenericAdmin: true, links: [{ to: null, label: '❌ Cancelled: Insufficient Participation', primary: true, disabled: true }] },  // Junior U16 Gamefish 2025
+    '0a099402-0bc5-46b0-b94d-0f94129758f0': { hideGenericAdmin: true, links: [{ to: null, label: '📊 Results Coming Soon', primary: true, disabled: true }] },  // Junior U16 Gamefish 2025
     '82dbbca2-fbea-4eb7-931c-a60072a136c1': { hideGenericAdmin: true, links: [{ to: null, label: '📊 Results Coming Soon', primary: true, disabled: true }] },  // Junior U19 Gamefish 2025
     'c9fce393-71f7-4f9e-85cf-163911ccb877': { hideGenericAdmin: true, links: [{ to: null, label: '📊 Results Coming Soon', primary: true, disabled: true }] },  // HT Billfish Interprov 2025
     '1c6ebb69-e11c-46d4-8894-ec00848bde37': { hideGenericAdmin: true, links: [{ to: null, label: '📊 Results Coming Soon', primary: true, disabled: true }] },  // Tuna International 2025
     'a6d492db-e803-428d-b37c-a2fb3a662063': { hideGenericAdmin: true, links: [{ to: null, label: '📊 Results Coming Soon', primary: true, disabled: true }] },  // Tuna Nationals 2025
-    'f0a4d797-e3b8-47ad-b5d4-171fafb2627b': { hideGenericAdmin: true, links: [{ to: null, label: '📊 Results Coming Soon', primary: true, disabled: true }] },  // Gamefish Interprov 2025
+    'f0a4d797-e3b8-47ad-b5d4-171fafb2627b': { hideGenericAdmin: true, links: [{ to: null, label: '❌ Cancelled: Insufficient Entries', primary: true, disabled: true }] },  // Gamefish Interprov 2025
     '39031484-67be-450b-be43-e2c5e090fbce': { hideGenericAdmin: true, links: [{ to: null, label: '📊 Results Coming Soon', primary: true, disabled: true }] },  // LT Billfish Nationals 2025
     '11880c4a-82df-4dec-a7b0-57e0b98db1f4': { hideGenericAdmin: true, links: [{ to: null, label: '📊 Results Coming Soon', primary: true, disabled: true }] },  // Bottomfish Interprov 2025
 
