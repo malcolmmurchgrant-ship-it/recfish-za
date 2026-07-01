@@ -29,23 +29,22 @@ function getCompConfig(comp, canEnter) {
   }
 
   const specific = {
-    '3855034f-ab39-4297-9be4-ba9a7e566ce0': {  // Gamefish Nationals
+    '3855034f-ab39-4297-9be4-ba9a7e566ce0': {  // Gamefish Nationals 2026
       hideGenericAdmin: false,
       links: [
-        ...(canEnter ? [{ to: '/gamefish',       label: '🎣 Enter Catches', primary: true  }] : []),
-        {               to: '/gamefish-scores',   label: '📊 Scoreboard',    primary: !canEnter },
+        { to: `/scoreboard/3855034f-ab39-4297-9be4-ba9a7e566ce0`, label: '📊 Scoreboard', primary: true },
       ],
     },
     'ff6e95a9-4f9e-4b54-ad47-a913831d336c': {  // Tuna Nationals 2026
       hideGenericAdmin: false,
       links: [
-        { to: '/tuna-nationals-scores', label: '📊 Scoreboard', primary: true },
+        { to: `/scoreboard/ff6e95a9-4f9e-4b54-ad47-a913831d336c`, label: '📊 Scoreboard', primary: true },
       ],
     },
     '4a905558-8a94-4dc2-8305-bce37bfc1fe4': {  // Tuna International 2026
       hideGenericAdmin: false,
       links: [
-        { to: '/tuna-international-scores', label: '📊 Scoreboard', primary: true },
+        { to: `/scoreboard/4a905558-8a94-4dc2-8305-bce37bfc1fe4`, label: '📊 Scoreboard', primary: true },
       ],
     },
     // ── 2024 historical imports — scoreboards coming soon ──────────────────
@@ -351,7 +350,7 @@ export default function Competitions() {
 
       {/* New competition shortcut */}
       <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
-        <button onClick={() => navigate('/competition-admin-v2')}
+        <button onClick={() => navigate('/setup-wizard')}
           style={{ background: 'none', border: 'none', color: '#9ca3af', fontSize: '0.82rem', cursor: 'pointer', textDecoration: 'underline' }}>
           + Create New Competition
         </button>
