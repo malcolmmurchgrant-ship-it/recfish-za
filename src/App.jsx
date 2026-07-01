@@ -19,6 +19,10 @@ import UniversalScoreboard from './pages/UniversalScoreboard'
 import UniversalCatchLogger from './components/CompetitionAdmin/UniversalCatchLogger'
 import CompetitionCatchLogger from './pages/CompetitionCatchLogger'
 import Profile from './pages/Profile'
+import GamefishScoreboard from './pages/GamefishScoreboard'
+import GamefishAdmin from './pages/GamefishAdmin'
+import TunaNationalsScoreboard from './pages/TunaNationalsScoreboard'
+import TunaInternationalScoreboard from './pages/TunaInternationalScoreboard'
 import SessionEndSummaryModal from './components/SessionEndSummaryModal'
 
 const NAVY = '#1e3a8a'
@@ -260,6 +264,10 @@ function AppContent() {
             <Route path='/setup-wizard'         element={<CompetitionSetupWizard />} />
             <Route path='/setup-wizard/:competitionId' element={<CompetitionSetupWizard />} />
             <Route path='/competition-catch-logger/:competitionId' element={<CatchLoggerPage />} />
+            <Route path='/gamefish-scores'      element={<GamefishScoreboard />} />
+            <Route path='/gamefish-admin'       element={<GamefishAdmin />} />
+            <Route path='/tuna-nationals-scores'      element={<TunaNationalsScoreboard />} />
+            <Route path='/tuna-international-scores'  element={<TunaInternationalScoreboard />} />
             <Route path='/profile'              element={<Profile />} />
             <Route path='/'                     element={<Navigate to='/dashboard' replace />} />
           </Routes>
