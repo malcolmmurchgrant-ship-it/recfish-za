@@ -207,7 +207,6 @@ export default function Competitions() {
         team_size, default_line_class_kg, hosting_province,
         federation_id, association_id, is_historical_import
       `)
-      .not('status', 'eq', 'cancelled')
       .order('start_date', { ascending: false })
       .then(({ data }) => {
         setCompetitions(data || [])
@@ -223,6 +222,7 @@ export default function Competitions() {
     if (filter === 'active')    return c.status === 'active'
     if (filter === 'upcoming')  return ['upcoming', 'registration_open'].includes(c.status)
     if (filter === 'completed') return c.status === 'completed'
+    if (filter === 'cancelled') return c.status === 'cancelled'
     return true
   })
 
@@ -231,6 +231,7 @@ export default function Competitions() {
     active:    competitions.filter(c => c.status === 'active').length,
     upcoming:  competitions.filter(c => ['upcoming', 'registration_open'].includes(c.status)).length,
     completed: competitions.filter(c => c.status === 'completed').length,
+    cancelled: competitions.filter(c => c.status === 'cancelled').length,
   }
 
   return (
@@ -251,6 +252,7 @@ export default function Competitions() {
           { key: 'active',    label: '🟢 Live'      },
           { key: 'upcoming',  label: '🔵 Upcoming'  },
           { key: 'completed', label: '⚪ Completed' },
+          { key: 'cancelled', label: '🔴 Cancelled' },
         ].map(f => (
           <button key={f.key} onClick={() => setFilter(f.key)}
             style={{
