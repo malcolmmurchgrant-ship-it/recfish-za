@@ -33,6 +33,10 @@ function getCompConfig(comp, canEnter) {
       hideGenericAdmin: true,
       links: [{ to: null, label: '❌ Cancelled: Insufficient Entries', primary: true, disabled: true }],
     },
+    '04d2fff2-1a29-4c42-abec-17a8db7df6f5': {  // Tuna Nationals 2026 — cancelled duplicate
+      hideGenericAdmin: true,
+      links: [{ to: null, label: '❌ Cancelled', primary: true, disabled: true }],
+    },
     '85057f74-0afb-414c-9688-6eb057326374': {  // Border Bonanza 2026 — fictitious test event
       hideGenericAdmin: true,
       links: [{ to: null, label: '🧪 Test Event Only', primary: true, disabled: true }],
