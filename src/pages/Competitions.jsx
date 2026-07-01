@@ -29,6 +29,12 @@ function getCompConfig(comp, canEnter) {
   }
 
   const specific = {
+    'c8332f15-ce44-4d0b-a3ab-009fc2a2c484': {  // All Coastal Bottomfish IP 2026
+      hideGenericAdmin: false,
+      links: [
+        { to: `/scoreboard/c8332f15-ce44-4d0b-a3ab-009fc2a2c484`, label: '📊 Scoreboard', primary: true },
+      ],
+    },
     '3855034f-ab39-4297-9be4-ba9a7e566ce0': {  // Gamefish Nationals 2026
       hideGenericAdmin: false,
       links: [
