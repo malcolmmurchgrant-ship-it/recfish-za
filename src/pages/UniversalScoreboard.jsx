@@ -118,7 +118,14 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
       supabase.from('competition_catches')
         .select('*, competition_teams(id, team_name, province), competition_days(id, day_number, date)')
         .eq('competition_id', competitionId)
-        .order('created_at', { ascending: false }),
+        .order('fishing_date')
+        // PostgREST silently caps at 1000 rows with no error when exceeded.
+        // A competition with one row per individual fish can easily exceed this
+        // (All Coastal IP 2026 has 2,196 rows). Without this, the scoreboard
+        // silently computes from a truncated dataset and zeros out many anglers.
+        // The dashboard Max Rows setting was raised to 5000 (confirmed 2026-06-27)
+        // so .range(0, 4999) is safe; 9999 gives headroom above that ceiling too.
+        .range(0, 9999),
       supabase.from('competition_participants')
         .select('*, competition_teams(id, team_name, province)')
         .eq('competition_id', competitionId),
@@ -199,6 +206,20 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
         const dn = c.competition_days?.day_number || dateToDay[c.fishing_date]
         return String(dn) === String(dayFilter)
       })
+
+  // ── TEMPORARY DEBUG — remove after diagnosing All Coastal scoreboard zeros ──
+  if (catches.length > 0 && participants.length > 0) {
+    console.log('[USS DEBUG] competition:', competition?.name)
+    console.log('[USS DEBUG] scoringConfig:', JSON.stringify(scoringConfig))
+    console.log('[USS DEBUG] catches total:', catches.length)
+    console.log('[USS DEBUG] scoringCatches:', scoringCatches.length)
+    console.log('[USS DEBUG] filteredCatches:', filteredCatches.length)
+    console.log('[USS DEBUG] participants:', participants.length)
+    console.log('[USS DEBUG] sample catch participant_id:', catches[0]?.participant_id)
+    console.log('[USS DEBUG] sample participant id:', participants[0]?.id, 'user_id:', participants[0]?.user_id)
+    const testMatch = filteredCatches.filter(c => c.participant_id === participants[0]?.id)
+    console.log('[USS DEBUG] catches matching first participant:', testMatch.length)
+  }
 
   // ── Team standings ────────────────────────────────────────────────────────
   const useMultiplier = !!scoringConfig?.species_multiplier
