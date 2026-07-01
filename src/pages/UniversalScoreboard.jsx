@@ -175,7 +175,18 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
     if (c.scoring === false) return false
     if (!showPending && c.data_quality === 'unverified' && !isAdmin) return false
     if (c.species_name === 'No Catch') return false
-    // Exclude only genuinely empty/zero entries with no points either
+    // For points-method competitions, zero-point rows are legitimate catch
+    // records under the species-subtotal encoding (only the last fish of each
+    // species per angler per day carries the full species total; all other
+    // individual fish rows for that species have points = 0). Excluding them
+    // would remove real catches and zero out every angler's score.
+    // For weight/percentage competitions, genuinely empty rows (no weight,
+    // no points) are safe to exclude.
+    const method = scoringConfig?.method || 'points'
+    if (method === 'points') {
+      // Keep any row that has a real species name — it's a real catch
+      return !!(c.species_name && c.species_name !== 'No Catch')
+    }
     const hasWeight = c.weight_kg && parseFloat(c.weight_kg) > 0
     const hasPoints = c.points && parseFloat(c.points) > 0
     if (!hasWeight && !hasPoints) return false
