@@ -73,15 +73,23 @@ export default function HistoricalCompetitionView({ competitionId }) {
             competition_days ( id, day_number )
           `)
           .eq('competition_id', competitionId)
+          // Without an explicit order, PostgREST falls back to Postgres's
+          // internal physical-row order, which is not guaranteed stable over
+          // time (it can shift after updates, deletes, or table maintenance).
+          // Ordering by fishing_date keeps results deterministic regardless
+          // of row count or storage history.
+          .order('fishing_date')
           // PostgREST defaults to a 1000-row cap with no error or warning when
-          // exceeded — silently dropping whichever rows fall past row 1000 in
+          // exceeded — silently dropping whichever rows fall past the cap in
           // server-side order. A historical competition with one row per
           // individual fish (rather than one row per species) can comfortably
-          // exceed 1000 (Bottomfish Nationals 2024 has 1,384), so this MUST be
-          // set explicitly above any plausible competition size, or anglers
-          // whose rows land past the cutoff will silently appear to have
-          // caught nothing. 9999 is comfortably above any realistic catch
-          // count for a single competition.
+          // exceed 1000 (Bottomfish Nationals 2024 has 1,384). The project's
+          // own "Max Rows" dashboard setting (Settings → API → Max Rows) is a
+          // hard server-side ceiling that this client-side .range() CANNOT
+          // override — confirmed by raising the dashboard setting from 1000
+          // to 5000 to actually fix the truncation. This .range() is kept as
+          // defense in depth so the client never artificially re-introduces a
+          // lower cap than whatever the dashboard allows.
           .range(0, 9999),
         supabase
           .from('competition_participants')
@@ -152,6 +160,16 @@ export default function HistoricalCompetitionView({ competitionId }) {
     const key = `${boatName}|${dayNum}`
     if (!anglersPerBoatDay[key]) anglersPerBoatDay[key] = new Set()
     anglersPerBoatDay[key].add(angler)
+  }
+
+  // Skipper and hours by boat+day — used in per-angler catch table rows
+  // to show who skippered each boat and to compute per-day CPUE
+  const skipperByBoatDay = {}
+  const hoursByBoatDay   = {}
+  for (const sess of sessions) {
+    const key = `${sess.boat_name}|${sess.day_number}`
+    skipperByBoatDay[key] = sess.skipper_name || null
+    hoursByBoatDay[key]   = parseFloat(sess.fishing_hours) || 0
   }
 
   let totalAnglerHours = 0
@@ -363,7 +381,16 @@ export default function HistoricalCompetitionView({ competitionId }) {
                   const day = c.competition_days?.day_number ?? '—'
                   const key = `${day}|${c.species_name}`
                   if (!grouped[key]) {
-                    grouped[key] = { day, species: c.species_name, count: 0, boat: c.competition_boats?.boat_name || '—' }
+                    const boatName = c.competition_boats?.boat_name || '—'
+                    const boatKey  = `${boatName}|${day}`
+                    grouped[key] = {
+                      day,
+                      date:    dateByDayNumber[day] || null,
+                      species: c.species_name,
+                      count:   0,
+                      boat:    boatName,
+                      skipper: skipperByBoatDay[boatKey] || null,
+                    }
                   }
                   grouped[key].count += 1
                 }
@@ -382,6 +409,26 @@ export default function HistoricalCompetitionView({ competitionId }) {
                 ? new Set(anglerCatches.map(c => c.species_name)).size
                 : null
 
+              // Per-day CPUE for this angler — fish per hour, derived from
+              // each day's boat session hours and this angler's catch count.
+              // Only computed for unit-count competitions (no weight recorded).
+              const cpueByDay = {}
+              if (isUnitCountFormat) {
+                const fishByDay = {}
+                const boatByDay = {}
+                for (const c of anglerCatches) {
+                  const day  = c.competition_days?.day_number
+                  const boat = c.competition_boats?.boat_name
+                  if (!day) continue
+                  fishByDay[day] = (fishByDay[day] || 0) + 1
+                  if (boat) boatByDay[day] = boat
+                }
+                for (const [day, fish] of Object.entries(fishByDay)) {
+                  const hours = hoursByBoatDay[`${boatByDay[day]}|${day}`] || 0
+                  cpueByDay[day] = hours > 0 ? (fish / hours).toFixed(2) : null
+                }
+              }
+
               return (
                 <div key={anglerName} style={{ marginBottom: '0.9rem' }}>
                   <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#374151', marginBottom: '0.35rem' }}>
@@ -395,10 +442,13 @@ export default function HistoricalCompetitionView({ competitionId }) {
                       <thead>
                         <tr style={{ background: '#f3f4f6' }}>
                           <th style={{ ...S.th, color: '#374151' }}>Day</th>
+                          {isUnitCountFormat && <th style={{ ...S.th, color: '#374151' }}>Date</th>}
                           <th style={{ ...S.th, color: '#374151' }}>Species</th>
                           {isUnitCountFormat && <th style={{ ...S.th, color: '#374151', textAlign: 'right' }}>Fish</th>}
                           {!isUnitCountFormat && <th style={{ ...S.th, color: '#374151' }}>Weight (kg)</th>}
                           <th style={{ ...S.th, color: '#374151' }}>Boat</th>
+                          {isUnitCountFormat && <th style={{ ...S.th, color: '#374151' }}>Skipper</th>}
+                          {isUnitCountFormat && <th style={{ ...S.th, color: '#374151', textAlign: 'right' }}>CPUE</th>}
                         </tr>
                       </thead>
                       <tbody>
@@ -406,9 +456,14 @@ export default function HistoricalCompetitionView({ competitionId }) {
                           ? displayRows.map((row, i) => (
                               <tr key={`${row.day}|${row.species}|${i}`} style={{ borderBottom: '1px solid #f3f4f6' }}>
                                 <td style={S.td}>Day {row.day}</td>
+                                <td style={{ ...S.td, color: GREY, whiteSpace: 'nowrap' }}>{formatDate(row.date)}</td>
                                 <td style={S.td}>{row.species}</td>
                                 <td style={{ ...S.td, textAlign: 'right', fontWeight: 600 }}>{row.count}</td>
                                 <td style={{ ...S.td, color: GREY }}>{row.boat}</td>
+                                <td style={{ ...S.td, color: GREY }}>{row.skipper || '—'}</td>
+                                <td style={{ ...S.td, textAlign: 'right', color: GREY }}>
+                                  {cpueByDay[row.day] != null ? `${cpueByDay[row.day]}/hr` : '—'}
+                                </td>
                               </tr>
                             ))
                           : displayRows.map(row => (
