@@ -149,7 +149,15 @@ export default function HistoricalCompetitionView({ competitionId }) {
   // different original shapes, so fish-count and species-count are tracked
   // and labeled separately everywhere below, rather than collapsed into one
   // ambiguous label.
-  const isUnitCountFormat = realCatches.length > 0 && realCatches.every(c => c.weight_kg == null)
+  // Unit-count format: competitions where fish are counted (not weighed),
+  // e.g. catch-and-release bottomfish. We use a majority threshold rather
+  // than requiring every single catch to have null weight — in practice,
+  // anglers occasionally record a weight for a personal-best or record claim
+  // even in a release competition, so a handful of weight values shouldn't
+  // switch the entire display to weight-based mode. 95% threshold is generous
+  // enough to handle a few PB records without misclassifying true weight comps.
+  const weightedCount = realCatches.filter(c => c.weight_kg != null).length
+  const isUnitCountFormat = realCatches.length === 0 || (weightedCount / realCatches.length) < 0.05
 
   const anglersPerBoatDay = {}
   for (const c of catches) {
