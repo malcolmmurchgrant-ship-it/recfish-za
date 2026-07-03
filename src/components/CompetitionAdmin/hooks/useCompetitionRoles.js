@@ -98,18 +98,22 @@ export function useCompetitionRoles(competitionId) {
 
   // Grant a role for this competition
   async function grantRole(email, role) {
-    // Look up user by email
-    const { data: users, error: lookupErr } = await supabase
-      .from('users')
-      .select('id')
-      .eq('email', email)
-      .maybeSingle()
+    // Look up user by email via a SECURITY DEFINER function rather than
+    // querying `users` directly — the users RLS policy only allows
+    // SELECT on your own row, so a plain query here always returned
+    // nothing (and threw "User not found") for anyone but yourself,
+    // regardless of whether the account actually existed. The RPC
+    // returns only the id, scoped to admins, without opening up the
+    // rest of `users` (id_number, medical_notes, etc.) to every admin.
+    const { data: userId, error: lookupErr } = await supabase
+      .rpc('lookup_user_id_by_email', { lookup_email: email })
 
-    if (lookupErr || !users) throw new Error(`User not found: ${email}`)
+    if (lookupErr) throw lookupErr
+    if (!userId) throw new Error(`User not found: ${email}`)
 
     const { error: insertErr } = await supabase
       .from('competition_user_roles')
-      .insert({ competition_id: competitionId, user_id: users.id, role })
+      .insert({ competition_id: competitionId, user_id: userId, role })
 
     if (insertErr) throw insertErr
   }
