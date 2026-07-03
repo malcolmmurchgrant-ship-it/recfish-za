@@ -38,7 +38,6 @@ export default function CompetitionAdminScoring({
   const [teamFilter, setTeamFilter] = useState('all')
   const [search,     setSearch]     = useState('')
   const [editing,    setEditing]    = useState(null)
-  const [creating,   setCreating]   = useState(false)
   const [error,      setError]      = useState('')
 
   const teams = [...new Map(
@@ -84,10 +83,20 @@ export default function CompetitionAdminScoring({
             ))}
           </div>
           {(isAdmin || isScorer) && !isLocked && (
-            <button onClick={() => setCreating(true)}
-              style={{ background: GREEN, color: 'white', border: 'none', padding: '0.4rem 0.9rem', borderRadius: 6, cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
+            // Routes to the real catch logger (UniversalCatchLogger) instead of
+            // opening a local modal. The old NewCatchModal wrote straight to
+            // competition_catches with an angler_id (registered-user id) even
+            // for unregistered participants, and always scored via the
+            // weight/percentage method — silently wrong for any 'points' /
+            // unit_count competition (e.g. bottomfish), and invisible to the
+            // real logger's participant_id-based lookups. Removed rather than
+            // patched, since the correct home for catch entry is the
+            // dedicated /competition-catch-logger page, not a second parallel
+            // form on the admin Scoring tab.
+            <a href={`/competition-catch-logger/${competition.id}`}
+              style={{ background: GREEN, color: 'white', border: 'none', padding: '0.4rem 0.9rem', borderRadius: 6, cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600, textDecoration: 'none', display: 'inline-block' }}>
               + Log Catch
-            </button>
+            </a>
           )}
         </div>
       </div>
@@ -177,18 +186,6 @@ export default function CompetitionAdminScoring({
           days={days}
           onSave={() => { setEditing(null); onCatchUpdate() }}
           onClose={() => setEditing(null)}
-        />
-      )}
-
-      {/* ── New Catch Modal ──────────────────────────────────────────────── */}
-      {creating && (
-        <NewCatchModal
-          competition={competition}
-          config={config}
-          participants={participants}
-          days={days}
-          onSave={() => { setCreating(false); onCatchUpdate() }}
-          onClose={() => setCreating(false)}
         />
       )}
     </div>
@@ -308,164 +305,6 @@ function CatchEditModal({ catch_, config, participants, days, onSave, onClose })
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           <button onClick={handleSave} disabled={saving} style={S.btn(GREEN)}>
             {saving ? 'Saving…' : '✓ Save Changes'}
-          </button>
-          <button onClick={onClose} style={S.btn(GREY)}>Cancel</button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── NewCatchModal ─────────────────────────────────────────────────────────────
-function NewCatchModal({ competition, config, participants, days, onSave, onClose }) {
-  const [form,   setForm]   = useState({
-    angler_id:      '',
-    species_name:   '',
-    weight_kg:      '',
-    length_cm:      '',
-    line_class_kg:  config?.scoring?.line_class?.default_kg || '',
-    competition_day_id: days[0]?.id || '',
-    notes:          '',
-    retained:       true,
-  })
-  const [preview, setPreview] = useState(null)
-  const [saving,  setSaving]  = useState(false)
-  const [error,   setError]   = useState('')
-
-  function recalcPreview(updates) {
-    const f = { ...form, ...updates }
-    if (!f.weight_kg || !f.species_name) { setPreview(null); return }
-    const scoringConfig = config?.scoring || {}
-    const result = calculateCatchPoints({
-      scoringConfig,
-      weightKg:    parseFloat(f.weight_kg) || 0,
-      lineClassKg: parseInt(f.line_class_kg) || scoringConfig?.line_class?.default_kg || 10,
-      fishCount:   1,
-      isFirstFish: true,
-      isBillfish:  false,
-      isKingfishRelease: false,
-    })
-    setPreview(result)
-  }
-
-  function handleChange(key, value) {
-    setForm(f => ({ ...f, [key]: value }))
-    recalcPreview({ [key]: value })
-  }
-
-  async function handleSave() {
-    if (!form.angler_id || !form.species_name) { setError('Angler and species are required'); return }
-    setSaving(true); setError('')
-    const participant = participants.find(p => p.id === form.angler_id)
-    const day = days.find(d => d.id === form.competition_day_id)
-    const { points } = preview || { points: 0 }
-
-    const { error: err } = await supabase
-      .from('competition_catches')
-      .insert({
-        competition_id:     competition.id,
-        competition_day_id: form.competition_day_id,
-        angler_id:          form.angler_id,
-        team_id:            participant?.team_id || null,
-        species_name:       form.species_name.trim(),
-        weight_kg:          parseFloat(form.weight_kg) || null,
-        length_cm:          parseFloat(form.length_cm) || null,
-        line_class_kg:      parseInt(form.line_class_kg) || null,
-        fishing_date:       day?.date || null,
-        points:             points,
-        retained:           form.retained,
-        notes:              form.notes.trim() || null,
-        data_quality:       'unverified',
-        scoring:            true,
-      })
-
-    if (err) { setError(err.message); setSaving(false); return }
-    setSaving(false)
-    onSave()
-  }
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 1000, overflowY: 'auto', padding: '1rem' }}>
-      <div style={{ background: 'white', borderRadius: 10, padding: '1.5rem', maxWidth: 600, width: '100%', marginTop: '2rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-          <div style={{ fontWeight: 700, color: NAVY }}>Log New Catch</div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: GREY }}>✕</button>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
-          <div style={{ gridColumn: '1 / -1' }}>
-            <label style={S.label}>Angler *</label>
-            <select style={S.select} value={form.angler_id}
-              onChange={e => handleChange('angler_id', e.target.value)}>
-              <option value="">— Select angler —</option>
-              {participants
-                .filter(p => p.status !== 'disqualified')
-                .sort((a, b) => a.full_name.localeCompare(b.full_name))
-                .map(p => (
-                  <option key={p.id} value={p.id}>
-                    {p.full_name}{p.angler_number ? ` (#${p.angler_number})` : ''}
-                  </option>
-                ))}
-            </select>
-          </div>
-          <div style={{ gridColumn: '1 / -1' }}>
-            <label style={S.label}>Species *</label>
-            <input style={S.input} placeholder="Enter species name"
-              value={form.species_name}
-              onChange={e => handleChange('species_name', e.target.value)} />
-          </div>
-          <div>
-            <label style={S.label}>Weight (kg)</label>
-            <input style={S.input} type="number" step="0.001"
-              value={form.weight_kg}
-              onChange={e => handleChange('weight_kg', e.target.value)} />
-          </div>
-          <div>
-            <label style={S.label}>Length (cm)</label>
-            <input style={S.input} type="number" step="0.1"
-              value={form.length_cm}
-              onChange={e => handleChange('length_cm', e.target.value)} />
-          </div>
-          {config?.scoring?.line_class?.enabled && (
-            <div>
-              <label style={S.label}>Line Class (kg)</label>
-              <select style={S.select} value={form.line_class_kg}
-                onChange={e => handleChange('line_class_kg', e.target.value)}>
-                <option value="">— Select —</option>
-                {(config.scoring.line_class.available_classes || []).map(lc => (
-                  <option key={lc} value={lc}>{lc} kg</option>
-                ))}
-              </select>
-            </div>
-          )}
-          <div>
-            <label style={S.label}>Day</label>
-            <select style={S.select} value={form.competition_day_id}
-              onChange={e => handleChange('competition_day_id', e.target.value)}>
-              {days.map(d => <option key={d.id} value={d.id}>Day {d.day_number} — {d.date}</option>)}
-            </select>
-          </div>
-          <div style={{ gridColumn: '1 / -1' }}>
-            <label style={S.label}>Notes</label>
-            <input style={S.input} placeholder="Optional notes"
-              value={form.notes}
-              onChange={e => handleChange('notes', e.target.value)} />
-          </div>
-        </div>
-
-        {/* Points preview */}
-        {preview && (
-          <div style={{ padding: '0.75rem', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 6, marginBottom: '0.75rem' }}>
-            <div style={{ fontWeight: 700, color: GREEN }}>Points preview: {preview.points.toFixed(2)}</div>
-            <div style={{ fontSize: '0.78rem', color: GREY }}>{preview.detail} · {preview.method}</div>
-          </div>
-        )}
-
-        {error && <div style={{ color: RED, fontSize: '0.85rem', marginBottom: '0.5rem' }}>{error}</div>}
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button onClick={handleSave} disabled={saving || !form.angler_id || !form.species_name}
-            style={{ ...S.btn(GREEN), opacity: (!form.angler_id || !form.species_name) ? 0.5 : 1 }}>
-            {saving ? 'Logging…' : '✓ Log Catch'}
           </button>
           <button onClick={onClose} style={S.btn(GREY)}>Cancel</button>
         </div>
