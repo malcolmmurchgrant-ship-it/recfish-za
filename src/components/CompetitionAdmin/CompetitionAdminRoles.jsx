@@ -46,13 +46,15 @@ export default function CompetitionAdminRoles({
       .select('id, role, created_at, user_id')
       .eq('competition_id', competitionId)
       .order('created_at')
-    // Resolve emails from users table
+    // Resolve emails from users table via a SECURITY DEFINER function —
+    // `users` only allows SELECT on your own row, so a direct query here
+    // silently returned nothing for anyone else (that's why John's role
+    // showed with no name/email while Malcolm's own rows displayed fine).
     if (data?.length) {
       const ids = data.map(r => r.user_id)
-      const { data: users } = await supabase
-        .from('users')
-        .select('id, email, full_name')
-        .in('id', ids)
+      const { data: users, error: usersErr } = await supabase
+        .rpc('lookup_users_by_ids', { lookup_ids: ids })
+      if (usersErr) console.error('lookup_users_by_ids error:', usersErr)
       const userMap = Object.fromEntries((users || []).map(u => [u.id, u]))
       setRoles(data.map(r => ({ ...r, ...userMap[r.user_id] })))
     } else {
