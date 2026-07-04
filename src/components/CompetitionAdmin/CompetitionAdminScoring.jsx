@@ -4,7 +4,8 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { calculateCatchPoints } from './utils/scoringEngine'
+import { calculateCatchPoints, calcPointsScoring } from './utils/scoringEngine'
+import { findSpeciesConfig } from './utils/catchLoggerScoring'
 
 const NAVY  = '#1e3a8a'
 const GREY  = '#6b7280'
@@ -133,8 +134,18 @@ export default function CompetitionAdminScoring({
         </div>
       ) : filtered.map(c => {
         const qColor = DQ_COLORS[c.data_quality] || GREY
-        const participant = c.competition_participants
-        const team = participant?.competition_teams
+        // useCompetitionCatches' query never actually joins
+        // competition_participants (only competition_teams and
+        // competition_days are embedded), so c.competition_participants was
+        // always undefined here — blanking both the angler name and, since
+        // it was derived from that same undefined object, the team too.
+        // Resolve the participant from the participants prop instead
+        // (already loaded by index.jsx), matching on participant_id first
+        // and falling back to angler_id/user_id for any row saved the other
+        // way. Team comes straight off the catch's own correctly-joined
+        // competition_teams field.
+        const participant = participants.find(p => p.id === c.participant_id || (c.angler_id && p.user_id === c.angler_id))
+        const team = c.competition_teams
         return (
           <div key={c.id} style={{ ...S.card, borderLeft: `4px solid ${qColor}` }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
@@ -194,6 +205,7 @@ export default function CompetitionAdminScoring({
 
 // ── CatchEditModal ────────────────────────────────────────────────────────────
 function CatchEditModal({ catch_, config, participants, days, onSave, onClose }) {
+  const scoringMethod = config?.scoring?.method || 'percentage'
   const [form,   setForm]   = useState({
     species_name:   catch_.species_name   || '',
     weight_kg:      catch_.weight_kg      || '',
@@ -203,6 +215,7 @@ function CatchEditModal({ catch_, config, participants, days, onSave, onClose })
     notes:          catch_.notes          || '',
     retained:       catch_.retained       ?? true,
     scoring:        catch_.scoring        ?? true,
+    is_over_line:   catch_.is_over_line   ?? false,
     competition_day_id: catch_.competition_day_id || '',
   })
   const [saving, setSaving] = useState(false)
@@ -210,17 +223,46 @@ function CatchEditModal({ catch_, config, participants, days, onSave, onClose })
 
   async function handleSave() {
     setSaving(true); setError('')
-    // Recalculate points
+    // Recalculate points — branched by scoring method. The old version always
+    // used the weight/percentage formula, which silently produced wrong
+    // points for any 'points' / unit_count competition (e.g. bottomfish),
+    // where scoring is points-per-fish + species-bonus + over-line-bonus,
+    // not (weight/line_class)² × 32.
     const scoringConfig = config?.scoring || {}
-    const { points } = calculateCatchPoints({
-      scoringConfig,
-      weightKg:      parseFloat(form.weight_kg) || 0,
-      lineClassKg:   parseInt(form.line_class_kg) || scoringConfig?.line_class?.default_kg || 10,
-      fishCount:     1,
-      isBillfish:    false,
-      isKingfishRelease: false,
-      isFirstFish:   true,
-    })
+    let points
+
+    if (scoringMethod === 'points') {
+      const speciesCfg    = findSpeciesConfig(config?.species, form.species_name)
+      const pointsPerFish = speciesCfg?.points_per_fish ?? scoringConfig?.points_per_fish ?? 3
+      const speciesBonus  = speciesCfg?.species_bonus   ?? scoringConfig?.species_bonus_points ?? 3
+      const overLineBonus = speciesCfg?.over_line_bonus ?? scoringConfig?.over_line_bonus ?? 0
+      // This modal edits one already-logged fish at a time. isFirstFish is
+      // preserved from how the catch was originally scored (species_sequence
+      // === 1) rather than recomputed against sibling rows for this
+      // angler/day/species — recomputing that here would need reloading
+      // every other catch for the same angler/day, which is out of scope for
+      // a single-row edit. If you change the species itself on a fish that
+      // was the first-of-species, double-check the bonus manually afterward.
+      points = calcPointsScoring({
+        fishCount:     1,
+        pointsPerFish,
+        speciesBonus,
+        overLineCount: form.is_over_line ? 1 : 0,
+        overLineBonus,
+        isFirstFish:   catch_.species_sequence === 1,
+      })
+    } else {
+      const result = calculateCatchPoints({
+        scoringConfig,
+        weightKg:    parseFloat(form.weight_kg) || 0,
+        lineClassKg: parseInt(form.line_class_kg) || scoringConfig?.line_class?.default_kg || 10,
+        fishCount:   1,
+        isBillfish:  false,
+        isKingfishRelease: false,
+        isFirstFish: true,
+      })
+      points = result.points
+    }
 
     const { error: err } = await supabase
       .from('competition_catches')
@@ -229,6 +271,7 @@ function CatchEditModal({ catch_, config, participants, days, onSave, onClose })
         weight_kg:     parseFloat(form.weight_kg) || null,
         length_cm:     parseFloat(form.length_cm) || null,
         line_class_kg: parseInt(form.line_class_kg) || null,
+        is_over_line:  !!form.is_over_line,
         points:        form.data_quality === 'disqualified' ? 0 : points,
         scored_at:     new Date().toISOString(),
       })
@@ -293,6 +336,15 @@ function CatchEditModal({ catch_, config, participants, days, onSave, onClose })
               <option value="rejected">Rejected (excluded)</option>
             </select>
           </div>
+          {scoringMethod === 'points' && (
+            <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: '0.6rem' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.9rem' }}>
+                <input type="checkbox" checked={form.is_over_line}
+                  onChange={e => setForm(f => ({ ...f, is_over_line: e.target.checked }))} />
+                Over Line Class (bonus applies)
+              </label>
+            </div>
+          )}
           <div style={{ gridColumn: '1 / -1' }}>
             <label style={S.label}>Notes</label>
             <textarea style={{ ...S.input, minHeight: 60, resize: 'vertical' }}
