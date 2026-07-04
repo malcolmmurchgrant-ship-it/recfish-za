@@ -37,7 +37,6 @@ export default function CompetitionAdminScoring({
   const [dayFilter,    setDayFilter]    = useState('all')
   const [teamFilter,   setTeamFilter]   = useState('all')
   const [anglerFilter, setAnglerFilter] = useState('all')
-  const [search,       setSearch]       = useState('')
   const [editing,      setEditing]      = useState(null)
   const [error,        setError]        = useState('')
 
@@ -72,16 +71,6 @@ export default function CompetitionAdminScoring({
     if (dayFilter !== 'all' && c.competition_days?.day_number !== parseInt(dayFilter)) return false
     if (teamFilter !== 'all' && c.competition_teams?.team_name !== teamFilter) return false
     if (anglerFilter !== 'all' && c.participant_id !== anglerFilter && c.angler_id !== anglerFilter) return false
-    if (search) {
-      // Same fix as the card display below: c.competition_participants was
-      // never actually joined by useCompetitionCatches' query, so this
-      // always evaluated to an empty string — angler-name search has never
-      // matched anything. Resolve from the participants prop instead.
-      const participant = participants.find(p => p.id === c.participant_id || (c.angler_id && p.user_id === c.angler_id))
-      const name = participant?.full_name?.toLowerCase() || ''
-      const sp   = (c.species_name || '').toLowerCase()
-      if (!name.includes(search.toLowerCase()) && !sp.includes(search.toLowerCase())) return false
-    }
     return true
   })
 
@@ -155,11 +144,6 @@ export default function CompetitionAdminScoring({
               <option key={p.id} value={p.id}>{p.full_name}{p.is_captain ? ' (Captain)' : ''}</option>
             ))}
           </select>
-        </div>
-        <div style={{ flex: 2, minWidth: 180 }}>
-          <label style={S.label}>Search</label>
-          <input style={S.input} placeholder="Angler name or species…"
-            value={search} onChange={e => setSearch(e.target.value)} />
         </div>
       </div>
 

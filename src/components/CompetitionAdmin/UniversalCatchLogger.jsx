@@ -38,7 +38,8 @@
 // this is verified against both Gamefish Nationals 2026 and All Coastal IP 2026
 // historical data).
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { useCompetitionConfig } from './hooks/useCompetitionConfig'
@@ -133,9 +134,19 @@ export default function UniversalCatchLogger({ competitionId }) {
   const { competition, config, loading: configLoading, error: configError } = useCompetitionConfig(competitionId)
   const {
     participants, days, boats, loadingMeta, metaError,
-    getBoatAnglersForDay,
+    getBoatAnglersForDay, getAnglerBoatForDay,
     loadAnglerDayCatches, loadTeamDayCatches, loadBoatDayCatches,
   } = useCatchLoggerData(competitionId)
+
+  const [searchParams] = useSearchParams()
+  // Guards the two cascading-reset effects below during initial deep-link
+  // resolution (arriving from a Scoreboard "jump to this angler's card"
+  // click, e.g. ?participantId=...). Without this, setting day/boat/angler
+  // programmatically in sequence would trigger these same effects and wipe
+  // out the very values we just set, since from React's perspective "day
+  // changed" is true regardless of whether a person or our own init code
+  // changed it.
+  const didInitRef = useRef(false)
 
   const [day, setDay] = useState('')
   const [teamId, setTeamId] = useState('')
@@ -197,8 +208,41 @@ export default function UniversalCatchLogger({ competitionId }) {
 
   const participant = participants.find(p => p.id === participantId) || null
 
-  useEffect(() => { setTeamId(''); setBoatId(''); setParticipantId('') }, [day])
-  useEffect(() => { setParticipantId('') }, [teamId, boatId])
+  useEffect(() => {
+    if (!didInitRef.current) return // don't wipe out an in-progress deep-link resolution
+    setTeamId(''); setBoatId(''); setParticipantId('')
+  }, [day])
+  useEffect(() => {
+    if (!didInitRef.current) return
+    setParticipantId('')
+  }, [teamId, boatId])
+
+  // ── Deep-link resolution ─────────────────────────────────────────────────
+  // Arriving via ?participantId=X (from a Scoreboard angler click) jumps
+  // straight to that angler's card instead of making the person click
+  // through Day → Boat/Team → Angler manually. Defaults to the earliest
+  // fishing day, since a click from the Scoreboard (which aggregates across
+  // all days) doesn't inherently know which specific day to land on.
+  useEffect(() => {
+    if (didInitRef.current) return
+    if (loadingMeta || days.length === 0) return
+
+    const linkParticipantId = searchParams.get('participantId')
+    if (linkParticipantId) {
+      const targetDay = [...days].sort((a, b) => a.day_number - b.day_number)[0]
+      setDay(targetDay.id)
+      if (splitBoatFormat) {
+        const matchedBoat = getAnglerBoatForDay(linkParticipantId, targetDay.id)
+        if (matchedBoat) setBoatId(matchedBoat.id)
+      } else {
+        const p = participants.find(pp => pp.id === linkParticipantId)
+        if (p?.competition_teams?.id) setTeamId(p.competition_teams.id)
+      }
+      setParticipantId(linkParticipantId)
+    }
+
+    didInitRef.current = true
+  }, [loadingMeta, days, participants, splitBoatFormat, getAnglerBoatForDay, searchParams])
 
   // ── Load existing card when angler + day selected ───────────────────────────
   useEffect(() => {
@@ -380,8 +424,17 @@ export default function UniversalCatchLogger({ competitionId }) {
         boat_id: splitBoatFormat ? (boatId || null) : null,
         fishing_date: selectedDay.date || null,
         entered_by: user?.id,
-        data_quality: 'self_reported',
       }
+      // Only applied to brand-new rows (see insert branches below) — never
+      // to updates of existing rows. Previously data_quality lived in
+      // baseFields and got spread into every payload including updates,
+      // which meant re-saving a scorecard silently overwrote any admin
+      // Reject/Disqualify back to the default every time. Verified by
+      // default here since John/Malcolm log catches directly themselves
+      // rather than running a two-step angler-reports/official-verifies
+      // flow — Rejected still requires an explicit edit afterward, and
+      // that edit now sticks even if the scorecard is later re-saved.
+      const newRowDataQuality = 'verified'
 
       // Measured rows: one row per fish
       let recordNoteAttached = false
@@ -409,7 +462,8 @@ export default function UniversalCatchLogger({ competitionId }) {
           if (err) throw err
           keptIds.add(fish._id)
         } else {
-          const { data, error: err } = await supabase.from('competition_catches').insert(payload).select('id').single()
+          const { data, error: err } = await supabase.from('competition_catches')
+            .insert({ ...payload, data_quality: newRowDataQuality }).select('id').single()
           if (err) throw err
           keptIds.add(data.id)
         }
@@ -454,7 +508,8 @@ export default function UniversalCatchLogger({ competitionId }) {
             if (err) throw err
             keptIds.add(existingIds[i])
           } else {
-            const { data, error: err } = await supabase.from('competition_catches').insert(payload).select('id').single()
+            const { data, error: err } = await supabase.from('competition_catches')
+              .insert({ ...payload, data_quality: newRowDataQuality }).select('id').single()
             if (err) throw err
             keptIds.add(data.id)
           }

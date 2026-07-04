@@ -5,6 +5,7 @@
 // For now renders standings directly from catches + participants.
 
 import { useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { buildIndividualStandings, aggregateTeamScores } from './utils/scoringEngine'
 
 const NAVY  = '#1e3a8a'
@@ -24,8 +25,15 @@ const S = {
 const RANK_COLORS = { 1: GOLD, 2: '#9ca3af', 3: '#b45309' }
 
 export default function CompetitionAdminScoreboard({
-  competition, config, catches, participants, teams, isAdmin, onSelectAngler,
+  competition, config, catches, participants, teams, isAdmin,
 }) {
+  const navigate = useNavigate()
+  // Takes you straight to that angler's real scorecard on the Catch Logger
+  // page ("Lutz's Card" style view), not a same-page tab switch — that's
+  // the actual page editing happens on.
+  function goToAnglersCard(participantId) {
+    navigate(`/competition-catch-logger/${competition.id}?participantId=${participantId}`)
+  }
   const [viewMode,        setViewMode]        = useState('individual')
   const [showPending,     setShowPending]      = useState(true)
   const [categoryFilter,  setCategoryFilter]   = useState('all')
@@ -144,14 +152,12 @@ export default function CompetitionAdminScoreboard({
                       {s.rank <= 3 ? ['🥇','🥈','🥉'][s.rank - 1] : s.rank}
                     </td>
                     <td style={{ padding: '0.5rem 0.75rem', fontWeight: 600, color: NAVY, whiteSpace: 'nowrap' }}>
-                      {onSelectAngler ? (
-                        <button
-                          onClick={() => onSelectAngler(s.participantId, s.teamName)}
-                          title="Jump to this angler's catches in Scoring"
-                          style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: NAVY, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 3 }}>
-                          {s.displayName}
-                        </button>
-                      ) : s.displayName}
+                      <button
+                        onClick={() => goToAnglersCard(s.participantId)}
+                        title="Open this angler's card in the Catch Logger"
+                        style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: NAVY, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 3 }}>
+                        {s.displayName}
+                      </button>
                       {s.anglerNumber && <span style={{ color: GREY, fontWeight: 400 }}> #{s.anglerNumber}</span>}
                     </td>
                     <td style={{ padding: '0.5rem 0.75rem', color: GREY, fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
@@ -204,14 +210,12 @@ export default function CompetitionAdminScoreboard({
               {t.members.sort((a, b) => b.totalPoints - a.totalPoints).map(m => (
                 <div key={m.participantId} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.3rem 0.5rem', background: '#f8fafc', borderRadius: 5, marginBottom: '0.25rem' }}>
                   <div style={{ flex: 1, fontSize: '0.85rem' }}>
-                    {onSelectAngler ? (
-                      <button
-                        onClick={() => onSelectAngler(m.participantId, m.teamName ?? t.teamName)}
-                        title="Jump to this angler's catches in Scoring"
-                        style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 3 }}>
-                        {m.displayName}
-                      </button>
-                    ) : m.displayName}
+                    <button
+                      onClick={() => goToAnglersCard(m.participantId)}
+                      title="Open this angler's card in the Catch Logger"
+                      style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 3 }}>
+                      {m.displayName}
+                    </button>
                   </div>
                   <div style={{ fontSize: '0.78rem', color: GREY }}>{m.catchCount} fish</div>
                   <div style={{ fontWeight: 700, color: NAVY, minWidth: 60, textAlign: 'right' }}>{m.totalPoints.toFixed(2)}</div>
