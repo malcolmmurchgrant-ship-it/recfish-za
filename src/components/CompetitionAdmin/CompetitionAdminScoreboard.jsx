@@ -84,6 +84,14 @@ export default function CompetitionAdminScoreboard({
 
   const categories = ['all', ...new Set(participants.map(p => p.category).filter(Boolean))]
   const isLocked   = !!competition?.results_published_at
+  // Weight isn't tracked at all in unit-count/'points' competitions (species
+  // are tallied, not weighed) — showing a column of 0.00s for every angler
+  // is just noise. Line class is fixed competition-wide here (not per
+  // angler — competition_participants has no such column), so pull it from
+  // the template's scoring_config rather than a per-row field that never
+  // existed.
+  const showWeight = config?.scoring?.method !== 'points'
+  const lineClassKg = config?.scoring?.line_class_kg ?? competition?.default_line_class_kg ?? null
 
   return (
     <div>
@@ -139,7 +147,7 @@ export default function CompetitionAdminScoreboard({
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
               <thead>
                 <tr style={{ background: NAVY, color: 'white' }}>
-                  {['Rank','Angler','Team','LC','Category','Points','Weight','Spp','Catches'].map(h => (
+                  {['Rank','Angler','Team','LC','Category','Points', ...(showWeight ? ['Weight'] : []), 'Species','Catches'].map(h => (
                     <th key={h} style={{ padding: '0.5rem 0.75rem', textAlign: h === 'Rank' ? 'center' : 'left', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -164,7 +172,7 @@ export default function CompetitionAdminScoreboard({
                       {s.teamName || '—'}
                     </td>
                     <td style={{ padding: '0.5rem 0.75rem', color: GREY, fontSize: '0.82rem', textAlign: 'center' }}>
-                      {s.lineClass ? `${s.lineClass}kg` : '—'}
+                      {lineClassKg ? `${lineClassKg}kg` : '—'}
                     </td>
                     <td style={{ padding: '0.5rem 0.75rem' }}>
                       {s.category && <span style={S.badge(s.category === 'junior' ? '#7c3aed' : s.category === 'ladies' ? '#db2777' : NAVY)}>{s.category}</span>}
@@ -172,9 +180,11 @@ export default function CompetitionAdminScoreboard({
                     <td style={{ padding: '0.5rem 0.75rem', fontWeight: 700, color: NAVY, textAlign: 'right' }}>
                       {s.totalPoints.toFixed(2)}
                     </td>
-                    <td style={{ padding: '0.5rem 0.75rem', color: GREY, textAlign: 'right' }}>
-                      {s.totalWeightKg.toFixed(2)}
-                    </td>
+                    {showWeight && (
+                      <td style={{ padding: '0.5rem 0.75rem', color: GREY, textAlign: 'right' }}>
+                        {s.totalWeightKg.toFixed(2)}
+                      </td>
+                    )}
                     <td style={{ padding: '0.5rem 0.75rem', textAlign: 'center', color: GREY }}>
                       {s.speciesCount}
                     </td>
@@ -184,7 +194,7 @@ export default function CompetitionAdminScoreboard({
                   </tr>
                 ))}
                 {filteredStandings.length === 0 && (
-                  <tr><td colSpan={9} style={{ padding: '1.5rem', textAlign: 'center', color: GREY, fontStyle: 'italic' }}>No catches recorded yet.</td></tr>
+                  <tr><td colSpan={showWeight ? 9 : 8} style={{ padding: '1.5rem', textAlign: 'center', color: GREY, fontStyle: 'italic' }}>No catches recorded yet.</td></tr>
                 )}
               </tbody>
             </table>
@@ -203,7 +213,7 @@ export default function CompetitionAdminScoreboard({
                     {t.rank <= 3 ? ['🥇','🥈','🥉'][t.rank - 1] + ' ' : `${t.rank}. `}
                     {t.teamName}
                   </div>
-                  <div style={{ fontSize: '0.8rem', color: GREY }}>{t.memberCount} anglers · {t.totalWeight.toFixed(2)} kg</div>
+                  <div style={{ fontSize: '0.8rem', color: GREY }}>{t.memberCount} anglers{showWeight ? ` · ${t.totalWeight.toFixed(2)} kg` : ''}</div>
                 </div>
                 <div style={{ fontWeight: 800, fontSize: '1.3rem', color: NAVY }}>{t.totalPoints.toFixed(2)}</div>
               </div>
