@@ -4,8 +4,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { calculateCatchPoints, calcPointsScoring } from './utils/scoringEngine'
-import { findSpeciesConfig } from './utils/catchLoggerScoring'
+import { calculateCatchPoints } from './utils/scoringEngine'
 
 const NAVY  = '#1e3a8a'
 const GREY  = '#6b7280'
@@ -223,34 +222,24 @@ function CatchEditModal({ catch_, config, participants, days, onSave, onClose })
 
   async function handleSave() {
     setSaving(true); setError('')
-    // Recalculate points — branched by scoring method. The old version always
-    // used the weight/percentage formula, which silently produced wrong
-    // points for any 'points' / unit_count competition (e.g. bottomfish),
-    // where scoring is points-per-fish + species-bonus + over-line-bonus,
-    // not (weight/line_class)² × 32.
     const scoringConfig = config?.scoring || {}
     let points
 
     if (scoringMethod === 'points') {
-      const speciesCfg    = findSpeciesConfig(config?.species, form.species_name)
-      const pointsPerFish = speciesCfg?.points_per_fish ?? scoringConfig?.points_per_fish ?? 3
-      const speciesBonus  = speciesCfg?.species_bonus   ?? scoringConfig?.species_bonus_points ?? 3
-      const overLineBonus = speciesCfg?.over_line_bonus ?? scoringConfig?.over_line_bonus ?? 0
-      // This modal edits one already-logged fish at a time. isFirstFish is
-      // preserved from how the catch was originally scored (species_sequence
-      // === 1) rather than recomputed against sibling rows for this
-      // angler/day/species — recomputing that here would need reloading
-      // every other catch for the same angler/day, which is out of scope for
-      // a single-row edit. If you change the species itself on a fish that
-      // was the first-of-species, double-check the bonus manually afterward.
-      points = calcPointsScoring({
-        fishCount:     1,
-        pointsPerFish,
-        speciesBonus,
-        overLineCount: form.is_over_line ? 1 : 0,
-        overLineBonus,
-        isFirstFish:   catch_.species_sequence === 1,
-      })
+      // Real-world data showed species_sequence is null on every row the
+      // catch logger writes, not 1/2/3 as originally assumed — and a
+      // multi-fish unit_count catch (e.g. "2 Yellowtail") is saved as
+      // MULTIPLE rows, with only the first carrying the real total
+      // (SUM(points) across the group is the source of truth) and every
+      // additional row intentionally holding points = 0 as a placeholder.
+      // Recomputing "as if" this row is exactly 1 fish with no sibling
+      // context — which is all this modal has — either zeroes out a
+      // legitimate multi-fish total or re-inflates an intentional zero
+      // padding row. Both happened in testing. So: never recompute a
+      // 'points'-method score here. The only safe, unambiguous change is
+      // zeroing it on Disqualified; everything else preserves whatever the
+      // catch logger originally calculated with full context.
+      points = form.data_quality === 'disqualified' ? 0 : parseFloat(catch_.points ?? 0)
     } else {
       const result = calculateCatchPoints({
         scoringConfig,
@@ -289,6 +278,12 @@ function CatchEditModal({ catch_, config, participants, days, onSave, onClose })
           <div style={{ fontWeight: 700, color: NAVY }}>Edit Catch</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: GREY }}>✕</button>
         </div>
+
+        {scoringMethod === 'points' && (
+          <div style={{ fontSize: '0.8rem', color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 6, padding: '0.6rem 0.75rem', marginBottom: '0.75rem' }}>
+            ⚠ Points are preserved as originally logged and are not recalculated here — a multi-fish catch (e.g. "2 Yellowtail") is saved as several rows where only one carries the real total, so recomputing in isolation can silently corrupt it. To fix a wrong species or fish count, set Data Quality to Rejected below and have it re-logged through the Catch Logger instead of editing it here.
+          </div>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
           <div style={{ gridColumn: '1 / -1' }}>
@@ -341,7 +336,7 @@ function CatchEditModal({ catch_, config, participants, days, onSave, onClose })
               <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.9rem' }}>
                 <input type="checkbox" checked={form.is_over_line}
                   onChange={e => setForm(f => ({ ...f, is_over_line: e.target.checked }))} />
-                Over Line Class (bonus applies)
+                Over Line Class (record only — doesn't recalculate points here)
               </label>
             </div>
           )}
