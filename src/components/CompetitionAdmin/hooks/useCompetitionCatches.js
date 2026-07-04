@@ -68,8 +68,21 @@ export function useCompetitionCatches(competitionId) {
 
   // Mark angler as DQ — zeroes points but retains catch data
   async function disqualifyAngler(participantId, reason) {
-    // Update all catches for this participant
-    const { error: err } = await supabase
+    // Registered anglers' catches are matched by angler_id (== user_id);
+    // unregistered anglers (no RecFish ZA account — the common case here,
+    // e.g. every junior angler in this competition) have angler_id = null
+    // and are matched by participant_id instead. The previous version only
+    // ever filtered on angler_id, so disqualifying an unregistered angler
+    // silently updated zero rows — the DQ button would appear to succeed
+    // but nothing would actually change on the scoreboard.
+    const { data: participant, error: pErr } = await supabase
+      .from('competition_participants')
+      .select('id, user_id')
+      .eq('id', participantId)
+      .single()
+    if (pErr) throw pErr
+
+    let query = supabase
       .from('competition_catches')
       .update({
         data_quality: 'disqualified',
@@ -77,7 +90,12 @@ export function useCompetitionCatches(competitionId) {
         notes:        reason,
       })
       .eq('competition_id', competitionId)
-      .eq('angler_id', participantId)
+
+    query = participant.user_id
+      ? query.eq('angler_id', participant.user_id)
+      : query.eq('participant_id', participant.id)
+
+    const { error: err } = await query
     if (err) throw err
     await load()
   }
@@ -88,7 +106,10 @@ export function useCompetitionCatches(competitionId) {
   }
 
   function catchesByParticipant(participantId) {
-    return catches.filter(c => c.angler_id === participantId)
+    // Matches either identifier — angler_id only lines up with a
+    // registered angler's user_id, participant_id always lines up with
+    // competition_participants.id regardless of registration status.
+    return catches.filter(c => c.participant_id === participantId || c.angler_id === participantId)
   }
 
   function catchesByTeam(teamId) {

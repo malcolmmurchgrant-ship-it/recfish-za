@@ -142,16 +142,20 @@ export function aggregateTeamScores(catches, participants, teamConfig, scoringCo
 // ── Individual standings ──────────────────────────────────────────────────────
 export function buildIndividualStandings(catches, participants) {
   const byParticipant = {}
+  const byUserId = {}   // user_id -> participant.id, for registered anglers
+  const byPartId = {}   // participant.id -> participant.id (self-map, for clarity below)
 
   for (const p of participants) {
-    // Key by user_id (matches angler_id in competition_catches)
-    // Fall back to p.id for new-style participants
-    const key = p.user_id || p.id
+    // Keyed by participant.id always now — this is the one identifier every
+    // participant has, registered or not. user_id only exists for anglers
+    // with a RecFish ZA account.
+    const key = p.id
     byParticipant[key] = {
       participantId:  p.id,
       anglerNumber:   p.angler_number,
       displayName:    p.full_name,
       teamId:         p.team_id,
+      teamName:       p.competition_teams?.team_name || p.competition_teams?.province || null,
       lineClass:      p.line_class_kg,
       category:       p.category,
       totalPoints:    0,
@@ -161,11 +165,21 @@ export function buildIndividualStandings(catches, participants) {
       bestFish:       null,
       catches:        [],
     }
+    if (p.user_id) byUserId[p.user_id] = key
+    byPartId[p.id] = key
   }
 
   for (const c of catches) {
     if (c.data_quality === 'rejected') continue
-    const p = byParticipant[c.angler_id]
+    // Registered anglers are matched via angler_id (== user_id). Unregistered
+    // anglers (no RecFish ZA account — the common case for junior anglers)
+    // have angler_id = null on their catches and must be matched via
+    // participant_id instead — same fallback useCatchLoggerData already uses
+    // when loading an angler's catches for the logger's draft card. Matching
+    // on angler_id alone silently dropped every unregistered angler's
+    // catches from standings entirely.
+    const key = (c.angler_id && byUserId[c.angler_id]) || byPartId[c.participant_id]
+    const p = byParticipant[key]
     if (!p) continue
     const pts = c.data_quality === 'disqualified' ? 0 : parseFloat(c.points || 0)
     p.totalPoints   += pts
