@@ -678,13 +678,30 @@ export default function UniversalCatchLogger({ competitionId }) {
               {error && <div style={{ background: '#fef2f2', color: RED, padding: '0.75rem', borderRadius: 6, marginBottom: '0.75rem' }}>{error}</div>}
               {saved && <div style={{ background: '#f0fdf4', color: GREEN, padding: '0.75rem', borderRadius: 6, marginBottom: '0.75rem', fontWeight: 600 }}>✅ Saved successfully!</div>}
 
-              <button onClick={handleSave} disabled={saving || totalValidFish === 0}
-                style={{ ...S.btn(), padding: '0.75rem 2rem', fontSize: '1rem', opacity: (saving || totalValidFish === 0) ? 0.5 : 1 }}>
-                {saving ? 'Saving…' : originalRows.length > 0 ? '💾 Update Scorecard' : '💾 Save Scorecard'}
-              </button>
-              {totalValidFish === 0 && (
-                <span style={{ fontSize: '0.82rem', color: '#9ca3af', marginLeft: '0.75rem' }}>Add at least 1 valid catch to save</span>
-              )}
+              {/* A scorecard with nothing entered and nothing previously saved
+                  has nothing to save — block that. But an EXISTING scorecard
+                  (originalRows.length > 0) reduced back to zero is a
+                  legitimate "I logged this by mistake, remove it" action —
+                  handleSave's delete-diff already correctly removes rows no
+                  longer represented, so blocking the button here was the
+                  only thing actually preventing that from working. */}
+              {(() => {
+                const isBlankNew = totalValidFish === 0 && originalRows.length === 0
+                return (
+                  <>
+                    <button onClick={handleSave} disabled={saving || isBlankNew}
+                      style={{ ...S.btn(), padding: '0.75rem 2rem', fontSize: '1rem', opacity: (saving || isBlankNew) ? 0.5 : 1 }}>
+                      {saving ? 'Saving…' : originalRows.length > 0 ? '💾 Update Scorecard' : '💾 Save Scorecard'}
+                    </button>
+                    {isBlankNew && (
+                      <span style={{ fontSize: '0.82rem', color: '#9ca3af', marginLeft: '0.75rem' }}>Add at least 1 valid catch to save</span>
+                    )}
+                    {!isBlankNew && totalValidFish === 0 && originalRows.length > 0 && (
+                      <span style={{ fontSize: '0.82rem', color: RED, marginLeft: '0.75rem' }}>⚠ Saving will remove all logged catches for this angler on this day</span>
+                    )}
+                  </>
+                )
+              })()}
             </>
           )}
 
