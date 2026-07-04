@@ -24,7 +24,7 @@ const S = {
 const RANK_COLORS = { 1: GOLD, 2: '#9ca3af', 3: '#b45309' }
 
 export default function CompetitionAdminScoreboard({
-  competition, config, catches, participants, teams, isAdmin,
+  competition, config, catches, participants, teams, isAdmin, onSelectAngler,
 }) {
   const [viewMode,        setViewMode]        = useState('individual')
   const [showPending,     setShowPending]      = useState(true)
@@ -144,7 +144,14 @@ export default function CompetitionAdminScoreboard({
                       {s.rank <= 3 ? ['🥇','🥈','🥉'][s.rank - 1] : s.rank}
                     </td>
                     <td style={{ padding: '0.5rem 0.75rem', fontWeight: 600, color: NAVY, whiteSpace: 'nowrap' }}>
-                      {s.displayName}
+                      {onSelectAngler ? (
+                        <button
+                          onClick={() => onSelectAngler(s.participantId, s.teamName)}
+                          title="Jump to this angler's catches in Scoring"
+                          style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: NAVY, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 3 }}>
+                          {s.displayName}
+                        </button>
+                      ) : s.displayName}
                       {s.anglerNumber && <span style={{ color: GREY, fontWeight: 400 }}> #{s.anglerNumber}</span>}
                     </td>
                     <td style={{ padding: '0.5rem 0.75rem', color: GREY, fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
@@ -196,7 +203,16 @@ export default function CompetitionAdminScoreboard({
               </div>
               {t.members.sort((a, b) => b.totalPoints - a.totalPoints).map(m => (
                 <div key={m.participantId} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.3rem 0.5rem', background: '#f8fafc', borderRadius: 5, marginBottom: '0.25rem' }}>
-                  <div style={{ flex: 1, fontSize: '0.85rem' }}>{m.displayName}</div>
+                  <div style={{ flex: 1, fontSize: '0.85rem' }}>
+                    {onSelectAngler ? (
+                      <button
+                        onClick={() => onSelectAngler(m.participantId, m.teamName ?? t.teamName)}
+                        title="Jump to this angler's catches in Scoring"
+                        style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 3 }}>
+                        {m.displayName}
+                      </button>
+                    ) : m.displayName}
+                  </div>
                   <div style={{ fontSize: '0.78rem', color: GREY }}>{m.catchCount} fish</div>
                   <div style={{ fontWeight: 700, color: NAVY, minWidth: 60, textAlign: 'right' }}>{m.totalPoints.toFixed(2)}</div>
                 </div>

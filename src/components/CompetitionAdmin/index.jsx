@@ -36,6 +36,15 @@ const TABS = [
 
 export default function CompetitionAdmin({ competitionId }) {
   const [activeTab,     setActiveTab]     = useState('scoring')
+  // Set when an angler is clicked on the Scoreboard — carries them straight
+  // to that angler's catches in the Scoring tab instead of making them
+  // reselect Day/Team manually.
+  const [scoringFilter, setScoringFilter] = useState(null)
+
+  function goToAnglerScoring(participantId, teamName) {
+    setScoringFilter({ participantId, teamName })
+    setActiveTab('scoring')
+  }
   const [participants,  setParticipants]  = useState([])
   const [days,          setDays]          = useState([])
   const [teams,         setTeams]         = useState([])
@@ -204,6 +213,7 @@ export default function CompetitionAdmin({ competitionId }) {
           isAdmin={isAdmin}
           isScorer={isScorer}
           onCatchUpdate={reloadCatches}
+          initialFilter={scoringFilter}
         />
       )}
 
@@ -215,6 +225,7 @@ export default function CompetitionAdmin({ competitionId }) {
           participants={participants}
           teams={teams}
           isAdmin={isAdmin}
+          onSelectAngler={goToAnglerScoring}
         />
       )}
 

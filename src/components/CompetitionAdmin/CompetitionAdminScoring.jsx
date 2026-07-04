@@ -32,23 +32,46 @@ const DQ_COLORS = {
 
 export default function CompetitionAdminScoring({
   competition, config, catches, participants, days,
-  isAdmin, isScorer, onCatchUpdate,
+  isAdmin, isScorer, onCatchUpdate, initialFilter,
 }) {
-  const [dayFilter,  setDayFilter]  = useState('all')
-  const [teamFilter, setTeamFilter] = useState('all')
-  const [search,     setSearch]     = useState('')
-  const [editing,    setEditing]    = useState(null)
-  const [error,      setError]      = useState('')
+  const [dayFilter,    setDayFilter]    = useState('all')
+  const [teamFilter,   setTeamFilter]   = useState('all')
+  const [anglerFilter, setAnglerFilter] = useState('all')
+  const [search,       setSearch]       = useState('')
+  const [editing,      setEditing]      = useState(null)
+  const [error,        setError]        = useState('')
+
+  // Arriving here from a Scoreboard angler click (see index.jsx) — jump
+  // straight to that team + angler instead of making them reselect manually.
+  useEffect(() => {
+    if (!initialFilter) return
+    if (initialFilter.teamName)     setTeamFilter(initialFilter.teamName)
+    if (initialFilter.participantId) setAnglerFilter(initialFilter.participantId)
+  }, [initialFilter])
 
   const teams = [...new Map(
     participants.filter(p => p.competition_teams)
       .map(p => [p.team_id, p.competition_teams])
   ).values()]
 
+  // Anglers scoped to the currently selected team — this is what makes the
+  // dropdown actually useful instead of scrolling/typing through everyone.
+  const anglersInScope = participants
+    .filter(p => teamFilter === 'all' || p.competition_teams?.team_name === teamFilter)
+    .sort((a, b) => (a.full_name || '').localeCompare(b.full_name || ''))
+
+  // If the team filter changes and the currently selected angler isn't in
+  // the new scope, reset rather than silently filtering to nothing.
+  useEffect(() => {
+    if (anglerFilter === 'all') return
+    if (!anglersInScope.some(p => p.id === anglerFilter)) setAnglerFilter('all')
+  }, [teamFilter]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Filter catches ───────────────────────────────────────────────────────
   const filtered = catches.filter(c => {
     if (dayFilter !== 'all' && c.competition_days?.day_number !== parseInt(dayFilter)) return false
     if (teamFilter !== 'all' && c.competition_teams?.team_name !== teamFilter) return false
+    if (anglerFilter !== 'all' && c.participant_id !== anglerFilter && c.angler_id !== anglerFilter) return false
     if (search) {
       // Same fix as the card display below: c.competition_participants was
       // never actually joined by useCompetitionCatches' query, so this
@@ -124,6 +147,15 @@ export default function CompetitionAdminScoring({
             </select>
           </div>
         )}
+        <div style={{ flex: 1, minWidth: 160 }}>
+          <label style={S.label}>Angler</label>
+          <select style={S.select} value={anglerFilter} onChange={e => setAnglerFilter(e.target.value)}>
+            <option value="all">All Anglers</option>
+            {anglersInScope.map(p => (
+              <option key={p.id} value={p.id}>{p.full_name}{p.is_captain ? ' (Captain)' : ''}</option>
+            ))}
+          </select>
+        </div>
         <div style={{ flex: 2, minWidth: 180 }}>
           <label style={S.label}>Search</label>
           <input style={S.input} placeholder="Angler name or species…"
