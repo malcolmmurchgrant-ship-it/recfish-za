@@ -50,7 +50,12 @@ export default function CompetitionAdminScoring({
     if (dayFilter !== 'all' && c.competition_days?.day_number !== parseInt(dayFilter)) return false
     if (teamFilter !== 'all' && c.competition_teams?.team_name !== teamFilter) return false
     if (search) {
-      const name = c.competition_participants?.full_name?.toLowerCase() || ''
+      // Same fix as the card display below: c.competition_participants was
+      // never actually joined by useCompetitionCatches' query, so this
+      // always evaluated to an empty string — angler-name search has never
+      // matched anything. Resolve from the participants prop instead.
+      const participant = participants.find(p => p.id === c.participant_id || (c.angler_id && p.user_id === c.angler_id))
+      const name = participant?.full_name?.toLowerCase() || ''
       const sp   = (c.species_name || '').toLowerCase()
       if (!name.includes(search.toLowerCase()) && !sp.includes(search.toLowerCase())) return false
     }
