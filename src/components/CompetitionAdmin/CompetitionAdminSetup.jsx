@@ -3,7 +3,7 @@
 // Competition name, dates, venue, status controls,
 // session/day management, rule override log.
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 
 const NAVY = '#1e3a8a'
@@ -39,7 +39,7 @@ const STATUS_LABELS = {
   archived:    'Archived',
 }
 
-export default function CompetitionAdminSetup({ competition, config, days, isAdmin, onReload }) {
+export default function CompetitionAdminSetup({ competition, config, days, boats, isAdmin, onReload }) {
   const [editing,  setEditing]  = useState(false)
   const [saving,   setSaving]   = useState(false)
   const [error,    setError]    = useState('')
@@ -57,6 +57,76 @@ export default function CompetitionAdminSetup({ competition, config, days, isAdm
   // Day session state
   const [dayAction,  setDayAction]  = useState({})
   const [dayLoading, setDayLoading] = useState({})
+
+  // Per-boat fishing session times (Lines In / Lines Up), for record-keeping
+  // and fishing-hours tracking. This is informational only for this
+  // competition — scoring here is 'points' method (points-per-fish +
+  // species/over-line bonuses), not CPUE, so nothing entered here changes
+  // the standings.
+  const [fishingSessions, setFishingSessions]   = useState([])
+  const [loadingSessions, setLoadingSessions]   = useState(true)
+  const [expandedDay,     setExpandedDay]       = useState(null)
+  const [sessionForm,     setSessionForm]       = useState({}) // keyed by session id: { lines_in, lines_up }
+  const [savingSession,   setSavingSession]     = useState({}) // keyed by session id
+
+  useEffect(() => {
+    if (!competition?.id) return
+    loadFishingSessions()
+  }, [competition?.id])
+
+  async function loadFishingSessions() {
+    setLoadingSessions(true)
+    const { data, error: err } = await supabase
+      .from('competition_fishing_sessions')
+      .select('*')
+      .eq('competition_id', competition.id)
+    if (!err) setFishingSessions(data || [])
+    setLoadingSessions(false)
+  }
+
+  function sessionsForDay(dayNumber) {
+    return fishingSessions.filter(s => s.day_number === dayNumber)
+  }
+
+  function fieldFor(session, field) {
+    return sessionForm[session.id]?.[field] ?? session[field] ?? ''
+  }
+
+  function setField(sessionId, field, value) {
+    setSessionForm(f => ({ ...f, [sessionId]: { ...f[sessionId], [field]: value } }))
+  }
+
+  // Hours between two "HH:MM" times, same day. Returns null if either is
+  // missing/invalid rather than guessing — an incomplete pair shouldn't
+  // silently produce a wrong number.
+  function computeHours(linesIn, linesUp) {
+    if (!linesIn || !linesUp) return null
+    const [inH, inM]  = linesIn.split(':').map(Number)
+    const [upH, upM]  = linesUp.split(':').map(Number)
+    if ([inH, inM, upH, upM].some(Number.isNaN)) return null
+    const minutes = (upH * 60 + upM) - (inH * 60 + inM)
+    if (minutes < 0) return null // lines-up before lines-in — flag by showing nothing rather than a negative number
+    return parseFloat((minutes / 60).toFixed(2))
+  }
+
+  async function saveSession(session) {
+    const linesIn  = fieldFor(session, 'lines_in')
+    const linesUp  = fieldFor(session, 'lines_up')
+    const hours    = computeHours(linesIn, linesUp)
+    setSavingSession(p => ({ ...p, [session.id]: true }))
+    const { error: err } = await supabase
+      .from('competition_fishing_sessions')
+      .update({
+        lines_in:      linesIn || null,
+        lines_up:      linesUp || null,
+        fishing_hours: hours,
+        updated_at:    new Date().toISOString(),
+      })
+      .eq('id', session.id)
+    setSavingSession(p => ({ ...p, [session.id]: false }))
+    if (err) { setError(err.message); return }
+    await loadFishingSessions()
+  }
 
   if (!competition) return null
 
@@ -273,49 +343,114 @@ export default function CompetitionAdminSetup({ competition, config, days, isAdm
       {days?.length > 0 && (
         <div style={S.card}>
           <div style={S.section}>Session Management</div>
-          {days.map(day => (
-            <div key={day.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 0.75rem', border: '1px solid #e5e7eb', borderRadius: 6, marginBottom: '0.4rem', flexWrap: 'wrap' }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 600, color: NAVY }}>Day {day.day_number}</div>
-                <div style={{ fontSize: '0.8rem', color: GREY }}>
-                  {day.date} · {day.fishing_start_time} – {day.fishing_end_time}
-                  {day.cancelled && <span style={{ color: RED, marginLeft: 6 }}>CANCELLED — {day.cancellation_reason}</span>}
+          <div style={{ fontSize: '0.78rem', color: GREY, marginBottom: '0.75rem' }}>
+            Lines In / Lines Up times below are for record-keeping and fishing-hours
+            tracking only — this competition scores on points-per-fish, so nothing
+            entered here affects standings.
+          </div>
+          {days.map(day => {
+            const daySessions = sessionsForDay(day.day_number)
+            const isExpanded = expandedDay === day.day_number
+            return (
+              <div key={day.id} style={{ border: '1px solid #e5e7eb', borderRadius: 6, marginBottom: '0.4rem', overflow: 'hidden' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 0.75rem', flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, color: NAVY }}>Day {day.day_number}</div>
+                    <div style={{ fontSize: '0.8rem', color: GREY }}>
+                      {day.date} · {day.fishing_start_time} – {day.fishing_end_time}
+                      {day.cancelled && <span style={{ color: RED, marginLeft: 6 }}>CANCELLED — {day.cancellation_reason}</span>}
+                    </div>
+                  </div>
+                  <span style={S.badge(
+                    day.session_status === 'open'      ? GREEN :
+                    day.session_status === 'closed'    ? NAVY  :
+                    day.session_status === 'finalised' ? '#7c3aed' : GREY
+                  )}>
+                    {day.session_status || 'setup'}
+                  </span>
+                  {isAdmin && !isLocked && (
+                    <div style={{ display: 'flex', gap: '0.4rem' }}>
+                      {day.session_status !== 'open' && (
+                        <button onClick={() => updateDayStatus(day.id, 'open')}
+                          disabled={dayLoading[day.id]}
+                          style={{ ...S.btn(GREEN), padding: '0.3rem 0.7rem', fontSize: '0.78rem' }}>
+                          Open
+                        </button>
+                      )}
+                      {day.session_status === 'open' && (
+                        <button onClick={() => updateDayStatus(day.id, 'closed')}
+                          disabled={dayLoading[day.id]}
+                          style={{ ...S.btn(NAVY), padding: '0.3rem 0.7rem', fontSize: '0.78rem' }}>
+                          Close
+                        </button>
+                      )}
+                      {day.session_status === 'closed' && (
+                        <button onClick={() => updateDayStatus(day.id, 'finalised')}
+                          disabled={dayLoading[day.id]}
+                          style={{ ...S.btn('#7c3aed'), padding: '0.3rem 0.7rem', fontSize: '0.78rem' }}>
+                          Finalise
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {boats?.length > 0 && (
+                    <button onClick={() => setExpandedDay(isExpanded ? null : day.day_number)}
+                      style={{ ...S.btn(GREY), padding: '0.3rem 0.7rem', fontSize: '0.78rem' }}>
+                      {isExpanded ? '▲ Hide Boat Times' : '▼ Boat Times'}
+                    </button>
+                  )}
                 </div>
+
+                {isExpanded && (
+                  <div style={{ borderTop: '1px solid #e5e7eb', padding: '0.75rem', background: '#f8fafc' }}>
+                    {loadingSessions ? (
+                      <div style={{ color: GREY, fontStyle: 'italic', fontSize: '0.85rem' }}>Loading…</div>
+                    ) : daySessions.length === 0 ? (
+                      <div style={{ color: GREY, fontStyle: 'italic', fontSize: '0.85rem' }}>
+                        No session rows found for this day — boats may not have been set up yet.
+                      </div>
+                    ) : (
+                      <div style={{ display: 'grid', gap: '0.5rem' }}>
+                        {daySessions.map(session => {
+                          const linesIn  = fieldFor(session, 'lines_in')
+                          const linesUp  = fieldFor(session, 'lines_up')
+                          const hours    = computeHours(linesIn, linesUp)
+                          return (
+                            <div key={session.id} style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 0.8fr auto', gap: '0.6rem', alignItems: 'center', background: 'white', borderRadius: 6, padding: '0.5rem 0.75rem', border: '1px solid #e5e7eb' }}>
+                              <div>
+                                <div style={{ fontWeight: 600, color: NAVY, fontSize: '0.88rem' }}>{session.boat_name}</div>
+                                <div style={{ fontSize: '0.75rem', color: GREY }}>{session.skipper_name}</div>
+                              </div>
+                              <div>
+                                <label style={{ ...S.label, marginBottom: 2 }}>Lines In</label>
+                                <input type="time" style={{ ...S.input, padding: '0.4rem 0.5rem' }}
+                                  value={linesIn}
+                                  onChange={e => setField(session.id, 'lines_in', e.target.value)} />
+                              </div>
+                              <div>
+                                <label style={{ ...S.label, marginBottom: 2 }}>Lines Up</label>
+                                <input type="time" style={{ ...S.input, padding: '0.4rem 0.5rem' }}
+                                  value={linesUp}
+                                  onChange={e => setField(session.id, 'lines_up', e.target.value)} />
+                              </div>
+                              <div style={{ fontSize: '0.85rem', color: GREY, textAlign: 'center' }}>
+                                {hours != null ? `${hours}h` : '—'}
+                              </div>
+                              <button onClick={() => saveSession(session)}
+                                disabled={savingSession[session.id]}
+                                style={{ ...S.btn(GREEN), padding: '0.35rem 0.7rem', fontSize: '0.78rem' }}>
+                                {savingSession[session.id] ? 'Saving…' : 'Save'}
+                              </button>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              <span style={S.badge(
-                day.session_status === 'open'      ? GREEN :
-                day.session_status === 'closed'    ? NAVY  :
-                day.session_status === 'finalised' ? '#7c3aed' : GREY
-              )}>
-                {day.session_status || 'setup'}
-              </span>
-              {isAdmin && !isLocked && (
-                <div style={{ display: 'flex', gap: '0.4rem' }}>
-                  {day.session_status !== 'open' && (
-                    <button onClick={() => updateDayStatus(day.id, 'open')}
-                      disabled={dayLoading[day.id]}
-                      style={{ ...S.btn(GREEN), padding: '0.3rem 0.7rem', fontSize: '0.78rem' }}>
-                      Open
-                    </button>
-                  )}
-                  {day.session_status === 'open' && (
-                    <button onClick={() => updateDayStatus(day.id, 'closed')}
-                      disabled={dayLoading[day.id]}
-                      style={{ ...S.btn(NAVY), padding: '0.3rem 0.7rem', fontSize: '0.78rem' }}>
-                      Close
-                    </button>
-                  )}
-                  {day.session_status === 'closed' && (
-                    <button onClick={() => updateDayStatus(day.id, 'finalised')}
-                      disabled={dayLoading[day.id]}
-                      style={{ ...S.btn('#7c3aed'), padding: '0.3rem 0.7rem', fontSize: '0.78rem' }}>
-                      Finalise
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 

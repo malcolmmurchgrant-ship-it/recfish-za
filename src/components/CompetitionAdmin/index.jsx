@@ -39,6 +39,7 @@ export default function CompetitionAdmin({ competitionId }) {
   const [participants,  setParticipants]  = useState([])
   const [days,          setDays]          = useState([])
   const [teams,         setTeams]         = useState([])
+  const [boats,         setBoats]         = useState([])
   const [loadingMeta,   setLoadingMeta]   = useState(true)
 
   // ── Core hooks ───────────────────────────────────────────────────────────
@@ -64,7 +65,7 @@ export default function CompetitionAdmin({ competitionId }) {
 
   async function loadMeta() {
     setLoadingMeta(true)
-    const [{ data: parts }, { data: ds }, { data: tms }] = await Promise.all([
+    const [{ data: parts }, { data: ds }, { data: tms }, { data: bts }] = await Promise.all([
       supabase.from('competition_participants')
         .select('*, competition_teams(id, team_name, province, team_type)')
         .eq('competition_id', competitionId)
@@ -77,10 +78,15 @@ export default function CompetitionAdmin({ competitionId }) {
         .select('*')
         .eq('competition_id', competitionId)
         .order('team_name'),
+      supabase.from('competition_boats')
+        .select('*')
+        .eq('competition_id', competitionId)
+        .order('boat_name'),
     ])
     setParticipants(parts || [])
     setDays(ds || [])
     setTeams(tms || [])
+    setBoats(bts || [])
     setLoadingMeta(false)
   }
 
@@ -180,6 +186,7 @@ export default function CompetitionAdmin({ competitionId }) {
           competition={competition}
           config={config}
           days={days}
+          boats={boats}
           isAdmin={isAdmin}
           onReload={reloadAll}
         />
