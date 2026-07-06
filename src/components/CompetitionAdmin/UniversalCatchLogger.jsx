@@ -218,18 +218,23 @@ export default function UniversalCatchLogger({ competitionId }) {
   }, [teamId, boatId])
 
   // ── Deep-link resolution ─────────────────────────────────────────────────
-  // Arriving via ?participantId=X (from a Scoreboard angler click) jumps
-  // straight to that angler's card instead of making the person click
-  // through Day → Boat/Team → Angler manually. Defaults to the earliest
-  // fishing day, since a click from the Scoreboard (which aggregates across
-  // all days) doesn't inherently know which specific day to land on.
+  // Arriving via ?participantId=X (and optionally &day=N) jumps straight to
+  // that angler's card instead of making the person click through
+  // Day → Boat/Team → Angler manually. The Scoring tab's "+ Log Catch" link
+  // carries both when a specific day is selected there; a Scoreboard name
+  // click only ever carries participantId (standings aggregate across all
+  // days, so there's no specific day to pass), in which case this falls
+  // back to the earliest fishing day.
   useEffect(() => {
     if (didInitRef.current) return
     if (loadingMeta || days.length === 0) return
 
     const linkParticipantId = searchParams.get('participantId')
     if (linkParticipantId) {
-      const targetDay = [...days].sort((a, b) => a.day_number - b.day_number)[0]
+      const requestedDayNum = parseInt(searchParams.get('day'), 10)
+      const sortedDays = [...days].sort((a, b) => a.day_number - b.day_number)
+      const targetDay = (!Number.isNaN(requestedDayNum) && sortedDays.find(d => d.day_number === requestedDayNum))
+        || sortedDays[0]
       setDay(targetDay.id)
       if (splitBoatFormat) {
         const matchedBoat = getAnglerBoatForDay(linkParticipantId, targetDay.id)

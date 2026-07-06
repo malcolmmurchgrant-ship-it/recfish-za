@@ -110,7 +110,13 @@ export default function CompetitionAdminScoring({
             // patched, since the correct home for catch entry is the
             // dedicated /competition-catch-logger page, not a second parallel
             // form on the admin Scoring tab.
-            <a href={`/competition-catch-logger/${competition.id}`}
+            <a href={`/competition-catch-logger/${competition.id}${(() => {
+              const params = new URLSearchParams()
+              if (anglerFilter !== 'all') params.set('participantId', anglerFilter)
+              if (dayFilter !== 'all') params.set('day', dayFilter)
+              const qs = params.toString()
+              return qs ? `?${qs}` : ''
+            })()}`}
               style={{ background: GREEN, color: 'white', border: 'none', padding: '0.4rem 0.9rem', borderRadius: 6, cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600, textDecoration: 'none', display: 'inline-block' }}>
               + Log Catch
             </a>
