@@ -139,14 +139,20 @@ export default function UniversalCatchLogger({ competitionId }) {
   } = useCatchLoggerData(competitionId)
 
   const [searchParams] = useSearchParams()
-  // Guards the two cascading-reset effects below during initial deep-link
-  // resolution (arriving from a Scoreboard "jump to this angler's card"
-  // click, e.g. ?participantId=...). Without this, setting day/boat/angler
-  // programmatically in sequence would trigger these same effects and wipe
-  // out the very values we just set, since from React's perspective "day
-  // changed" is true regardless of whether a person or our own init code
-  // changed it.
-  const didInitRef = useRef(false)
+  // Deep-link resolution (below) sets day, then boatId/teamId, then
+  // participantId across several state updates in one go. Each of those
+  // changes is exactly what the two reset-effects below normally watch for
+  // to clear a person's in-progress manual selection — so a single shared
+  // "skip resets" flag doesn't work here: whichever effect runs first on
+  // the next render consumes it, leaving the second effect to fire
+  // normally and wipe out what deep-link just set (this is exactly what
+  // was happening — Marinus's boat was being resolved correctly, then
+  // cleared one render later). Each effect gets its own one-shot flag,
+  // armed together just before the deep-link's state changes, so neither
+  // can be silently starved by the other firing first.
+  const skipDayResetRef      = useRef(false)
+  const skipTeamBoatResetRef = useRef(false)
+  const didInitRef = useRef(false) // guards the deep-link effect itself from re-running
 
   const [day, setDay] = useState('')
   const [teamId, setTeamId] = useState('')
@@ -209,11 +215,11 @@ export default function UniversalCatchLogger({ competitionId }) {
   const participant = participants.find(p => p.id === participantId) || null
 
   useEffect(() => {
-    if (!didInitRef.current) return // don't wipe out an in-progress deep-link resolution
+    if (skipDayResetRef.current) { skipDayResetRef.current = false; return }
     setTeamId(''); setBoatId(''); setParticipantId('')
   }, [day])
   useEffect(() => {
-    if (!didInitRef.current) return
+    if (skipTeamBoatResetRef.current) { skipTeamBoatResetRef.current = false; return }
     setParticipantId('')
   }, [teamId, boatId])
 
@@ -235,6 +241,9 @@ export default function UniversalCatchLogger({ competitionId }) {
       const sortedDays = [...days].sort((a, b) => a.day_number - b.day_number)
       const targetDay = (!Number.isNaN(requestedDayNum) && sortedDays.find(d => d.day_number === requestedDayNum))
         || sortedDays[0]
+
+      skipDayResetRef.current = true
+      skipTeamBoatResetRef.current = true
       setDay(targetDay.id)
       if (splitBoatFormat) {
         const matchedBoat = getAnglerBoatForDay(linkParticipantId, targetDay.id)
