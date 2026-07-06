@@ -233,7 +233,15 @@ export default function UniversalCatchLogger({ competitionId }) {
   // back to the earliest fishing day.
   useEffect(() => {
     if (didInitRef.current) return
-    if (loadingMeta || days.length === 0) return
+    // Both loading flags matter here: loadingMeta (participants/days/boats/
+    // draws) and configLoading (splitBoatFormat, derived from config, comes
+    // from a completely separate hook). If config hadn't finished loading
+    // yet at this exact moment, splitBoatFormat could be computed wrong
+    // just this once — sending resolution down the wrong branch — and
+    // since this effect never retries once didInitRef is set, it would
+    // stay wrong permanently rather than self-correct when config arrived
+    // a moment later. This was silently misrouting boat resolution.
+    if (loadingMeta || configLoading || days.length === 0) return
 
     const linkParticipantId = searchParams.get('participantId')
     if (linkParticipantId) {
@@ -256,7 +264,7 @@ export default function UniversalCatchLogger({ competitionId }) {
     }
 
     didInitRef.current = true
-  }, [loadingMeta, days, participants, splitBoatFormat, getAnglerBoatForDay, searchParams])
+  }, [loadingMeta, configLoading, days, participants, splitBoatFormat, getAnglerBoatForDay, searchParams])
 
   // ── Load existing card when angler + day selected ───────────────────────────
   useEffect(() => {
