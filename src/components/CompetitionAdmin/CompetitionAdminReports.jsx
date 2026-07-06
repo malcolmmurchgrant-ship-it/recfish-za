@@ -4,7 +4,7 @@
 // Prize category management (editable until Publish Final Results).
 // Sponsor configuration.
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { downloadCSV, downloadXLSX, downloadPDF } from './utils/reportGenerator'
 import { buildIndividualStandings } from './utils/scoringEngine'
@@ -53,6 +53,22 @@ export default function CompetitionAdminReports({
 
   const isLocked   = !!competition?.results_published_at || published
   const standings  = useMemo(() => buildIndividualStandings(catches, participants), [catches, participants])
+  // Weight isn't tracked at all for 'points'-method (unit-count) competitions
+  // like this one — species are tallied, not weighed — so a "Total Weight"
+  // stat would just show 0.0kg regardless of how much fishing actually
+  // happened. Same fix as the Scoreboard tab's Weight column, for the same
+  // reason.
+  const showWeight = config?.scoring?.method !== 'points'
+
+  const [fishingSessions, setFishingSessions] = useState([])
+  useEffect(() => {
+    if (!competition?.id) return
+    supabase.from('competition_fishing_sessions')
+      .select('*')
+      .eq('competition_id', competition.id)
+      .order('day_number').order('boat_name')
+      .then(({ data }) => setFishingSessions(data || []))
+  }, [competition?.id])
 
   // ── Save reporting config ─────────────────────────────────────────────────
   async function saveReportingConfig() {
@@ -176,7 +192,7 @@ export default function CompetitionAdminReports({
             { label: 'Verified',     val: catches.filter(c => c.data_quality === 'verified').length },
             { label: 'DQ\'d',        val: catches.filter(c => c.data_quality === 'disqualified').length },
             { label: 'Species',      val: new Set(catches.map(c => c.species_name).filter(Boolean)).size },
-            { label: 'Total Weight', val: catches.reduce((s, c) => s + parseFloat(c.weight_kg || 0), 0).toFixed(1) + ' kg' },
+            ...(showWeight ? [{ label: 'Total Weight', val: catches.reduce((s, c) => s + parseFloat(c.weight_kg || 0), 0).toFixed(1) + ' kg' }] : []),
           ].map(({ label, val }) => (
             <div key={label} style={{ background: '#f8fafc', borderRadius: 6, padding: '0.6rem 0.75rem' }}>
               <div style={{ fontSize: '0.72rem', color: GREY, textTransform: 'uppercase', fontWeight: 700 }}>{label}</div>
@@ -185,6 +201,77 @@ export default function CompetitionAdminReports({
           ))}
         </div>
       </div>
+
+      {/* ── Record / PB claims ───────────────────────────────────────────── */}
+      {(() => {
+        // notes is shared between the angler's Record/PB claim (typed at
+        // catch-logging time) and an admin's rejection reason (typed later
+        // in the Edit modal) — there's no separate flag distinguishing them.
+        // Excluding rejected/disqualified catches is a heuristic, not a
+        // structural guarantee, but keeps this list accurate for how the
+        // app is actually used today.
+        const claims = catches.filter(c =>
+          c.notes && c.notes.trim() &&
+          c.data_quality !== 'rejected' && c.data_quality !== 'disqualified'
+        )
+        if (claims.length === 0) return null
+        return (
+          <div style={S.card}>
+            <div style={S.section}>🏆 Record / PB Claims</div>
+            <div style={{ fontSize: '0.8rem', color: GREY, marginBottom: '0.75rem' }}>
+              Catches with a Record/PB note attached — for John/you to verify and action (e.g. submit to SADSAA) manually.
+            </div>
+            <div style={{ display: 'grid', gap: '0.4rem' }}>
+              {claims.map(c => {
+                const participant = participants.find(p => p.id === c.participant_id || (c.angler_id && p.user_id === c.angler_id))
+                return (
+                  <div key={c.id} style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 6, padding: '0.6rem 0.75rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.4rem' }}>
+                      <span style={{ fontWeight: 600, color: NAVY }}>
+                        {participant?.full_name || 'Unknown angler'} — {c.species_name}
+                      </span>
+                      <span style={{ fontSize: '0.75rem', color: GREY }}>
+                        Day {c.competition_days?.day_number || '?'}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '0.85rem', color: '#92400e', marginTop: 2 }}>{c.notes}</div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ── Fishing session times ────────────────────────────────────────── */}
+      {fishingSessions.some(s => s.lines_in && s.lines_up) && (
+        <div style={S.card}>
+          <div style={S.section}>Fishing Session Times</div>
+          <div style={{ fontSize: '0.8rem', color: GREY, marginBottom: '0.75rem' }}>
+            Lines In / Lines Up times logged per boat, for record-keeping and
+            verification. Not a CPUE figure — that needs weight data, which
+            isn't tracked in this points/unit-count competition (species are
+            tallied, not weighed).
+          </div>
+          {[...new Set(fishingSessions.map(s => s.day_number))].sort((a, b) => a - b).map(dayNum => {
+            const daySessions = fishingSessions.filter(s => s.day_number === dayNum && s.lines_in && s.lines_up)
+            if (daySessions.length === 0) return null
+            return (
+              <div key={dayNum} style={{ marginBottom: '0.75rem' }}>
+                <div style={{ fontWeight: 600, color: NAVY, fontSize: '0.85rem', marginBottom: '0.4rem' }}>Day {dayNum}</div>
+                <div style={{ display: 'grid', gap: '0.3rem' }}>
+                  {daySessions.map(s => (
+                    <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', background: '#f8fafc', borderRadius: 6, padding: '0.4rem 0.75rem' }}>
+                      <span><strong style={{ color: NAVY }}>{s.boat_name}</strong> — {s.skipper_name}</span>
+                      <span style={{ color: GREY }}>{s.lines_in} – {s.lines_up} ({s.fishing_hours != null ? `${s.fishing_hours}h` : '—'})</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* ── Download reports ─────────────────────────────────────────────── */}
       <div style={S.card}>

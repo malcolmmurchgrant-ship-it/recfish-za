@@ -174,6 +174,9 @@ export default function CompetitionAdminScoring({
                   {c.data_quality === 'disqualified' && <span style={S.badge(RED)}>🚫 DQ</span>}
                   {c.data_quality === 'rejected'     && <span style={S.badge('#9ca3af')}>Rejected</span>}
                   {c.data_quality === 'verified'     && <span style={S.badge(GREEN)}>✓ Verified</span>}
+                  {c.notes && c.data_quality !== 'rejected' && c.data_quality !== 'disqualified' && (
+                    <span style={S.badge(GOLD)} title={c.notes}>🏆 Claim</span>
+                  )}
                   {c.species_name}
                   {c.weight_kg && <span style={{ fontWeight: 400, color: GREY }}>{parseFloat(c.weight_kg).toFixed(2)} kg</span>}
                 </div>
