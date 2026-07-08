@@ -372,7 +372,7 @@ export default function CompetitionAdminReports({
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0.75rem' }}>
           {[
             { type: 'csv',        label: '📄 Download CSV',           desc: 'Spreadsheet-ready results' },
-            { type: 'xlsx',       label: '📊 Download XLSX',          desc: xlsxMode === 'multi_sheet' ? '3 worksheets' : 'Single worksheet' },
+            { type: 'xlsx',       label: '📊 Download Excel (.xls)',  desc: xlsxMode === 'multi_sheet' ? '3 worksheets' : 'Single worksheet' },
             // PDF options hidden until the generate-competition-pdf Edge
             // Function actually exists — confirmed via the Supabase
             // dashboard that zero Edge Functions are deployed on this
