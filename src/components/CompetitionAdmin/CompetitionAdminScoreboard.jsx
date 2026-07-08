@@ -6,7 +6,7 @@
 
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { buildIndividualStandings, aggregateTeamScores } from './utils/scoringEngine'
+import { buildIndividualStandings, aggregateTeamScores, buildBoatPercentageTeamStandings, buildDailyAnglerPercentages } from './utils/scoringEngine'
 
 const NAVY  = '#1e3a8a'
 const GREY  = '#6b7280'
@@ -25,7 +25,7 @@ const S = {
 const RANK_COLORS = { 1: GOLD, 2: '#9ca3af', 3: '#b45309' }
 
 export default function CompetitionAdminScoreboard({
-  competition, config, catches, participants, teams, isAdmin,
+  competition, config, catches, participants, teams, days, boats, isAdmin,
 }) {
   const navigate = useNavigate()
   // Takes you straight to that angler's real scorecard on the Catch Logger
@@ -56,31 +56,33 @@ export default function CompetitionAdminScoreboard({
       .map((s, i) => ({ ...s, rank: i + 1 }))
   }, [individualStandings, categoryFilter])
 
-  // Team standings
-  const teamStandings = useMemo(() => {
-    const byTeam = {}
-    for (const s of individualStandings) {
-      if (!s.teamId) continue
-      if (!byTeam[s.teamId]) {
-        const team = teams?.find(t => t.id === s.teamId)
-        byTeam[s.teamId] = {
-          teamId:      s.teamId,
-          teamName:    team?.team_name || team?.province || 'Unknown',
-          totalPoints: 0,
-          totalWeight: 0,
-          memberCount: 0,
-          members:     [],
-        }
-      }
-      byTeam[s.teamId].totalPoints += s.totalPoints
-      byTeam[s.teamId].totalWeight += s.totalWeightKg
-      byTeam[s.teamId].memberCount += 1
-      byTeam[s.teamId].members.push(s)
-    }
-    return Object.values(byTeam)
-      .sort((a, b) => b.totalPoints - a.totalPoints)
-      .map((t, i) => ({ ...t, rank: i + 1 }))
-  }, [individualStandings, teams])
+  // Team standings — boat-percentage based (see buildBoatPercentageTeamStandings
+  // in scoringEngine.js for the full methodology). This was previously a
+  // plain sum of raw points per team, which didn't match the actual scoring
+  // rules for this format (top scorer on each boat/day = 100%, others scored
+  // relative to them, regardless of which team they're from).
+  const teamStandings = useMemo(() =>
+    buildBoatPercentageTeamStandings(activeCatches, participants, teams, days, boats),
+    [activeCatches, participants, teams, days, boats]
+  )
+
+  // Per-day, per-angler raw points + boat percentage, for the new Daily view
+  // and for anyone wanting to see "who was top on this boat, this day"
+  // directly (raw points decide the daily award, percentage is what feeds
+  // team totals — both matter, shown side by side rather than collapsed
+  // into a single figure).
+  const dailyRecords = useMemo(() =>
+    buildDailyAnglerPercentages(activeCatches, participants, days, boats),
+    [activeCatches, participants, days, boats]
+  )
+  const [dailyDayFilter, setDailyDayFilter] = useState('all')
+  const filteredDaily = useMemo(() => {
+    const rows = dailyDayFilter === 'all'
+      ? dailyRecords
+      : dailyRecords.filter(d => String(d.dayNumber) === String(dailyDayFilter))
+    // Raw points first — that's what decides the daily top-angler award
+    return [...rows].sort((a, b) => b.rawPoints - a.rawPoints)
+  }, [dailyRecords, dailyDayFilter])
 
   const categories = ['all', ...new Set(participants.map(p => p.category).filter(Boolean))]
   const isLocked   = !!competition?.results_published_at
@@ -102,6 +104,7 @@ export default function CompetitionAdminScoreboard({
           <div style={{ display: 'flex', gap: 0, borderRadius: 6, overflow: 'hidden', border: '1px solid #e5e7eb' }}>
             {[
               { id: 'individual', label: '👤 Individual' },
+              { id: 'daily',      label: '📅 Daily' },
               { id: 'teams',      label: '🏆 Teams' },
             ].map(m => (
               <button key={m.id} onClick={() => setViewMode(m.id)}
@@ -202,6 +205,61 @@ export default function CompetitionAdminScoreboard({
         </div>
       )}
 
+      {/* ── Daily standings (raw points + boat %, side by side) ─────────── */}
+      {viewMode === 'daily' && (
+        <div style={S.card}>
+          <div style={{ marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <label style={S.label}>Day</label>
+            <select style={S.select} value={dailyDayFilter} onChange={e => setDailyDayFilter(e.target.value)}>
+              <option value="all">All Days</option>
+              {[...new Set(dailyRecords.map(d => d.dayNumber))].filter(n => n != null).sort((a, b) => a - b).map(n => (
+                <option key={n} value={n}>Day {n}</option>
+              ))}
+            </select>
+          </div>
+          <div style={{ fontSize: '0.78rem', color: GREY, marginBottom: '0.75rem' }}>
+            Sorted by raw points — that's what decides each day's top-angler award.
+            Percentage is relative to the top scorer on that same boat that day (any team), and is what feeds into Team totals.
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
+              <thead>
+                <tr style={{ background: NAVY, color: 'white' }}>
+                  {['Day','Angler','Team','Boat','Raw Points','Boat %'].map(h => (
+                    <th key={h} style={{ padding: '0.5rem 0.75rem', textAlign: 'left', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredDaily.map((d, i) => (
+                  <tr key={`${d.dayId}-${d.participantId}`}
+                    style={{ background: i % 2 === 0 ? 'white' : '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                    <td style={{ padding: '0.5rem 0.75rem', whiteSpace: 'nowrap' }}>Day {d.dayNumber}</td>
+                    <td style={{ padding: '0.5rem 0.75rem', fontWeight: 600, color: NAVY, whiteSpace: 'nowrap' }}>
+                      <button
+                        onClick={() => goToAnglersCard(d.participantId)}
+                        title="Open this angler's card in the Catch Logger"
+                        style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: NAVY, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 3 }}>
+                        {d.displayName}
+                      </button>
+                    </td>
+                    <td style={{ padding: '0.5rem 0.75rem', color: GREY, fontSize: '0.82rem', whiteSpace: 'nowrap' }}>{d.teamName || '—'}</td>
+                    <td style={{ padding: '0.5rem 0.75rem', color: GREY, fontSize: '0.82rem', whiteSpace: 'nowrap' }}>{d.boatName}</td>
+                    <td style={{ padding: '0.5rem 0.75rem', fontWeight: 700, color: NAVY, textAlign: 'right' }}>{d.rawPoints.toFixed(2)}</td>
+                    <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right', color: d.percentage === 100 ? GREEN : GREY, fontWeight: d.percentage === 100 ? 700 : 400 }}>
+                      {d.percentage.toFixed(1)}%{d.percentage === 100 ? ' 🥇' : ''}
+                    </td>
+                  </tr>
+                ))}
+                {filteredDaily.length === 0 && (
+                  <tr><td colSpan={6} style={{ padding: '1.5rem', textAlign: 'center', color: GREY, fontStyle: 'italic' }}>No catches recorded yet.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* ── Team standings ───────────────────────────────────────────────── */}
       {viewMode === 'teams' && (
         <div>
@@ -213,11 +271,11 @@ export default function CompetitionAdminScoreboard({
                     {t.rank <= 3 ? ['🥇','🥈','🥉'][t.rank - 1] + ' ' : `${t.rank}. `}
                     {t.teamName}
                   </div>
-                  <div style={{ fontSize: '0.8rem', color: GREY }}>{t.memberCount} anglers{showWeight ? ` · ${t.totalWeight.toFixed(2)} kg` : ''}</div>
+                  <div style={{ fontSize: '0.8rem', color: GREY }}>{t.members.length} anglers · sum of daily boat %</div>
                 </div>
-                <div style={{ fontWeight: 800, fontSize: '1.3rem', color: NAVY }}>{t.totalPoints.toFixed(2)}</div>
+                <div style={{ fontWeight: 800, fontSize: '1.3rem', color: NAVY }}>{t.totalPercentage.toFixed(1)}%</div>
               </div>
-              {t.members.sort((a, b) => b.totalPoints - a.totalPoints).map(m => (
+              {t.members.sort((a, b) => b.percentageSum - a.percentageSum).map(m => (
                 <div key={m.participantId} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.3rem 0.5rem', background: '#f8fafc', borderRadius: 5, marginBottom: '0.25rem' }}>
                   <div style={{ flex: 1, fontSize: '0.85rem' }}>
                     <button
@@ -227,8 +285,8 @@ export default function CompetitionAdminScoreboard({
                       {m.displayName}
                     </button>
                   </div>
-                  <div style={{ fontSize: '0.78rem', color: GREY }}>{m.catchCount} fish</div>
-                  <div style={{ fontWeight: 700, color: NAVY, minWidth: 60, textAlign: 'right' }}>{m.totalPoints.toFixed(2)}</div>
+                  <div style={{ fontSize: '0.78rem', color: GREY }}>{m.daysCounted} day{m.daysCounted === 1 ? '' : 's'} fished</div>
+                  <div style={{ fontWeight: 700, color: NAVY, minWidth: 60, textAlign: 'right' }}>{m.percentageSum.toFixed(1)}%</div>
                 </div>
               ))}
             </div>

@@ -119,6 +119,52 @@ export function calculateCatchPoints({
   return { points: pts, method: 'points', detail: `${fishCount} fish × ${pPerFish}pts + ${sBonus} species bonus` }
 }
 
+// ── Daily boat percentages (per angler, per day) ────────────────────────────
+// The building block behind team scoring, but exposed on its own since raw
+// points AND percentage both matter independently: raw points decide the
+// daily top-angler award, percentage is what feeds into team totals. Returns
+// one record per angler per day they fished, so callers can show both
+// figures side by side without re-deriving anything.
+export function buildDailyAnglerPercentages(catches, participants, days, boats) {
+  const activeCatches = catches.filter(c => c.data_quality !== 'rejected')
+
+  // Total points per participant, per boat, per day
+  const byBoatDay = {}
+  for (const c of activeCatches) {
+    if (!c.boat_id || !c.competition_day_id) continue
+    const key = `${c.boat_id}|${c.competition_day_id}`
+    const pid = c.participant_id || participants.find(p => p.user_id === c.angler_id)?.id
+    if (!pid) continue
+    if (!byBoatDay[key]) byBoatDay[key] = {}
+    const pts = c.data_quality === 'disqualified' ? 0 : parseFloat(c.points || 0)
+    byBoatDay[key][pid] = (byBoatDay[key][pid] || 0) + pts
+  }
+
+  const records = []
+  for (const [key, anglerPoints] of Object.entries(byBoatDay)) {
+    const [boatId, dayId] = key.split('|')
+    const max = Math.max(...Object.values(anglerPoints), 0)
+    const day  = days?.find(d => d.id === dayId)
+    const boat = boats?.find(b => b.id === boatId)
+    for (const [pid, pts] of Object.entries(anglerPoints)) {
+      const p = participants.find(pp => pp.id === pid)
+      records.push({
+        participantId: pid,
+        displayName:   p?.full_name || 'Unknown',
+        teamId:        p?.team_id || null,
+        teamName:      p?.competition_teams?.team_name || p?.competition_teams?.province || null,
+        boatId,
+        boatName:      boat?.boat_name || 'Unknown',
+        dayId,
+        dayNumber:     day?.day_number ?? null,
+        rawPoints:     pts,
+        percentage:    max > 0 ? (pts / max) * 100 : 0,
+      })
+    }
+  }
+  return records
+}
+
 // ── Team aggregation ──────────────────────────────────────────────────────────
 // Aggregates individual catch points into team scores.
 // method: 'sum_all' | 'sum_top_n' | 'ip_provincial_sum'
@@ -137,6 +183,48 @@ export function aggregateTeamScores(catches, participants, teamConfig, scoringCo
   }
 
   return byTeam
+}
+
+// ── Boat-percentage team standings ──────────────────────────────────────────
+// Confirmed methodology (split-boat formats where boats rotate between
+// teams, e.g. Junior Bottomfish Nationals): within each boat, on each day,
+// the highest-scoring angler on that boat that day gets 100% — everyone
+// else on that same boat that day (regardless of which team they're from)
+// is scored as their raw points ÷ that boat's top score for the day. A
+// team's total is the sum of each of its 3 anglers' daily boat-percentages
+// across every fishing day. This is distinct from aggregateTeamScores
+// above (a plain raw-points sum) and from individual standings (which
+// stay raw-points-based — this percentage conversion is specifically a
+// team-scoring mechanism, not how individual prizes are decided).
+export function buildBoatPercentageTeamStandings(catches, participants, teams, days, boats) {
+  const daily = buildDailyAnglerPercentages(catches, participants, days, boats)
+
+  const byTeam = {}
+  for (const p of participants) {
+    if (!p.team_id) continue
+    const entries = daily.filter(d => d.participantId === p.id)
+    const percentageSum = entries.reduce((s, e) => s + e.percentage, 0)
+    if (!byTeam[p.team_id]) {
+      const team = teams?.find(t => t.id === p.team_id)
+      byTeam[p.team_id] = {
+        teamId:   p.team_id,
+        teamName: team?.team_name || team?.province || 'Unknown',
+        totalPercentage: 0,
+        members: [],
+      }
+    }
+    byTeam[p.team_id].totalPercentage += percentageSum
+    byTeam[p.team_id].members.push({
+      participantId: p.id,
+      displayName:   p.full_name,
+      percentageSum,
+      daysCounted:   entries.length,
+    })
+  }
+
+  return Object.values(byTeam)
+    .sort((a, b) => b.totalPercentage - a.totalPercentage)
+    .map((t, i) => ({ ...t, rank: i + 1 }))
 }
 
 // ── Individual standings ──────────────────────────────────────────────────────

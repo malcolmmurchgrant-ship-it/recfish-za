@@ -221,6 +221,8 @@ export default function CompetitionAdmin({ competitionId }) {
           catches={catches}
           participants={participants}
           teams={teams}
+          days={days}
+          boats={boats}
           isAdmin={isAdmin}
         />
       )}
@@ -231,6 +233,8 @@ export default function CompetitionAdmin({ competitionId }) {
           config={config}
           catches={catches}
           participants={participants}
+          days={days}
+          boats={boats}
           isAdmin={isAdmin}
         />
       )}

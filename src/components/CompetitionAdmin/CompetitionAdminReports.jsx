@@ -7,7 +7,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { downloadCSV, downloadXLSX, downloadPDF } from './utils/reportGenerator'
-import { buildIndividualStandings } from './utils/scoringEngine'
+import { buildIndividualStandings, buildDailyAnglerPercentages } from './utils/scoringEngine'
 
 const NAVY  = '#1e3a8a'
 const GREY  = '#6b7280'
@@ -37,7 +37,7 @@ const DEFAULT_PRIZE_CATEGORIES = [
 ]
 
 export default function CompetitionAdminReports({
-  competition, config, catches, participants, isAdmin,
+  competition, config, catches, participants, days, boats, isAdmin,
 }) {
   const [xlsxMode,      setXlsxMode]      = useState(config?.reporting?.xlsx_mode || 'multi_sheet')
   const [prizeCategories, setPrizeCats]   = useState(
@@ -59,6 +59,26 @@ export default function CompetitionAdminReports({
   // happened. Same fix as the Scoreboard tab's Weight column, for the same
   // reason.
   const showWeight = config?.scoring?.method !== 'points'
+  // Per-day, per-angler raw points + boat percentage — raw points decide
+  // each day's top-angler award, percentage is what feeds into team
+  // totals. Both matter independently, so both are shown here rather than
+  // collapsing into a single figure.
+  const dailyRecords = useMemo(() =>
+    buildDailyAnglerPercentages(catches.filter(c => c.data_quality !== 'rejected'), participants, days, boats),
+    [catches, participants, days, boats]
+  )
+  const dailyByDay = useMemo(() => {
+    const byDay = {}
+    for (const r of dailyRecords) {
+      const key = r.dayNumber ?? '?'
+      if (!byDay[key]) byDay[key] = []
+      byDay[key].push(r)
+    }
+    for (const key of Object.keys(byDay)) {
+      byDay[key].sort((a, b) => b.rawPoints - a.rawPoints)
+    }
+    return byDay
+  }, [dailyRecords])
 
   const [fishingSessions, setFishingSessions] = useState([])
   useEffect(() => {
@@ -201,6 +221,42 @@ export default function CompetitionAdminReports({
           ))}
         </div>
       </div>
+
+      {/* ── Daily results (raw points + boat %) ──────────────────────────── */}
+      {Object.keys(dailyByDay).length > 0 && (
+        <div style={S.card}>
+          <div style={S.section}>Daily Results</div>
+          <div style={{ fontSize: '0.8rem', color: GREY, marginBottom: '0.75rem' }}>
+            Raw points decide each day's top-angler award. Boat % is relative to the top
+            scorer on that same boat that day (any team) and is what feeds into Team totals.
+          </div>
+          {Object.keys(dailyByDay).sort((a, b) => a - b).map(dayNum => (
+            <div key={dayNum} style={{ marginBottom: '1rem' }}>
+              <div style={{ fontWeight: 600, color: NAVY, fontSize: '0.9rem', marginBottom: '0.4rem' }}>Day {dayNum}</div>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                <thead>
+                  <tr style={{ background: '#f1f5f9' }}>
+                    {['Angler','Team','Boat','Raw Points','Boat %'].map(h => (
+                      <th key={h} style={{ padding: '0.4rem 0.6rem', textAlign: 'left', fontSize: '0.72rem', textTransform: 'uppercase', color: GREY, fontWeight: 700 }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {dailyByDay[dayNum].map(d => (
+                    <tr key={`${dayNum}-${d.participantId}`} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                      <td style={{ padding: '0.4rem 0.6rem', fontWeight: 600, color: NAVY }}>{d.displayName}</td>
+                      <td style={{ padding: '0.4rem 0.6rem', color: GREY }}>{d.teamName || '—'}</td>
+                      <td style={{ padding: '0.4rem 0.6rem', color: GREY }}>{d.boatName}</td>
+                      <td style={{ padding: '0.4rem 0.6rem', textAlign: 'right', fontWeight: 700, color: NAVY }}>{d.rawPoints.toFixed(2)}</td>
+                      <td style={{ padding: '0.4rem 0.6rem', textAlign: 'right' }}>{d.percentage.toFixed(1)}%{d.percentage === 100 ? ' \ud83e\udd47' : ''}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ── Record / PB claims ───────────────────────────────────────────── */}
       {(() => {
