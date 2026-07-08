@@ -233,6 +233,7 @@ export default function CompetitionAdmin({ competitionId }) {
           config={config}
           catches={catches}
           participants={participants}
+          teams={teams}
           days={days}
           boats={boats}
           isAdmin={isAdmin}

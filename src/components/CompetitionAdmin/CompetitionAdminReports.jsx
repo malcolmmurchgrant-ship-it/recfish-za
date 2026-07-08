@@ -7,7 +7,11 @@
 import { useState, useMemo, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { downloadCSV, downloadXLSX, downloadPDF } from './utils/reportGenerator'
-import { buildIndividualStandings, buildDailyAnglerPercentages } from './utils/scoringEngine'
+import { buildIndividualStandings, buildDailyAnglerPercentages, buildBoatPercentageTeamStandings } from './utils/scoringEngine'
+
+// Flip to true once generate-competition-pdf is actually built and deployed
+// as a Supabase Edge Function (confirmed none exist on this project yet).
+const PDF_ENABLED = false
 
 const NAVY  = '#1e3a8a'
 const GREY  = '#6b7280'
@@ -37,7 +41,7 @@ const DEFAULT_PRIZE_CATEGORIES = [
 ]
 
 export default function CompetitionAdminReports({
-  competition, config, catches, participants, days, boats, isAdmin,
+  competition, config, catches, participants, teams, days, boats, isAdmin,
 }) {
   const [xlsxMode,      setXlsxMode]      = useState(config?.reporting?.xlsx_mode || 'multi_sheet')
   const [prizeCategories, setPrizeCats]   = useState(
@@ -67,6 +71,21 @@ export default function CompetitionAdminReports({
     buildDailyAnglerPercentages(catches.filter(c => c.data_quality !== 'rejected'), participants, days, boats),
     [catches, participants, days, boats]
   )
+  const teamStandings = useMemo(() =>
+    buildBoatPercentageTeamStandings(catches.filter(c => c.data_quality !== 'rejected'), participants, teams, days, boats),
+    [catches, participants, teams, days, boats]
+  )
+  // Same figure used in Team standings (a team's score is the sum of its 3
+  // members' values here) and on the Scoreboard's Individual tab — merged
+  // onto a standings copy so the downloadable reports show it too, without
+  // changing what buildIndividualStandings itself returns.
+  const standingsWithPercentage = useMemo(() => {
+    const byParticipant = {}
+    for (const d of dailyRecords) {
+      byParticipant[d.participantId] = (byParticipant[d.participantId] || 0) + d.percentage
+    }
+    return standings.map(s => ({ ...s, anglerPercentage: byParticipant[s.participantId] || 0 }))
+  }, [standings, dailyRecords])
   const dailyByDay = useMemo(() => {
     const byDay = {}
     for (const r of dailyRecords) {
@@ -138,9 +157,9 @@ export default function CompetitionAdminReports({
     setDownloading(type); setError('')
     try {
       if (type === 'csv') {
-        downloadCSV(standings, competition, config)
+        downloadCSV(standingsWithPercentage, competition, config)
       } else if (type === 'xlsx') {
-        downloadXLSX(standings, catches, competition, config, xlsxMode)
+        downloadXLSX(standingsWithPercentage, catches, competition, config, xlsxMode, { participants, dailyRecords, teamStandings })
       } else if (type === 'pdf') {
         await downloadPDF(competition.id, 'full_results')
       } else if (type === 'pdf_prize') {
@@ -354,9 +373,17 @@ export default function CompetitionAdminReports({
           {[
             { type: 'csv',        label: '📄 Download CSV',           desc: 'Spreadsheet-ready results' },
             { type: 'xlsx',       label: '📊 Download XLSX',          desc: xlsxMode === 'multi_sheet' ? '3 worksheets' : 'Single worksheet' },
-            { type: 'pdf',        label: '📋 Full Results PDF',       desc: 'Complete results report' },
-            { type: 'pdf_prize',  label: '🏆 Prize Giving PDF',      desc: 'Category winners summary' },
-            { type: 'pdf_scorer', label: '📝 Scorer\'s Sheet PDF',   desc: 'Internal audit sheet' },
+            // PDF options hidden until the generate-competition-pdf Edge
+            // Function actually exists — confirmed via the Supabase
+            // dashboard that zero Edge Functions are deployed on this
+            // project at all, so these three always failed silently.
+            // Flip PDF_ENABLED to true once that function is built and
+            // deployed; no other change needed here.
+            ...(PDF_ENABLED ? [
+              { type: 'pdf',        label: '📋 Full Results PDF',       desc: 'Complete results report' },
+              { type: 'pdf_prize',  label: '🏆 Prize Giving PDF',      desc: 'Category winners summary' },
+              { type: 'pdf_scorer', label: '📝 Scorer\'s Sheet PDF',   desc: 'Internal audit sheet' },
+            ] : []),
           ].map(r => (
             <button key={r.type} onClick={() => handleDownload(r.type)}
               disabled={!!downloading || standings.length === 0}
