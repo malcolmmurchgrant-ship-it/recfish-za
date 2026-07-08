@@ -84,6 +84,18 @@ export default function CompetitionAdminScoreboard({
     return [...rows].sort((a, b) => b.rawPoints - a.rawPoints)
   }, [dailyRecords, dailyDayFilter])
 
+  // Sum of each angler's own daily boat-percentages across every day they've
+  // fished — the same figure used inside Team standings (a team's score is
+  // literally the sum of its 3 members' values here), just surfaced per
+  // individual too, on request, alongside their raw points.
+  const anglerPercentageSum = useMemo(() => {
+    const byParticipant = {}
+    for (const d of dailyRecords) {
+      byParticipant[d.participantId] = (byParticipant[d.participantId] || 0) + d.percentage
+    }
+    return byParticipant
+  }, [dailyRecords])
+
   const categories = ['all', ...new Set(participants.map(p => p.category).filter(Boolean))]
   const isLocked   = !!competition?.results_published_at
   // Weight isn't tracked at all in unit-count/'points' competitions (species
@@ -150,7 +162,7 @@ export default function CompetitionAdminScoreboard({
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
               <thead>
                 <tr style={{ background: NAVY, color: 'white' }}>
-                  {['Rank','Angler','Team','LC','Category','Points', ...(showWeight ? ['Weight'] : []), 'Species','Catches'].map(h => (
+                  {['Rank','Angler','Team','LC','Angler %','Points', ...(showWeight ? ['Weight'] : []), 'Species','Catches'].map(h => (
                     <th key={h} style={{ padding: '0.5rem 0.75rem', textAlign: h === 'Rank' ? 'center' : 'left', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -177,8 +189,8 @@ export default function CompetitionAdminScoreboard({
                     <td style={{ padding: '0.5rem 0.75rem', color: GREY, fontSize: '0.82rem', textAlign: 'center' }}>
                       {lineClassKg ? `${lineClassKg}kg` : '—'}
                     </td>
-                    <td style={{ padding: '0.5rem 0.75rem' }}>
-                      {s.category && <span style={S.badge(s.category === 'junior' ? '#7c3aed' : s.category === 'ladies' ? '#db2777' : NAVY)}>{s.category}</span>}
+                    <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right', color: GREY }}>
+                      {(anglerPercentageSum[s.participantId] || 0).toFixed(1)}%
                     </td>
                     <td style={{ padding: '0.5rem 0.75rem', fontWeight: 700, color: NAVY, textAlign: 'right' }}>
                       {s.totalPoints.toFixed(2)}
