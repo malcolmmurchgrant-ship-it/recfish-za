@@ -309,3 +309,24 @@ export function buildIndividualStandings(catches, participants, days, boats) {
     .sort((a, b) => b.anglerPercentage - a.anglerPercentage || b.totalPoints - a.totalPoints)
     .map((p, i) => ({ ...p, rank: i + 1 }))
 }
+
+// ── Species summary grouping ──────────────────────────────────────────────
+// Collapses raw catch rows into one row per species: how many fish, total
+// points. A multi-fish catch of the same species is saved as several rows
+// (only one carries the real points total — see CompetitionAdminScoring.jsx
+// for why those aren't safe to hand-edit); this grouping is purely a
+// display/reporting concern and never touches the underlying rows. Pass
+// already-scoped catches in (e.g. one angler's one day, one boat's one day,
+// or the whole competition) to get that scope's summary.
+export function groupCatchesBySpecies(catches) {
+  const bySpecies = {}
+  for (const c of catches) {
+    if (c.data_quality === 'rejected') continue
+    const key = c.species_name || 'Unknown'
+    if (!bySpecies[key]) bySpecies[key] = { speciesName: key, fishCount: 0, totalPoints: 0, rows: [] }
+    bySpecies[key].fishCount += 1
+    bySpecies[key].totalPoints += c.data_quality === 'disqualified' ? 0 : parseFloat(c.points || 0)
+    bySpecies[key].rows.push(c)
+  }
+  return Object.values(bySpecies).sort((a, b) => b.totalPoints - a.totalPoints)
+}

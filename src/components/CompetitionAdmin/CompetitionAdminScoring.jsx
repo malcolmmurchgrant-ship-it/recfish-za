@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { calculateCatchPoints } from './utils/scoringEngine'
+import { calculateCatchPoints, groupCatchesBySpecies } from './utils/scoringEngine'
 
 const NAVY  = '#1e3a8a'
 const GREY  = '#6b7280'
@@ -31,7 +31,7 @@ const DQ_COLORS = {
 }
 
 export default function CompetitionAdminScoring({
-  competition, config, catches, participants, days,
+  competition, config, catches, participants, days, boats,
   isAdmin, isScorer, onCatchUpdate, initialFilter,
 }) {
   const [dayFilter,    setDayFilter]    = useState('all')
@@ -39,6 +39,11 @@ export default function CompetitionAdminScoring({
   const [anglerFilter, setAnglerFilter] = useState('all')
   const [editing,      setEditing]      = useState(null)
   const [error,        setError]        = useState('')
+  const [expandedGroups, setExpandedGroups] = useState({}) // species key -> bool, per-group raw-row reveal
+  const [showBoatSummary, setShowBoatSummary] = useState(false)
+  const [showCompSummary, setShowCompSummary] = useState(false)
+
+  const scoringMethod = config?.scoring?.method || 'percentage'
 
   // Arriving here from a Scoreboard angler click (see index.jsx) — jump
   // straight to that team + angler instead of making them reselect manually.
@@ -79,6 +84,40 @@ export default function CompetitionAdminScoring({
     c.data_quality === 'disqualified' || c.data_quality === 'rejected'
       ? s : s + parseFloat(c.points || 0), 0)
   const dqCount     = filtered.filter(c => c.data_quality === 'disqualified').length
+
+  // Same participant-resolution fix used throughout today — the catches
+  // query never actually joins competition_participants.
+  function resolveParticipant(c) {
+    return participants.find(p => p.id === c.participant_id || (c.angler_id && p.user_id === c.angler_id))
+  }
+
+  // Species tally for whatever's currently filtered (angler/day/team) —
+  // this is the main clutter fix: one row per species instead of one row
+  // per raw catch (including the 0-point padding rows).
+  const filteredSpeciesGroups = groupCatchesBySpecies(filtered)
+
+  // Per boat, per day — only meaningful once a specific day is picked
+  // (a boat carries different anglers on different days), so this ignores
+  // the Team/Angler filters and looks at everyone on each boat that day.
+  const boatSummaryData = (() => {
+    if (dayFilter === 'all') return null
+    const dayCatches = catches.filter(c =>
+      c.competition_days?.day_number === parseInt(dayFilter) && c.data_quality !== 'rejected'
+    )
+    const byBoat = {}
+    for (const c of dayCatches) {
+      const boatName = boats?.find(b => b.id === c.boat_id)?.boat_name || 'Unknown Boat'
+      if (!byBoat[boatName]) byBoat[boatName] = []
+      byBoat[boatName].push(c)
+    }
+    return Object.entries(byBoat)
+      .map(([boatName, boatCatches]) => ({ boatName, species: groupCatchesBySpecies(boatCatches) }))
+      .sort((a, b) => a.boatName.localeCompare(b.boatName))
+  })()
+
+  // Whole competition, every angler, every day, every boat — the overall
+  // species tally for the event so far.
+  const competitionSpeciesGroups = groupCatchesBySpecies(catches.filter(c => c.data_quality !== 'rejected'))
 
   const isLocked = !!competition?.results_published_at
 
@@ -153,24 +192,84 @@ export default function CompetitionAdminScoring({
         </div>
       </div>
 
-      {/* ── Catch cards ─────────────────────────────────────────────────── */}
-      {filtered.length === 0 ? (
-        <div style={{ ...S.card, color: GREY, textAlign: 'center', fontStyle: 'italic' }}>
-          No catches found for selected filters.
-        </div>
-      ) : filtered.map(c => {
+      {/* ── Species summary (points-method competitions) ─────────────────── */}
+      {scoringMethod === 'points' ? (
+        filteredSpeciesGroups.length === 0 ? (
+          <div style={{ ...S.card, color: GREY, textAlign: 'center', fontStyle: 'italic' }}>
+            No catches found for selected filters.
+          </div>
+        ) : filteredSpeciesGroups.map(g => {
+          const groupKey = g.speciesName
+          const isExpanded = !!expandedGroups[groupKey]
+          const hasClaim = g.rows.some(r => r.notes && r.data_quality !== 'rejected' && r.data_quality !== 'disqualified')
+          return (
+            <div key={groupKey} style={S.card}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div>
+                  <div style={{ fontWeight: 700, color: NAVY, display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                    {g.speciesName}
+                    {hasClaim && <span style={S.badge(GOLD)}>🏆 Claim</span>}
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: GREY, marginTop: 2 }}>
+                    {g.fishCount} fish
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '0.68rem', color: GREY, textTransform: 'uppercase' }}>Points</div>
+                    <div style={{ fontWeight: 700, color: NAVY, fontSize: '1.05rem' }}>{g.totalPoints.toFixed(2)}</div>
+                  </div>
+                  <button onClick={() => setExpandedGroups(p => ({ ...p, [groupKey]: !p[groupKey] }))}
+                    style={{ ...S.btn(GREY), fontSize: '0.78rem', padding: '0.35rem 0.7rem' }}>
+                    {isExpanded ? '▲ Hide entries' : '▼ View entries'}
+                  </button>
+                </div>
+              </div>
+
+              {isExpanded && (
+                <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid #e5e7eb', display: 'grid', gap: '0.4rem' }}>
+                  {g.rows.map(c => {
+                    const qColor = DQ_COLORS[c.data_quality] || GREY
+                    const participant = resolveParticipant(c)
+                    return (
+                      <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', background: '#f8fafc', borderLeft: `3px solid ${qColor}`, borderRadius: 6, padding: '0.5rem 0.75rem' }}>
+                        <div>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: NAVY }}>{participant?.full_name}</span>
+                          <span style={{ fontSize: '0.78rem', color: GREY }}>
+                            {' · '}Day {c.competition_days?.day_number || '?'}
+                            {c.data_quality === 'disqualified' && ' · 🚫 DQ'}
+                            {c.data_quality === 'rejected' && ' · Rejected'}
+                          </span>
+                          {c.notes && <div style={{ fontSize: '0.75rem', color: GOLD, fontStyle: 'italic' }}>📌 {c.notes}</div>}
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+                          <span style={{ fontWeight: 700, color: c.data_quality === 'disqualified' ? RED : NAVY }}>
+                            {c.data_quality === 'disqualified' ? '0' : parseFloat(c.points || 0).toFixed(2)}
+                          </span>
+                          {(isAdmin || isScorer) && !isLocked && (
+                            <button onClick={() => setEditing(c)}
+                              style={{ ...S.btn(), fontSize: '0.78rem', padding: '0.3rem 0.65rem' }}>
+                              ✏️ Edit
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )
+        })
+      ) : (
+        /* ── Catch cards (measured-mode competitions — no padding-row clutter, keep as-is) ── */
+        filtered.length === 0 ? (
+          <div style={{ ...S.card, color: GREY, textAlign: 'center', fontStyle: 'italic' }}>
+            No catches found for selected filters.
+          </div>
+        ) : filtered.map(c => {
         const qColor = DQ_COLORS[c.data_quality] || GREY
-        // useCompetitionCatches' query never actually joins
-        // competition_participants (only competition_teams and
-        // competition_days are embedded), so c.competition_participants was
-        // always undefined here — blanking both the angler name and, since
-        // it was derived from that same undefined object, the team too.
-        // Resolve the participant from the participants prop instead
-        // (already loaded by index.jsx), matching on participant_id first
-        // and falling back to angler_id/user_id for any row saved the other
-        // way. Team comes straight off the catch's own correctly-joined
-        // competition_teams field.
-        const participant = participants.find(p => p.id === c.participant_id || (c.angler_id && p.user_id === c.angler_id))
+        const participant = resolveParticipant(c)
         const team = c.competition_teams
         return (
           <div key={c.id} style={{ ...S.card, borderLeft: `4px solid ${qColor}` }}>
@@ -215,7 +314,73 @@ export default function CompetitionAdminScoring({
             </div>
           </div>
         )
-      })}
+        })
+      )}
+
+      {/* ── Boat Summary (per boat, per day) ──────────────────────────────── */}
+      <div style={S.card}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+          onClick={() => setShowBoatSummary(p => !p)}>
+          <div style={S.section0 || { fontWeight: 700, color: NAVY, fontSize: '0.95rem' }}>📊 Boat Summary</div>
+          <button style={{ ...S.btn(GREY), fontSize: '0.78rem', padding: '0.3rem 0.7rem' }}>
+            {showBoatSummary ? '▲ Hide' : '▼ Show'}
+          </button>
+        </div>
+        {showBoatSummary && (
+          dayFilter === 'all' ? (
+            <div style={{ color: GREY, fontStyle: 'italic', fontSize: '0.85rem', marginTop: '0.75rem' }}>
+              Select a specific Day above to see the species tally per boat for that day.
+            </div>
+          ) : !boatSummaryData || boatSummaryData.length === 0 ? (
+            <div style={{ color: GREY, fontStyle: 'italic', fontSize: '0.85rem', marginTop: '0.75rem' }}>
+              No catches logged for Day {dayFilter} yet.
+            </div>
+          ) : (
+            <div style={{ marginTop: '0.75rem', display: 'grid', gap: '1rem' }}>
+              {boatSummaryData.map(b => (
+                <div key={b.boatName}>
+                  <div style={{ fontWeight: 600, color: NAVY, fontSize: '0.88rem', marginBottom: '0.35rem' }}>{b.boatName}</div>
+                  <div style={{ display: 'grid', gap: '0.25rem' }}>
+                    {b.species.map(g => (
+                      <div key={g.speciesName} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', background: '#f8fafc', borderRadius: 6, padding: '0.35rem 0.65rem' }}>
+                        <span>{g.speciesName}</span>
+                        <span style={{ color: GREY }}>{g.fishCount} fish · <strong style={{ color: NAVY }}>{g.totalPoints.toFixed(2)} pts</strong></span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        )}
+      </div>
+
+      {/* ── Competition Summary (whole event, all anglers/days/boats) ────── */}
+      <div style={S.card}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+          onClick={() => setShowCompSummary(p => !p)}>
+          <div style={{ fontWeight: 700, color: NAVY, fontSize: '0.95rem' }}>🏆 Competition Summary</div>
+          <button style={{ ...S.btn(GREY), fontSize: '0.78rem', padding: '0.3rem 0.7rem' }}>
+            {showCompSummary ? '▲ Hide' : '▼ Show'}
+          </button>
+        </div>
+        {showCompSummary && (
+          competitionSpeciesGroups.length === 0 ? (
+            <div style={{ color: GREY, fontStyle: 'italic', fontSize: '0.85rem', marginTop: '0.75rem' }}>
+              No catches logged yet.
+            </div>
+          ) : (
+            <div style={{ marginTop: '0.75rem', display: 'grid', gap: '0.25rem' }}>
+              {competitionSpeciesGroups.map(g => (
+                <div key={g.speciesName} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', background: '#f8fafc', borderRadius: 6, padding: '0.4rem 0.75rem' }}>
+                  <span style={{ fontWeight: 600, color: NAVY }}>{g.speciesName}</span>
+                  <span style={{ color: GREY }}>{g.fishCount} fish · <strong style={{ color: NAVY }}>{g.totalPoints.toFixed(2)} pts</strong></span>
+                </div>
+              ))}
+            </div>
+          )
+        )}
+      </div>
 
       {/* ── Edit Modal ───────────────────────────────────────────────────── */}
       {editing && (

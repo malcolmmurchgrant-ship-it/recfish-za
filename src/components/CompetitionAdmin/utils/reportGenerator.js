@@ -3,6 +3,8 @@
 // No external packages required — uses only browser built-ins.
 // PDF generation is handled server-side via Supabase Edge Function.
 
+import { groupCatchesBySpecies } from './scoringEngine'
+
 // ── CSV download ──────────────────────────────────────────────────────────────
 export function downloadCSV(standings, competition, config) {
   // Weight-based fields are meaningless noise for a 'points'/unit-count
@@ -92,6 +94,7 @@ function buildSingleSheetHTML(standings, catches, competition, config, participa
 <div class="section"><h3>Standings</h3>${standingsTable(standings, showWeight)}</div>
 ${teamStandings.length ? `<div class="section"><h3>Team Standings</h3>${teamStandingsTable(teamStandings)}</div>` : ''}
 ${dailyRecords.length ? `<div class="section"><h3>Daily Results</h3>${dailyResultsTable(dailyRecords)}</div>` : ''}
+<div class="section"><h3>Species Summary</h3>${speciesSummaryTable(catches)}</div>
 <div class="section"><h3>All Catches</h3>${catchesTable(catches, participants, showWeight)}</div>
 ${prizeRows.length ? `<div class="section"><h3>Prize Categories</h3>${prizeTable(prizeRows)}</div>` : ''}
 </body></html>`
@@ -104,6 +107,7 @@ function buildMultiSheetHTML(standings, catches, competition, config, participan
     { name: 'Standings',      content: standingsTable(standings, showWeight) },
     ...(teamStandings.length ? [{ name: 'Team Standings', content: teamStandingsTable(teamStandings) }] : []),
     ...(dailyRecords.length  ? [{ name: 'Daily Results',  content: dailyResultsTable(dailyRecords) }] : []),
+    { name: 'Species Summary', content: speciesSummaryTable(catches) },
     { name: 'All Catches',    content: catchesTable(catches, participants, showWeight) },
     ...(prizeRows.length ? [{ name: 'Prize Winners', content: prizeTable(prizeRows) }] : []),
   ]
@@ -172,6 +176,13 @@ function catchesTable(catches, participants, showWeight) {
       c.data_quality || 'unverified', c.notes || '',
     ]
   })
+  return htmlTable(headers, rows)
+}
+
+function speciesSummaryTable(catches) {
+  const groups = groupCatchesBySpecies(catches.filter(c => c.data_quality !== 'rejected'))
+  const headers = ['Species', 'Fish', 'Points']
+  const rows = groups.map(g => [g.speciesName, g.fishCount, g.totalPoints.toFixed(2)])
   return htmlTable(headers, rows)
 }
 

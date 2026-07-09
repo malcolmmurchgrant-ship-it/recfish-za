@@ -208,6 +208,7 @@ export default function CompetitionAdmin({ competitionId }) {
           catches={catches}
           participants={participants}
           days={days}
+          boats={boats}
           isAdmin={isAdmin}
           isScorer={isScorer}
           onCatchUpdate={reloadCatches}
