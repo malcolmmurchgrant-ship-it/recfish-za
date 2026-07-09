@@ -198,7 +198,19 @@ export default function CompetitionAdminScoring({
           <div style={{ ...S.card, color: GREY, textAlign: 'center', fontStyle: 'italic' }}>
             No catches found for selected filters.
           </div>
-        ) : filteredSpeciesGroups.map(g => {
+        ) : (
+          <>
+            <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '0.75rem', padding: '0 0.25rem' }}>
+              <div>
+                <span style={{ fontSize: '0.7rem', color: GREY, textTransform: 'uppercase' }}>Total Fish Caught: </span>
+                <strong style={{ color: NAVY }}>{filteredSpeciesGroups.reduce((s, g) => s + g.fishCount, 0)}</strong>
+              </div>
+              <div>
+                <span style={{ fontSize: '0.7rem', color: GREY, textTransform: 'uppercase' }}>Total Species Caught: </span>
+                <strong style={{ color: NAVY }}>{filteredSpeciesGroups.length}</strong>
+              </div>
+            </div>
+            {filteredSpeciesGroups.map(g => {
           const groupKey = g.speciesName
           const isExpanded = !!expandedGroups[groupKey]
           const hasClaim = g.rows.some(r => r.notes && r.data_quality !== 'rejected' && r.data_quality !== 'disqualified')
@@ -260,7 +272,9 @@ export default function CompetitionAdminScoring({
               )}
             </div>
           )
-        })
+        })}
+          </>
+        )
       ) : (
         /* ── Catch cards (measured-mode competitions — no padding-row clutter, keep as-is) ── */
         filtered.length === 0 ? (
@@ -321,7 +335,7 @@ export default function CompetitionAdminScoring({
       <div style={S.card}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
           onClick={() => setShowBoatSummary(p => !p)}>
-          <div style={S.section0 || { fontWeight: 700, color: NAVY, fontSize: '0.95rem' }}>📊 Boat Summary</div>
+          <div style={{ fontWeight: 700, color: NAVY, fontSize: '0.95rem' }}>📊 Boat Summary</div>
           <button style={{ ...S.btn(GREY), fontSize: '0.78rem', padding: '0.3rem 0.7rem' }}>
             {showBoatSummary ? '▲ Hide' : '▼ Show'}
           </button>
@@ -337,19 +351,28 @@ export default function CompetitionAdminScoring({
             </div>
           ) : (
             <div style={{ marginTop: '0.75rem', display: 'grid', gap: '1rem' }}>
-              {boatSummaryData.map(b => (
-                <div key={b.boatName}>
-                  <div style={{ fontWeight: 600, color: NAVY, fontSize: '0.88rem', marginBottom: '0.35rem' }}>{b.boatName}</div>
-                  <div style={{ display: 'grid', gap: '0.25rem' }}>
-                    {b.species.map(g => (
-                      <div key={g.speciesName} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', background: '#f8fafc', borderRadius: 6, padding: '0.35rem 0.65rem' }}>
-                        <span>{g.speciesName}</span>
-                        <span style={{ color: GREY }}>{g.fishCount} fish · <strong style={{ color: NAVY }}>{g.totalPoints.toFixed(2)} pts</strong></span>
+              {boatSummaryData.map(b => {
+                const totalFish    = b.species.reduce((s, g) => s + g.fishCount, 0)
+                const totalSpecies = b.species.length
+                return (
+                  <div key={b.boatName}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.35rem' }}>
+                      <div style={{ fontWeight: 600, color: NAVY, fontSize: '0.88rem' }}>{b.boatName}</div>
+                      <div style={{ fontSize: '0.78rem', color: GREY }}>
+                        <strong style={{ color: NAVY }}>{totalFish}</strong> total fish · <strong style={{ color: NAVY }}>{totalSpecies}</strong> species
                       </div>
-                    ))}
+                    </div>
+                    <div style={{ display: 'grid', gap: '0.25rem' }}>
+                      {b.species.map(g => (
+                        <div key={g.speciesName} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', background: '#f8fafc', borderRadius: 6, padding: '0.35rem 0.65rem' }}>
+                          <span>{g.speciesName}</span>
+                          <span style={{ color: GREY }}>{g.fishCount} fish · <strong style={{ color: NAVY }}>{g.totalPoints.toFixed(2)} pts</strong></span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )
         )}
@@ -369,16 +392,49 @@ export default function CompetitionAdminScoring({
             <div style={{ color: GREY, fontStyle: 'italic', fontSize: '0.85rem', marginTop: '0.75rem' }}>
               No catches logged yet.
             </div>
-          ) : (
-            <div style={{ marginTop: '0.75rem', display: 'grid', gap: '0.25rem' }}>
-              {competitionSpeciesGroups.map(g => (
-                <div key={g.speciesName} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', background: '#f8fafc', borderRadius: 6, padding: '0.4rem 0.75rem' }}>
-                  <span style={{ fontWeight: 600, color: NAVY }}>{g.speciesName}</span>
-                  <span style={{ color: GREY }}>{g.fishCount} fish · <strong style={{ color: NAVY }}>{g.totalPoints.toFixed(2)} pts</strong></span>
+          ) : (() => {
+            const totalFish    = competitionSpeciesGroups.reduce((s, g) => s + g.fishCount, 0)
+            const totalSpecies = competitionSpeciesGroups.length
+            const maxFish      = Math.max(...competitionSpeciesGroups.map(g => g.fishCount), 1)
+            return (
+              <div style={{ marginTop: '0.75rem' }}>
+                <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '0.75rem' }}>
+                  <div>
+                    <div style={{ fontSize: '0.7rem', color: GREY, textTransform: 'uppercase' }}>Total Fish Caught</div>
+                    <div style={{ fontWeight: 700, color: NAVY, fontSize: '1.3rem' }}>{totalFish}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.7rem', color: GREY, textTransform: 'uppercase' }}>Total Species Caught</div>
+                    <div style={{ fontWeight: 700, color: NAVY, fontSize: '1.3rem' }}>{totalSpecies}</div>
+                  </div>
                 </div>
-              ))}
-            </div>
-          )
+
+                {/* Simple inline bar chart — no charting library dependency,
+                    just proportional div widths, consistent with how the
+                    rest of this codebase is built (inline styles only). */}
+                <div style={{ display: 'grid', gap: '0.4rem', marginBottom: '1rem' }}>
+                  {competitionSpeciesGroups.map(g => (
+                    <div key={g.speciesName} style={{ display: 'grid', gridTemplateColumns: '160px 1fr 70px', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '0.78rem', color: NAVY, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.speciesName}</span>
+                      <div style={{ background: '#eef2ff', borderRadius: 4, height: 16, position: 'relative' }}>
+                        <div style={{ background: NAVY, borderRadius: 4, height: '100%', width: `${(g.fishCount / maxFish) * 100}%`, minWidth: 2 }} />
+                      </div>
+                      <span style={{ fontSize: '0.78rem', color: GREY, textAlign: 'right' }}>{g.fishCount} fish</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ display: 'grid', gap: '0.25rem' }}>
+                  {competitionSpeciesGroups.map(g => (
+                    <div key={g.speciesName} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', background: '#f8fafc', borderRadius: 6, padding: '0.4rem 0.75rem' }}>
+                      <span style={{ fontWeight: 600, color: NAVY }}>{g.speciesName}</span>
+                      <span style={{ color: GREY }}>{g.fishCount} fish · <strong style={{ color: NAVY }}>{g.totalPoints.toFixed(2)} pts</strong></span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })()
         )}
       </div>
 

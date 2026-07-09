@@ -91,7 +91,13 @@ export function useCompetitionRoles(competitionId) {
                           ADMIN_EMAILS.includes(user?.email)
   const isAdmin         = isPlatformAdmin ||
                           ['association_admin','provincial_admin','club_admin'].includes(platformRole) ||
-                          competitionRole === 'admin'
+                          // 'tournament_director' at the competition level was never
+                          // actually recognized here despite the Roles tab's own
+                          // description promising "Full control: rules, draws,
+                          // participants, prize categories" — someone granted that
+                          // role got LESS access than Scorer (isAdmin/isScorer/canView
+                          // all false), the opposite of what the UI describes.
+                          ['admin', 'tournament_director'].includes(competitionRole)
   const isScorer        = isAdmin || competitionRole === 'scorer' ||
                           ['tournament_director','scorer'].includes(platformRole)
   const canView         = isScorer || competitionRole === 'read_only'
