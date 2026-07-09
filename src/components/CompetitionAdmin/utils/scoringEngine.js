@@ -228,7 +228,15 @@ export function buildBoatPercentageTeamStandings(catches, participants, teams, d
 }
 
 // ── Individual standings ──────────────────────────────────────────────────────
-export function buildIndividualStandings(catches, participants) {
+// ── Individual standings ──────────────────────────────────────────────────────
+// Ranked by Angler % first (sum of daily boat percentages, same figure used
+// for Team totals), raw points as the tiebreaker — confirmed methodology:
+// anglers who hit 100% on their boat any day cluster at the top together,
+// ranked among themselves by points; everyone else follows sorted by their
+// own percentage. A higher raw-points total can still rank below someone
+// with fewer points but a better percentage — that's intentional, per the
+// confirmed ranking rule, not a bug.
+export function buildIndividualStandings(catches, participants, days, boats) {
   const byParticipant = {}
   const byUserId = {}   // user_id -> participant.id, for registered anglers
   const byPartId = {}   // participant.id -> participant.id (self-map, for clarity below)
@@ -250,6 +258,7 @@ export function buildIndividualStandings(catches, participants) {
       totalWeightKg:  0,
       catchCount:     0,
       speciesCount:   0,
+      anglerPercentage: 0,
       bestFish:       null,
       catches:        [],
     }
@@ -284,7 +293,19 @@ export function buildIndividualStandings(catches, participants) {
     p.speciesCount = new Set(p.catches.map(c => c.species_name)).size
   }
 
+  // Angler % — same daily boat-percentage sum used for Team standings,
+  // computed here too so ranking (and every consumer of this function) is
+  // consistent without each caller separately re-deriving it.
+  if (days && boats) {
+    const daily = buildDailyAnglerPercentages(catches, participants, days, boats)
+    for (const d of daily) {
+      if (byParticipant[d.participantId]) {
+        byParticipant[d.participantId].anglerPercentage += d.percentage
+      }
+    }
+  }
+
   return Object.values(byParticipant)
-    .sort((a, b) => b.totalPoints - a.totalPoints)
+    .sort((a, b) => b.anglerPercentage - a.anglerPercentage || b.totalPoints - a.totalPoints)
     .map((p, i) => ({ ...p, rank: i + 1 }))
 }

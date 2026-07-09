@@ -56,7 +56,7 @@ export default function CompetitionAdminReports({
   const [published,     setPublished]     = useState(false)
 
   const isLocked   = !!competition?.results_published_at || published
-  const standings  = useMemo(() => buildIndividualStandings(catches, participants), [catches, participants])
+  const standings  = useMemo(() => buildIndividualStandings(catches, participants, days, boats), [catches, participants, days, boats])
   // Weight isn't tracked at all for 'points'-method (unit-count) competitions
   // like this one — species are tallied, not weighed — so a "Total Weight"
   // stat would just show 0.0kg regardless of how much fishing actually
@@ -75,17 +75,6 @@ export default function CompetitionAdminReports({
     buildBoatPercentageTeamStandings(catches.filter(c => c.data_quality !== 'rejected'), participants, teams, days, boats),
     [catches, participants, teams, days, boats]
   )
-  // Same figure used in Team standings (a team's score is the sum of its 3
-  // members' values here) and on the Scoreboard's Individual tab — merged
-  // onto a standings copy so the downloadable reports show it too, without
-  // changing what buildIndividualStandings itself returns.
-  const standingsWithPercentage = useMemo(() => {
-    const byParticipant = {}
-    for (const d of dailyRecords) {
-      byParticipant[d.participantId] = (byParticipant[d.participantId] || 0) + d.percentage
-    }
-    return standings.map(s => ({ ...s, anglerPercentage: byParticipant[s.participantId] || 0 }))
-  }, [standings, dailyRecords])
   const dailyByDay = useMemo(() => {
     const byDay = {}
     for (const r of dailyRecords) {
@@ -157,9 +146,9 @@ export default function CompetitionAdminReports({
     setDownloading(type); setError('')
     try {
       if (type === 'csv') {
-        downloadCSV(standingsWithPercentage, competition, config)
+        downloadCSV(standings, competition, config)
       } else if (type === 'xlsx') {
-        downloadXLSX(standingsWithPercentage, catches, competition, config, xlsxMode, { participants, dailyRecords, teamStandings })
+        downloadXLSX(standings, catches, competition, config, xlsxMode, { participants, dailyRecords, teamStandings })
       } else if (type === 'pdf') {
         await downloadPDF(competition.id, 'full_results')
       } else if (type === 'pdf_prize') {

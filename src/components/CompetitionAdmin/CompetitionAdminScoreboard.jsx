@@ -45,8 +45,8 @@ export default function CompetitionAdminScoreboard({
   )
 
   const individualStandings = useMemo(() =>
-    buildIndividualStandings(activeCatches, participants),
-    [activeCatches, participants]
+    buildIndividualStandings(activeCatches, participants, days, boats),
+    [activeCatches, participants, days, boats]
   )
 
   const filteredStandings = useMemo(() => {
@@ -83,18 +83,6 @@ export default function CompetitionAdminScoreboard({
     // Raw points first — that's what decides the daily top-angler award
     return [...rows].sort((a, b) => b.rawPoints - a.rawPoints)
   }, [dailyRecords, dailyDayFilter])
-
-  // Sum of each angler's own daily boat-percentages across every day they've
-  // fished — the same figure used inside Team standings (a team's score is
-  // literally the sum of its 3 members' values here), just surfaced per
-  // individual too, on request, alongside their raw points.
-  const anglerPercentageSum = useMemo(() => {
-    const byParticipant = {}
-    for (const d of dailyRecords) {
-      byParticipant[d.participantId] = (byParticipant[d.participantId] || 0) + d.percentage
-    }
-    return byParticipant
-  }, [dailyRecords])
 
   const categories = ['all', ...new Set(participants.map(p => p.category).filter(Boolean))]
   const isLocked   = !!competition?.results_published_at
@@ -190,7 +178,7 @@ export default function CompetitionAdminScoreboard({
                       {lineClassKg ? `${lineClassKg}kg` : '—'}
                     </td>
                     <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right', color: GREY }}>
-                      {(anglerPercentageSum[s.participantId] || 0).toFixed(1)}%
+                      {(s.anglerPercentage || 0).toFixed(1)}%
                     </td>
                     <td style={{ padding: '0.5rem 0.75rem', fontWeight: 700, color: NAVY, textAlign: 'right' }}>
                       {s.totalPoints.toFixed(2)}
