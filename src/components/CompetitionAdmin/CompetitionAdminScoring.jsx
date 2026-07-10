@@ -118,22 +118,45 @@ export default function CompetitionAdminScoring({
   const allFilteredDQd = nonRejectedFiltered.length > 0 && nonRejectedFiltered.every(c => c.data_quality === 'disqualified')
   const dqReason = allFilteredDQd ? (nonRejectedFiltered.find(c => c.notes)?.notes || 'No reason recorded') : null
 
-  // Per boat, per day — only meaningful once a specific day is picked
-  // (a boat carries different anglers on different days), so this ignores
-  // the Team/Angler filters and looks at everyone on each boat that day.
+  // Per boat — species tally for a single day (unchanged shape when a
+  // specific day is picked), or per boat broken down by day underneath
+  // when "All Days" is selected. A boat carries different anglers/teams on
+  // different days (rotation), so an "All Days" boat total on its own
+  // would blur together unrelated crews — nesting by day keeps that
+  // distinction visible while still not forcing a day to be picked first.
   const boatSummaryData = (() => {
-    if (dayFilter === 'all') return null
-    const dayCatches = catches.filter(c =>
-      c.competition_days?.day_number === parseInt(dayFilter) && c.data_quality !== 'rejected'
-    )
-    const byBoat = {}
-    for (const c of dayCatches) {
-      const boatName = boats?.find(b => b.id === c.boat_id)?.boat_name || 'Unknown Boat'
-      if (!byBoat[boatName]) byBoat[boatName] = []
-      byBoat[boatName].push(c)
+    const activeCatches = catches.filter(c => c.data_quality !== 'rejected')
+
+    if (dayFilter !== 'all') {
+      const dayCatches = activeCatches.filter(c => c.competition_days?.day_number === parseInt(dayFilter))
+      const byBoat = {}
+      for (const c of dayCatches) {
+        const boatName = boats?.find(b => b.id === c.boat_id)?.boat_name || 'Unknown Boat'
+        if (!byBoat[boatName]) byBoat[boatName] = []
+        byBoat[boatName].push(c)
+      }
+      return Object.entries(byBoat)
+        .map(([boatName, boatCatches]) => ({ boatName, days: null, species: groupCatchesBySpecies(boatCatches) }))
+        .sort((a, b) => a.boatName.localeCompare(b.boatName))
     }
-    return Object.entries(byBoat)
-      .map(([boatName, boatCatches]) => ({ boatName, species: groupCatchesBySpecies(boatCatches) }))
+
+    // All Days — group by boat, then by day within each boat
+    const byBoatDay = {}
+    for (const c of activeCatches) {
+      const boatName = boats?.find(b => b.id === c.boat_id)?.boat_name || 'Unknown Boat'
+      const dayNum   = c.competition_days?.day_number ?? '?'
+      if (!byBoatDay[boatName]) byBoatDay[boatName] = {}
+      if (!byBoatDay[boatName][dayNum]) byBoatDay[boatName][dayNum] = []
+      byBoatDay[boatName][dayNum].push(c)
+    }
+    return Object.entries(byBoatDay)
+      .map(([boatName, byDay]) => ({
+        boatName,
+        species: null,
+        days: Object.entries(byDay)
+          .map(([dayNum, dayCatches]) => ({ dayNumber: dayNum, species: groupCatchesBySpecies(dayCatches) }))
+          .sort((a, b) => Number(a.dayNumber) - Number(b.dayNumber)),
+      }))
       .sort((a, b) => a.boatName.localeCompare(b.boatName))
   })()
 
@@ -382,40 +405,67 @@ export default function CompetitionAdminScoring({
           </button>
         </div>
         {showBoatSummary && (
-          dayFilter === 'all' ? (
+          !boatSummaryData || boatSummaryData.length === 0 ? (
             <div style={{ color: GREY, fontStyle: 'italic', fontSize: '0.85rem', marginTop: '0.75rem' }}>
-              Select a specific Day above to see the species tally per boat for that day.
-            </div>
-          ) : !boatSummaryData || boatSummaryData.length === 0 ? (
-            <div style={{ color: GREY, fontStyle: 'italic', fontSize: '0.85rem', marginTop: '0.75rem' }}>
-              No catches logged for Day {dayFilter} yet.
+              No catches logged yet.
             </div>
           ) : (
-            <div style={{ marginTop: '0.75rem', display: 'grid', gap: '1rem' }}>
-              {boatSummaryData.map(b => {
-                const totalFish    = b.species.reduce((s, g) => s + g.fishCount, 0)
-                const totalSpecies = b.species.length
-                const boatCpue = cpueData.byBoatDay.find(bd => bd.boatName === b.boatName && String(bd.dayNumber) === String(dayFilter))
-                return (
-                  <div key={b.boatName}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '0.4rem' }}>
-                      <div style={{ fontWeight: 600, color: NAVY, fontSize: '0.88rem' }}>{b.boatName}</div>
-                      <div style={{ fontSize: '0.78rem', color: GREY }}>
-                        <strong style={{ color: NAVY }}>{totalFish}</strong> total fish · <strong style={{ color: NAVY }}>{totalSpecies}</strong> species
-                        {boatCpue?.cpue != null && <> · CPUE (Fish Per Hour): <strong style={{ color: NAVY }}>{boatCpue.cpue.toFixed(2)}</strong></>}
-                      </div>
+            <div style={{ marginTop: '0.75rem', display: 'grid', gap: '1.25rem' }}>
+              {boatSummaryData.map(b => (
+                <div key={b.boatName}>
+                  <div style={{ fontWeight: 700, color: NAVY, fontSize: '0.92rem', marginBottom: '0.4rem' }}>{b.boatName}</div>
+                  {dayFilter !== 'all' ? (
+                    (() => {
+                      const totalFish    = b.species.reduce((s, g) => s + g.fishCount, 0)
+                      const totalSpecies = b.species.length
+                      const boatCpue = cpueData.byBoatDay.find(bd => bd.boatName === b.boatName && String(bd.dayNumber) === String(dayFilter))
+                      return (
+                        <>
+                          <div style={{ fontSize: '0.78rem', color: GREY, marginBottom: '0.35rem' }}>
+                            <strong style={{ color: NAVY }}>{totalFish}</strong> total fish · <strong style={{ color: NAVY }}>{totalSpecies}</strong> species
+                            {boatCpue?.cpue != null && <> · CPUE (Fish Per Hour): <strong style={{ color: NAVY }}>{boatCpue.cpue.toFixed(2)}</strong></>}
+                          </div>
+                          <div style={{ display: 'grid', gap: '0.25rem' }}>
+                            {b.species.map(g => (
+                              <div key={g.speciesName} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', background: '#f8fafc', borderRadius: 6, padding: '0.35rem 0.65rem' }}>
+                                <span>{g.speciesName}</span>
+                                <span style={{ color: GREY }}>{g.fishCount} fish · <strong style={{ color: NAVY }}>{g.totalPoints.toFixed(2)} pts</strong></span>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )
+                    })()
+                  ) : (
+                    <div style={{ display: 'grid', gap: '0.6rem', paddingLeft: '0.5rem', borderLeft: '2px solid #e5e7eb' }}>
+                      {b.days.map(d => {
+                        const totalFish    = d.species.reduce((s, g) => s + g.fishCount, 0)
+                        const totalSpecies = d.species.length
+                        const boatCpue = cpueData.byBoatDay.find(bd => bd.boatName === b.boatName && String(bd.dayNumber) === String(d.dayNumber))
+                        return (
+                          <div key={d.dayNumber}>
+                            <div style={{ fontSize: '0.82rem', color: NAVY, fontWeight: 600, marginBottom: '0.3rem' }}>
+                              Day {d.dayNumber}
+                              <span style={{ fontWeight: 400, color: GREY, marginLeft: 6 }}>
+                                — {totalFish} total fish · {totalSpecies} species
+                                {boatCpue?.cpue != null && ` · CPUE: ${boatCpue.cpue.toFixed(2)}`}
+                              </span>
+                            </div>
+                            <div style={{ display: 'grid', gap: '0.25rem' }}>
+                              {d.species.map(g => (
+                                <div key={g.speciesName} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', background: '#f8fafc', borderRadius: 6, padding: '0.35rem 0.65rem' }}>
+                                  <span>{g.speciesName}</span>
+                                  <span style={{ color: GREY }}>{g.fishCount} fish · <strong style={{ color: NAVY }}>{g.totalPoints.toFixed(2)} pts</strong></span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )
+                      })}
                     </div>
-                    <div style={{ display: 'grid', gap: '0.25rem' }}>
-                      {b.species.map(g => (
-                        <div key={g.speciesName} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', background: '#f8fafc', borderRadius: 6, padding: '0.35rem 0.65rem' }}>
-                          <span>{g.speciesName}</span>
-                          <span style={{ color: GREY }}>{g.fishCount} fish · <strong style={{ color: NAVY }}>{g.totalPoints.toFixed(2)} pts</strong></span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )
-              })}
+                  )}
+                </div>
+              ))}
             </div>
           )
         )}
