@@ -283,7 +283,15 @@ export function buildIndividualStandings(catches, participants, days, boats) {
     p.totalWeightKg += parseFloat(c.weight_kg || 0)
     p.catchCount    += 1
     p.catches.push(c)
-    if (!p.bestFish || parseFloat(c.weight_kg) > parseFloat(p.bestFish.weight_kg)) {
+    // "Best fish" = the single catch that earned the most points, not the
+    // heaviest — weight_kg is always null for unit-count competitions
+    // (species tallied, not weighed), so comparing on weight there never
+    // actually updated past the first catch encountered. Points exists on
+    // every catch regardless of scoring method, and for weight-based
+    // competitions it still tracks closely with weight anyway (percentage
+    // scoring is itself a function of weight), so this is a strictly more
+    // correct comparison across every competition type, not just this one.
+    if (!p.bestFish || pts > (p.bestFish.data_quality === 'disqualified' ? 0 : parseFloat(p.bestFish.points || 0))) {
       p.bestFish = c
     }
   }
