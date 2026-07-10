@@ -96,6 +96,7 @@ function buildSingleSheetHTML(standings, catches, competition, config, participa
 ${teamStandings.length ? `<div class="section"><h3>Team Standings</h3>${teamStandingsTable(teamStandings)}</div>` : ''}
 ${dailyRecords.length ? `<div class="section"><h3>Daily Results</h3>${dailyResultsTable(dailyRecords, cpueData)}</div>` : ''}
 <div class="section"><h3>Species Summary</h3>${speciesSummaryTable(catches)}</div>
+<div class="section"><h3>Species by Angler</h3>${catchesSummaryTable(catches, participants)}</div>
 <div class="section"><h3>All Catches</h3>${catchesTable(catches, participants, showWeight)}</div>
 ${prizeRows.length ? `<div class="section"><h3>Prize Categories</h3>${prizeTable(prizeRows)}</div>` : ''}
 </body></html>`
@@ -109,6 +110,7 @@ function buildMultiSheetHTML(standings, catches, competition, config, participan
     ...(teamStandings.length ? [{ name: 'Team Standings', content: teamStandingsTable(teamStandings) }] : []),
     ...(dailyRecords.length  ? [{ name: 'Daily Results',  content: dailyResultsTable(dailyRecords, cpueData) }] : []),
     { name: 'Species Summary', content: speciesSummaryTable(catches) },
+    { name: 'Species by Angler', content: catchesSummaryTable(catches, participants) },
     { name: 'All Catches',    content: catchesTable(catches, participants, showWeight) },
     ...(prizeRows.length ? [{ name: 'Prize Winners', content: prizeTable(prizeRows) }] : []),
   ]
@@ -150,6 +152,33 @@ function standingsTable(standings, showWeight) {
     ...(showWeight ? [s.bestFish?.weight_kg || ''] : []),
   ])
   return htmlTable(headers, rows)
+}
+
+// Grouped by angler + day + species, with fish count and points summed —
+// matches the structure of a skipper's paper scorecard (one line per
+// species that angler landed that day), so John can check the totals here
+// against what was physically written down, rather than tallying every
+// raw catch row (including the multi-fish "padding" rows) by hand. The raw
+// catchesTable() below stays too, for anyone needing the individual-row
+// audit trail (timestamps, notes, exact save order).
+function catchesSummaryTable(catches, participants) {
+  const active = catches.filter(c => c.data_quality !== 'rejected')
+  const groups = {}
+  for (const c of active) {
+    const p = participants?.find(pp => pp.id === c.participant_id || (c.angler_id && pp.user_id === c.angler_id))
+    const anglerName = p?.full_name || 'Unknown'
+    const teamName = p?.competition_teams?.team_name || p?.competition_teams?.province || ''
+    const day = c.competition_days?.day_number ?? ''
+    const key = `${anglerName}|${day}|${c.species_name}`
+    if (!groups[key]) groups[key] = { anglerName, teamName, day, species: c.species_name || 'Unknown', fishCount: 0, totalPoints: 0 }
+    groups[key].fishCount += 1
+    groups[key].totalPoints += c.data_quality === 'disqualified' ? 0 : parseFloat(c.points || 0)
+  }
+  const rows = Object.values(groups).sort((a, b) =>
+    a.anglerName.localeCompare(b.anglerName) || (a.day - b.day) || a.species.localeCompare(b.species)
+  )
+  const headers = ['Angler', 'Team', 'Day', 'Species', 'Fish', 'Points']
+  return htmlTable(headers, rows.map(r => [r.anglerName, r.teamName, r.day, r.species, r.fishCount, r.totalPoints.toFixed(2)]))
 }
 
 function catchesTable(catches, participants, showWeight) {
