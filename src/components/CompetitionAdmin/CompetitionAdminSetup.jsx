@@ -66,6 +66,9 @@ export default function CompetitionAdminSetup({ competition, config, days, boats
   const [fishingSessions, setFishingSessions]   = useState([])
   const [loadingSessions, setLoadingSessions]   = useState(true)
   const [expandedDay,     setExpandedDay]       = useState(null)
+  const [rescheduleOpenDay, setRescheduleOpenDay] = useState(null) // day.id
+  const [rescheduleDate,    setRescheduleDate]    = useState('')
+  const [cancelReason,      setCancelReason]      = useState('')
   const [sessionForm,     setSessionForm]       = useState({}) // keyed by session id: { lines_in, lines_up }
   const [savingSession,   setSavingSession]     = useState({}) // keyed by session id
 
@@ -177,6 +180,46 @@ export default function CompetitionAdminSetup({ competition, config, days, boats
     const { error: err } = await supabase
       .from('competition_days')
       .update({ session_status: newStatus, updated_at: new Date().toISOString() })
+      .eq('id', dayId)
+    setDayLoading(p => ({ ...p, [dayId]: false }))
+    if (err) { setError(err.message); return }
+    onReload()
+  }
+
+  // Rest day / reschedule — previously required direct SQL (see Malcolm's
+  // July 10 rest-day fix). Cancelling marks the day so it's clearly not
+  // being fished rather than left looking like a forgotten pending day;
+  // rescheduling moves a day's calendar date without touching its
+  // day_number, so a "Day 3" that gets rained out and fished a day later
+  // is still Day 3, just on the correct date.
+  async function handleCancelDay(dayId, reason) {
+    setDayLoading(p => ({ ...p, [dayId]: true }))
+    const { error: err } = await supabase
+      .from('competition_days')
+      .update({ cancelled: true, cancellation_reason: reason || 'Rest day', updated_at: new Date().toISOString() })
+      .eq('id', dayId)
+    setDayLoading(p => ({ ...p, [dayId]: false }))
+    if (err) { setError(err.message); return }
+    onReload()
+  }
+
+  async function handleUncancelDay(dayId) {
+    setDayLoading(p => ({ ...p, [dayId]: true }))
+    const { error: err } = await supabase
+      .from('competition_days')
+      .update({ cancelled: false, cancellation_reason: null, updated_at: new Date().toISOString() })
+      .eq('id', dayId)
+    setDayLoading(p => ({ ...p, [dayId]: false }))
+    if (err) { setError(err.message); return }
+    onReload()
+  }
+
+  async function handleRescheduleDay(dayId, newDate) {
+    if (!newDate) return
+    setDayLoading(p => ({ ...p, [dayId]: true }))
+    const { error: err } = await supabase
+      .from('competition_days')
+      .update({ date: newDate, updated_at: new Date().toISOString() })
       .eq('id', dayId)
     setDayLoading(p => ({ ...p, [dayId]: false }))
     if (err) { setError(err.message); return }
@@ -399,6 +442,17 @@ export default function CompetitionAdminSetup({ competition, config, days, boats
                       {isExpanded ? '▲ Hide Boat Times' : '▼ Boat Times'}
                     </button>
                   )}
+                  {isAdmin && (
+                    <button onClick={() => {
+                      if (rescheduleOpenDay === day.id) { setRescheduleOpenDay(null); return }
+                      setRescheduleOpenDay(day.id)
+                      setRescheduleDate(day.date || '')
+                      setCancelReason(day.cancellation_reason || '')
+                    }}
+                      style={{ ...S.btn(GREY), padding: '0.3rem 0.7rem', fontSize: '0.78rem' }}>
+                      📅 Reschedule / Rest Day
+                    </button>
+                  )}
                 </div>
 
                 {isExpanded && (
@@ -444,6 +498,51 @@ export default function CompetitionAdminSetup({ competition, config, days, boats
                             </div>
                           )
                         })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {rescheduleOpenDay === day.id && (
+                  <div style={{ borderTop: '1px solid #e5e7eb', padding: '0.75rem', background: '#fffbeb' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '0.6rem', alignItems: 'end', marginBottom: '0.75rem' }}>
+                      <div>
+                        <label style={S.label}>Calendar Date</label>
+                        <input type="date" style={S.input} value={rescheduleDate}
+                          onChange={e => setRescheduleDate(e.target.value)} />
+                      </div>
+                      <button onClick={() => handleRescheduleDay(day.id, rescheduleDate)}
+                        disabled={dayLoading[day.id] || !rescheduleDate}
+                        style={{ ...S.btn(NAVY), padding: '0.5rem 1rem', fontSize: '0.82rem' }}>
+                        Save Date
+                      </button>
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: GREY, marginBottom: '0.5rem' }}>
+                      Moves this day's calendar date without changing its "Day {day.day_number}" label —
+                      use this when a day gets rained out and fished later instead.
+                    </div>
+
+                    {day.cancelled ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                        <span style={{ fontSize: '0.82rem', color: RED }}>Marked cancelled: {day.cancellation_reason}</span>
+                        <button onClick={() => handleUncancelDay(day.id)}
+                          disabled={dayLoading[day.id]}
+                          style={{ ...S.btn(GREEN), padding: '0.35rem 0.8rem', fontSize: '0.78rem' }}>
+                          Un-cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '0.6rem', alignItems: 'end' }}>
+                        <div>
+                          <label style={S.label}>Reason (e.g. "Rest day — weather")</label>
+                          <input style={S.input} placeholder="Rest day — weather"
+                            value={cancelReason} onChange={e => setCancelReason(e.target.value)} />
+                        </div>
+                        <button onClick={() => handleCancelDay(day.id, cancelReason)}
+                          disabled={dayLoading[day.id]}
+                          style={{ ...S.btn(RED), padding: '0.5rem 1rem', fontSize: '0.82rem' }}>
+                          Mark as Rest Day / Cancel
+                        </button>
                       </div>
                     )}
                   </div>

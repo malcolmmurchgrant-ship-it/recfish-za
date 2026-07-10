@@ -21,7 +21,7 @@ const S = {
   section:{ fontWeight: 700, color: NAVY, fontSize: '0.95rem', marginBottom: '0.75rem', paddingBottom: '0.4rem', borderBottom: '2px solid #e5e7eb' },
 }
 
-export default function CompetitionAdminParticipants({ competition, config, isAdmin, isScorer }) {
+export default function CompetitionAdminParticipants({ competition, config, days, isAdmin, isScorer }) {
   const [participants, setParticipants]   = useState([])
   const [teams,        setTeams]          = useState([])
   const [loading,      setLoading]        = useState(true)
@@ -29,6 +29,7 @@ export default function CompetitionAdminParticipants({ competition, config, isAd
   const [search,       setSearch]         = useState('')
   const [dqModal,      setDqModal]        = useState(null)   // participant to DQ
   const [dqReason,     setDqReason]       = useState('')
+  const [dqDayScope,   setDqDayScope]     = useState('all')  // 'all' or a competition_day_id
   const [saving,       setSaving]         = useState(false)
   const [error,        setError]          = useState('')
 
@@ -87,20 +88,45 @@ export default function CompetitionAdminParticipants({ competition, config, isAd
   async function handleDQ() {
     if (!dqReason.trim()) { setError('Please enter a DQ reason'); return }
     setSaving(true); setError('')
-    const { error: err } = await supabase
-      .from('competition_participants')
-      .update({ status: 'disqualified', notes: dqReason.trim() })
-      .eq('id', dqModal.id)
-    if (err) { setError(err.message); setSaving(false); return }
-    // Also zero all their catches
-    await supabase
+
+    // Only mark the participant record itself 'disqualified' for a
+    // whole-competition DQ — a single-day DQ shouldn't make the angler
+    // show as disqualified everywhere, just zero that one day's points.
+    if (dqDayScope === 'all') {
+      const { error: err } = await supabase
+        .from('competition_participants')
+        .update({ status: 'disqualified', notes: dqReason.trim() })
+        .eq('id', dqModal.id)
+      if (err) { setError(err.message); setSaving(false); return }
+    }
+
+    // Zero the actual catches. Previously this only matched angler_id,
+    // which lines up with a REGISTERED angler's user_id — but dqModal.id is
+    // a competition_participants.id, not a user_id, so this matched zero
+    // rows for any unregistered angler (the common case for junior
+    // anglers, e.g. exactly what happened with a Day 2 DQ that silently
+    // never zeroed the points). participant_id always lines up with
+    // competition_participants.id regardless of registration status.
+    let query = supabase
       .from('competition_catches')
-      .update({ data_quality: 'disqualified', scoring: false })
+      .update({ data_quality: 'disqualified', scoring: false, notes: dqReason.trim() })
       .eq('competition_id', competition.id)
-      .eq('angler_id', dqModal.id)
+
+    query = dqModal.user_id
+      ? query.eq('angler_id', dqModal.user_id)
+      : query.eq('participant_id', dqModal.id)
+
+    if (dqDayScope !== 'all') {
+      query = query.eq('competition_day_id', dqDayScope)
+    }
+
+    const { error: catchErr } = await query
+    if (catchErr) { setError(catchErr.message); setSaving(false); return }
+
     setSaving(false)
     setDqModal(null)
     setDqReason('')
+    setDqDayScope('all')
     load()
   }
 
@@ -110,11 +136,15 @@ export default function CompetitionAdminParticipants({ competition, config, isAd
       .from('competition_participants')
       .update({ status: 'registered', notes: null })
       .eq('id', participant.id)
-    await supabase
+    // Same participant_id/angler_id fix as handleDQ above.
+    let query = supabase
       .from('competition_catches')
       .update({ data_quality: 'unverified', scoring: true })
       .eq('competition_id', competition.id)
-      .eq('angler_id', participant.id)
+    query = participant.user_id
+      ? query.eq('angler_id', participant.user_id)
+      : query.eq('participant_id', participant.id)
+    await query
     load()
   }
 
@@ -316,8 +346,19 @@ export default function CompetitionAdminParticipants({ competition, config, isAd
           <div style={{ background: 'white', borderRadius: 10, padding: '1.5rem', maxWidth: 420, width: '100%' }}>
             <div style={{ fontWeight: 700, color: RED, fontSize: '1.05rem', marginBottom: '0.5rem' }}>🚫 Disqualify Angler</div>
             <div style={{ color: NAVY, fontWeight: 600, marginBottom: '0.75rem' }}>{dqModal.full_name}</div>
+            {days?.length > 0 && (
+              <>
+                <label style={S.label}>Scope</label>
+                <select style={{ ...S.select, marginBottom: '0.75rem' }} value={dqDayScope} onChange={e => setDqDayScope(e.target.value)}>
+                  <option value="all">Whole competition (marks angler as DQ'd everywhere)</option>
+                  {days.map(d => <option key={d.id} value={d.id}>Day {d.day_number} only — {d.date}</option>)}
+                </select>
+              </>
+            )}
             <div style={{ fontSize: '0.82rem', color: GREY, marginBottom: '0.75rem' }}>
-              All catches will be retained but scored as 0 points. This action can be reversed by an admin.
+              {dqDayScope === 'all'
+                ? 'All catches will be retained but scored as 0 points, and the angler will show as disqualified. This action can be reversed by an admin.'
+                : 'Only catches on the selected day will be zeroed — other days are untouched, and the angler will not show as disqualified overall. This action can be reversed by an admin.'}
             </div>
             <label style={S.label}>Reason for disqualification *</label>
             <textarea style={{ ...S.input, minHeight: 80, marginBottom: '0.75rem', resize: 'vertical' }}
@@ -329,7 +370,7 @@ export default function CompetitionAdminParticipants({ competition, config, isAd
                 style={{ ...S.btn(RED), opacity: !dqReason.trim() ? 0.5 : 1 }}>
                 {saving ? 'Processing…' : '🚫 Confirm DQ'}
               </button>
-              <button onClick={() => { setDqModal(null); setDqReason(''); setError('') }} style={S.btn(GREY)}>
+              <button onClick={() => { setDqModal(null); setDqReason(''); setDqDayScope('all'); setError('') }} style={S.btn(GREY)}>
                 Cancel
               </button>
             </div>

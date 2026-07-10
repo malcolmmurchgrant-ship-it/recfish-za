@@ -196,6 +196,7 @@ export default function CompetitionAdmin({ competitionId }) {
         <CompetitionAdminParticipants
           competition={competition}
           config={config}
+          days={days}
           isAdmin={isAdmin}
           isScorer={isScorer}
         />
