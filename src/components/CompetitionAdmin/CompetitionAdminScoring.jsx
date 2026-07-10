@@ -109,6 +109,15 @@ export default function CompetitionAdminScoring({
   // per raw catch (including the 0-point padding rows).
   const filteredSpeciesGroups = groupCatchesBySpecies(filtered)
 
+  // Whole-scope DQ notice — if every catch in the current filter is
+  // disqualified (the common case: an angler DQ'd for a whole day), show
+  // one clear banner with the reason instead of repeating a badge on every
+  // species card. Falls back to per-species badges below for a partial DQ
+  // (only some species affected), so nothing gets missed either way.
+  const nonRejectedFiltered = filtered.filter(c => c.data_quality !== 'rejected')
+  const allFilteredDQd = nonRejectedFiltered.length > 0 && nonRejectedFiltered.every(c => c.data_quality === 'disqualified')
+  const dqReason = allFilteredDQd ? (nonRejectedFiltered.find(c => c.notes)?.notes || 'No reason recorded') : null
+
   // Per boat, per day — only meaningful once a specific day is picked
   // (a boat carries different anglers on different days), so this ignores
   // the Team/Angler filters and looks at everyone on each boat that day.
@@ -234,10 +243,17 @@ export default function CompetitionAdminScoring({
                 )
               })()}
             </div>
+            {allFilteredDQd && (
+              <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '0.75rem 1rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={S.badge(RED)}>🚫 DQ</span>
+                <span style={{ color: RED, fontSize: '0.88rem' }}><strong>Disqualified</strong> — {dqReason}</span>
+              </div>
+            )}
             {filteredSpeciesGroups.map(g => {
           const groupKey = g.speciesName
           const isExpanded = !!expandedGroups[groupKey]
           const hasClaim = g.rows.some(r => r.notes && r.data_quality !== 'rejected' && r.data_quality !== 'disqualified')
+          const groupIsDQd = !allFilteredDQd && g.rows.length > 0 && g.rows.every(r => r.data_quality === 'disqualified')
           return (
             <div key={groupKey} style={S.card}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
@@ -245,6 +261,7 @@ export default function CompetitionAdminScoring({
                   <div style={{ fontWeight: 700, color: NAVY, display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
                     {g.speciesName}
                     {hasClaim && <span style={S.badge(GOLD)}>🏆 Claim</span>}
+                    {groupIsDQd && <span style={S.badge(RED)}>🚫 DQ</span>}
                   </div>
                   <div style={{ fontSize: '0.8rem', color: GREY, marginTop: 2 }}>
                     {g.fishCount} fish
