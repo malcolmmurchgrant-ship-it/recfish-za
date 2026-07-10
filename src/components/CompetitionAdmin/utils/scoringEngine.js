@@ -330,3 +330,87 @@ export function groupCatchesBySpecies(catches) {
   }
   return Object.values(bySpecies).sort((a, b) => b.totalPoints - a.totalPoints)
 }
+
+// ── CPUE — Fish Per Hour ─────────────────────────────────────────────────
+// "CPUE" (Catch Per Unit Effort) traditionally uses weight/hour, but this
+// competition doesn't track weight (species are tallied, not weighed) — so
+// this uses fish count/hour instead, labelled plainly as "Fish Per Hour"
+// alongside the CPUE name so newer anglers can connect the two.
+//
+// Hours come from competition_fishing_sessions, keyed by (day_number,
+// boat_name) — a different key shape than competition_catches (which uses
+// competition_day_id/boat_id), so this resolves through days/boats to
+// bridge the two. An angler's hours for a given day are simply their
+// boat's hours that day (everyone on a boat shares the same session).
+// Returns { byBoatDay: [...], byAnglerDay: [...], byAngler: [...] } —
+// byAngler sums fish and hours across every day that day's boat had hours
+// recorded, so it only reflects days where Lines In/Up were actually
+// captured, not the whole competition by default.
+export function buildCpueData(catches, participants, days, boats, fishingSessions) {
+  const activeCatches = catches.filter(c => c.data_quality !== 'rejected')
+
+  // hours lookup: "dayNumber|boatName" -> fishing_hours
+  const hoursLookup = {}
+  for (const s of (fishingSessions || [])) {
+    if (s.fishing_hours == null) continue
+    hoursLookup[`${s.day_number}|${s.boat_name}`] = parseFloat(s.fishing_hours)
+  }
+
+  // Fish counts per boat/day and per angler/day
+  const boatDayFish = {}   // "dayNumber|boatName" -> { fishCount, boatId, dayId }
+  const anglerDayFish = {} // "participantId|dayNumber" -> { fishCount, boatName, dayNumber }
+
+  for (const c of activeCatches) {
+    if (!c.boat_id || !c.competition_day_id) continue
+    const day  = days?.find(d => d.id === c.competition_day_id)
+    const boat = boats?.find(b => b.id === c.boat_id)
+    if (!day || !boat) continue
+    const pid = c.participant_id || participants.find(p => p.user_id === c.angler_id)?.id
+    if (!pid) continue
+
+    const bdKey = `${day.day_number}|${boat.boat_name}`
+    if (!boatDayFish[bdKey]) boatDayFish[bdKey] = { fishCount: 0, dayNumber: day.day_number, boatName: boat.boat_name }
+    boatDayFish[bdKey].fishCount += 1
+
+    const adKey = `${pid}|${day.day_number}`
+    if (!anglerDayFish[adKey]) anglerDayFish[adKey] = { fishCount: 0, dayNumber: day.day_number, boatName: boat.boat_name, participantId: pid }
+    anglerDayFish[adKey].fishCount += 1
+  }
+
+  const byBoatDay = Object.values(boatDayFish).map(b => {
+    const hours = hoursLookup[`${b.dayNumber}|${b.boatName}`] ?? null
+    return { ...b, hours, cpue: hours ? b.fishCount / hours : null }
+  })
+
+  const byAnglerDay = Object.values(anglerDayFish).map(a => {
+    const hours = hoursLookup[`${a.dayNumber}|${a.boatName}`] ?? null
+    const p = participants.find(pp => pp.id === a.participantId)
+    return {
+      ...a,
+      displayName: p?.full_name || 'Unknown',
+      hours,
+      cpue: hours ? a.fishCount / hours : null,
+    }
+  })
+
+  // Overall per-angler: sum fish and hours only across days that had hours
+  // recorded, so a competition with hours logged for some days but not
+  // others still gives an honest rate rather than silently under-counting.
+  const byAnglerMap = {}
+  for (const a of byAnglerDay) {
+    if (!byAnglerMap[a.participantId]) {
+      byAnglerMap[a.participantId] = { participantId: a.participantId, displayName: a.displayName, fishCount: 0, hours: 0, daysWithHours: 0 }
+    }
+    byAnglerMap[a.participantId].fishCount += a.fishCount
+    if (a.hours != null) {
+      byAnglerMap[a.participantId].hours += a.hours
+      byAnglerMap[a.participantId].daysWithHours += 1
+    }
+  }
+  const byAngler = Object.values(byAnglerMap).map(a => ({
+    ...a,
+    cpue: a.hours > 0 ? a.fishCount / a.hours : null,
+  }))
+
+  return { byBoatDay, byAnglerDay, byAngler }
+}

@@ -7,7 +7,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { downloadCSV, downloadXLSX, downloadPDF } from './utils/reportGenerator'
-import { buildIndividualStandings, buildDailyAnglerPercentages, buildBoatPercentageTeamStandings } from './utils/scoringEngine'
+import { buildIndividualStandings, buildDailyAnglerPercentages, buildBoatPercentageTeamStandings, buildCpueData } from './utils/scoringEngine'
 
 // Flip to true once generate-competition-pdf is actually built and deployed
 // as a Supabase Edge Function (confirmed none exist on this project yet).
@@ -98,6 +98,23 @@ export default function CompetitionAdminReports({
       .then(({ data }) => setFishingSessions(data || []))
   }, [competition?.id])
 
+  const cpueData = useMemo(() =>
+    buildCpueData(catches.filter(c => c.data_quality !== 'rejected'), participants, days, boats, fishingSessions),
+    [catches, participants, days, boats, fishingSessions]
+  )
+
+  // Overall competition-wide CPUE per angler (summed across every day that
+  // had hours recorded) — merged onto a standings copy for the Standings
+  // sheet/CSV, same pattern as the earlier anglerPercentage merge before
+  // that moved inside buildIndividualStandings itself. CPUE can't live
+  // there the same way since it needs fishingSessions, which that function
+  // doesn't otherwise touch.
+  const standingsWithCpue = useMemo(() => {
+    const byParticipant = {}
+    for (const a of cpueData.byAngler) byParticipant[a.participantId] = a.cpue
+    return standings.map(s => ({ ...s, cpue: byParticipant[s.participantId] ?? null }))
+  }, [standings, cpueData])
+
   // ── Save reporting config ─────────────────────────────────────────────────
   async function saveReportingConfig() {
     setSavingConfig(true); setError('')
@@ -146,9 +163,9 @@ export default function CompetitionAdminReports({
     setDownloading(type); setError('')
     try {
       if (type === 'csv') {
-        downloadCSV(standings, competition, config)
+        downloadCSV(standingsWithCpue, competition, config)
       } else if (type === 'xlsx') {
-        downloadXLSX(standings, catches, competition, config, xlsxMode, { participants, dailyRecords, teamStandings })
+        downloadXLSX(standingsWithCpue, catches, competition, config, xlsxMode, { participants, dailyRecords, teamStandings, cpueData })
       } else if (type === 'pdf') {
         await downloadPDF(competition.id, 'full_results')
       } else if (type === 'pdf_prize') {
@@ -237,6 +254,7 @@ export default function CompetitionAdminReports({
           <div style={{ fontSize: '0.8rem', color: GREY, marginBottom: '0.75rem' }}>
             Raw points decide each day's top-angler award. Boat % is relative to the top
             scorer on that same boat that day (any team) and is what feeds into Team totals.
+            CPUE is Fish Per Hour for that angler's boat that day.
           </div>
           {Object.keys(dailyByDay).sort((a, b) => a - b).map(dayNum => (
             <div key={dayNum} style={{ marginBottom: '1rem' }}>
@@ -244,21 +262,25 @@ export default function CompetitionAdminReports({
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                 <thead>
                   <tr style={{ background: '#f1f5f9' }}>
-                    {['Angler','Team','Boat','Raw Points','Boat %'].map(h => (
+                    {['Angler','Team','Boat','Raw Points','Boat %','CPUE'].map(h => (
                       <th key={h} style={{ padding: '0.4rem 0.6rem', textAlign: 'left', fontSize: '0.72rem', textTransform: 'uppercase', color: GREY, fontWeight: 700 }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {dailyByDay[dayNum].map(d => (
-                    <tr key={`${dayNum}-${d.participantId}`} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                      <td style={{ padding: '0.4rem 0.6rem', fontWeight: 600, color: NAVY }}>{d.displayName}</td>
-                      <td style={{ padding: '0.4rem 0.6rem', color: GREY }}>{d.teamName || '—'}</td>
-                      <td style={{ padding: '0.4rem 0.6rem', color: GREY }}>{d.boatName}</td>
-                      <td style={{ padding: '0.4rem 0.6rem', textAlign: 'right', fontWeight: 700, color: NAVY }}>{d.rawPoints.toFixed(2)}</td>
-                      <td style={{ padding: '0.4rem 0.6rem', textAlign: 'right' }}>{d.percentage.toFixed(1)}%{d.percentage === 100 ? ' \ud83e\udd47' : ''}</td>
-                    </tr>
-                  ))}
+                  {dailyByDay[dayNum].map(d => {
+                    const anglerCpue = cpueData.byAnglerDay.find(a => a.participantId === d.participantId && String(a.dayNumber) === String(dayNum))
+                    return (
+                      <tr key={`${dayNum}-${d.participantId}`} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                        <td style={{ padding: '0.4rem 0.6rem', fontWeight: 600, color: NAVY }}>{d.displayName}</td>
+                        <td style={{ padding: '0.4rem 0.6rem', color: GREY }}>{d.teamName || '—'}</td>
+                        <td style={{ padding: '0.4rem 0.6rem', color: GREY }}>{d.boatName}</td>
+                        <td style={{ padding: '0.4rem 0.6rem', textAlign: 'right', fontWeight: 700, color: NAVY }}>{d.rawPoints.toFixed(2)}</td>
+                        <td style={{ padding: '0.4rem 0.6rem', textAlign: 'right' }}>{d.percentage.toFixed(1)}%{d.percentage === 100 ? ' \ud83e\udd47' : ''}</td>
+                        <td style={{ padding: '0.4rem 0.6rem', textAlign: 'right', color: GREY }}>{anglerCpue?.cpue != null ? anglerCpue.cpue.toFixed(2) : '—'}</td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -310,12 +332,12 @@ export default function CompetitionAdminReports({
       {/* ── Fishing session times ────────────────────────────────────────── */}
       {fishingSessions.some(s => s.lines_in && s.lines_up) && (
         <div style={S.card}>
-          <div style={S.section}>Fishing Session Times</div>
+          <div style={S.section}>Fishing Session Times & CPUE</div>
           <div style={{ fontSize: '0.8rem', color: GREY, marginBottom: '0.75rem' }}>
-            Lines In / Lines Up times logged per boat, for record-keeping and
-            verification. Not a CPUE figure — that needs weight data, which
-            isn't tracked in this points/unit-count competition (species are
-            tallied, not weighed).
+            Lines In / Lines Up times logged per boat. CPUE here is Fish Per Hour
+            (fish count ÷ hours) — this competition doesn't track weight (species
+            are tallied, not weighed), so this uses catch rate rather than the
+            traditional weight/hour figure.
           </div>
           {[...new Set(fishingSessions.map(s => s.day_number))].sort((a, b) => a - b).map(dayNum => {
             const daySessions = fishingSessions.filter(s => s.day_number === dayNum && s.lines_in && s.lines_up)
@@ -324,12 +346,18 @@ export default function CompetitionAdminReports({
               <div key={dayNum} style={{ marginBottom: '0.75rem' }}>
                 <div style={{ fontWeight: 600, color: NAVY, fontSize: '0.85rem', marginBottom: '0.4rem' }}>Day {dayNum}</div>
                 <div style={{ display: 'grid', gap: '0.3rem' }}>
-                  {daySessions.map(s => (
-                    <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', background: '#f8fafc', borderRadius: 6, padding: '0.4rem 0.75rem' }}>
-                      <span><strong style={{ color: NAVY }}>{s.boat_name}</strong> — {s.skipper_name}</span>
-                      <span style={{ color: GREY }}>{s.lines_in} – {s.lines_up} ({s.fishing_hours != null ? `${s.fishing_hours}h` : '—'})</span>
-                    </div>
-                  ))}
+                  {daySessions.map(s => {
+                    const boatCpue = cpueData.byBoatDay.find(bd => bd.boatName === s.boat_name && bd.dayNumber === dayNum)
+                    return (
+                      <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', background: '#f8fafc', borderRadius: 6, padding: '0.4rem 0.75rem' }}>
+                        <span><strong style={{ color: NAVY }}>{s.boat_name}</strong> — {s.skipper_name}</span>
+                        <span style={{ color: GREY }}>
+                          {s.lines_in} – {s.lines_up} ({s.fishing_hours != null ? `${s.fishing_hours}h` : '—'})
+                          {boatCpue?.cpue != null && <> · CPUE: <strong style={{ color: NAVY }}>{boatCpue.cpue.toFixed(2)}</strong> fish/hr</>}
+                        </span>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )

@@ -4,9 +4,10 @@
 // Delegates to UniversalScoreboard when it's built (Phase 4).
 // For now renders standings directly from catches + participants.
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { buildIndividualStandings, aggregateTeamScores, buildBoatPercentageTeamStandings, buildDailyAnglerPercentages } from './utils/scoringEngine'
+import { supabase } from '../../lib/supabase'
+import { buildIndividualStandings, aggregateTeamScores, buildBoatPercentageTeamStandings, buildDailyAnglerPercentages, buildCpueData } from './utils/scoringEngine'
 
 const NAVY  = '#1e3a8a'
 const GREY  = '#6b7280'
@@ -84,6 +85,20 @@ export default function CompetitionAdminScoreboard({
     return [...rows].sort((a, b) => b.rawPoints - a.rawPoints)
   }, [dailyRecords, dailyDayFilter])
 
+  // CPUE ("Fish Per Hour") — not previously fetched on this tab
+  const [fishingSessions, setFishingSessions] = useState([])
+  useEffect(() => {
+    if (!competition?.id) return
+    supabase.from('competition_fishing_sessions')
+      .select('*')
+      .eq('competition_id', competition.id)
+      .then(({ data }) => setFishingSessions(data || []))
+  }, [competition?.id])
+  const cpueData = useMemo(() =>
+    buildCpueData(activeCatches, participants, days, boats, fishingSessions),
+    [activeCatches, participants, days, boats, fishingSessions]
+  )
+
   const categories = ['all', ...new Set(participants.map(p => p.category).filter(Boolean))]
   const isLocked   = !!competition?.results_published_at
   // Weight isn't tracked at all in unit-count/'points' competitions (species
@@ -150,13 +165,15 @@ export default function CompetitionAdminScoreboard({
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
               <thead>
                 <tr style={{ background: NAVY, color: 'white' }}>
-                  {['Rank','Angler','Team','LC','Angler %','Points', ...(showWeight ? ['Weight'] : []), 'Species','Catches'].map(h => (
+                  {['Rank','Angler','Team','LC','Angler %','Points', ...(showWeight ? ['Weight'] : []), 'Species','Catches','CPUE'].map(h => (
                     <th key={h} style={{ padding: '0.5rem 0.75rem', textAlign: h === 'Rank' ? 'center' : 'left', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {filteredStandings.map((s, i) => (
+                {filteredStandings.map((s, i) => {
+                  const anglerOverallCpue = cpueData.byAngler.find(a => a.participantId === s.participantId)
+                  return (
                   <tr key={s.participantId}
                     style={{ background: i % 2 === 0 ? 'white' : '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
                     <td style={{ padding: '0.5rem 0.75rem', textAlign: 'center', fontWeight: 700, color: RANK_COLORS[s.rank] || NAVY }}>
@@ -194,10 +211,14 @@ export default function CompetitionAdminScoreboard({
                     <td style={{ padding: '0.5rem 0.75rem', textAlign: 'center', color: GREY }}>
                       {s.catchCount}
                     </td>
+                    <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right', color: GREY }}>
+                      {anglerOverallCpue?.cpue != null ? anglerOverallCpue.cpue.toFixed(2) : '—'}
+                    </td>
                   </tr>
-                ))}
+                  )
+                })}
                 {filteredStandings.length === 0 && (
-                  <tr><td colSpan={showWeight ? 9 : 8} style={{ padding: '1.5rem', textAlign: 'center', color: GREY, fontStyle: 'italic' }}>No catches recorded yet.</td></tr>
+                  <tr><td colSpan={showWeight ? 10 : 9} style={{ padding: '1.5rem', textAlign: 'center', color: GREY, fontStyle: 'italic' }}>No catches recorded yet.</td></tr>
                 )}
               </tbody>
             </table>
@@ -220,18 +241,21 @@ export default function CompetitionAdminScoreboard({
           <div style={{ fontSize: '0.78rem', color: GREY, marginBottom: '0.75rem' }}>
             Sorted by raw points — that's what decides each day's top-angler award.
             Percentage is relative to the top scorer on that same boat that day (any team), and is what feeds into Team totals.
+            CPUE is Fish Per Hour, based on that boat's Lines In/Up times (Setup tab).
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
               <thead>
                 <tr style={{ background: NAVY, color: 'white' }}>
-                  {['Day','Angler','Team','Boat','Raw Points','Boat %'].map(h => (
+                  {['Day','Angler','Team','Boat','Raw Points','Boat %','CPUE'].map(h => (
                     <th key={h} style={{ padding: '0.5rem 0.75rem', textAlign: 'left', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {filteredDaily.map((d, i) => (
+                {filteredDaily.map((d, i) => {
+                  const anglerCpue = cpueData.byAnglerDay.find(a => a.participantId === d.participantId && String(a.dayNumber) === String(d.dayNumber))
+                  return (
                   <tr key={`${d.dayId}-${d.participantId}`}
                     style={{ background: i % 2 === 0 ? 'white' : '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
                     <td style={{ padding: '0.5rem 0.75rem', whiteSpace: 'nowrap' }}>Day {d.dayNumber}</td>
@@ -249,10 +273,14 @@ export default function CompetitionAdminScoreboard({
                     <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right', color: d.percentage === 100 ? GREEN : GREY, fontWeight: d.percentage === 100 ? 700 : 400 }}>
                       {d.percentage.toFixed(1)}%{d.percentage === 100 ? ' 🥇' : ''}
                     </td>
+                    <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right', color: GREY }}>
+                      {anglerCpue?.cpue != null ? anglerCpue.cpue.toFixed(2) : '—'}
+                    </td>
                   </tr>
-                ))}
+                  )
+                })}
                 {filteredDaily.length === 0 && (
-                  <tr><td colSpan={6} style={{ padding: '1.5rem', textAlign: 'center', color: GREY, fontStyle: 'italic' }}>No catches recorded yet.</td></tr>
+                  <tr><td colSpan={7} style={{ padding: '1.5rem', textAlign: 'center', color: GREY, fontStyle: 'italic' }}>No catches recorded yet.</td></tr>
                 )}
               </tbody>
             </table>

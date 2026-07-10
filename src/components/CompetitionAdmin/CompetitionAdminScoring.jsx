@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { calculateCatchPoints, groupCatchesBySpecies } from './utils/scoringEngine'
+import { calculateCatchPoints, groupCatchesBySpecies, buildCpueData } from './utils/scoringEngine'
 
 const NAVY  = '#1e3a8a'
 const GREY  = '#6b7280'
@@ -42,6 +42,19 @@ export default function CompetitionAdminScoring({
   const [expandedGroups, setExpandedGroups] = useState({}) // species key -> bool, per-group raw-row reveal
   const [showBoatSummary, setShowBoatSummary] = useState(false)
   const [showCompSummary, setShowCompSummary] = useState(false)
+
+  // CPUE ("Fish Per Hour") needs Lines In/Up hours from
+  // competition_fishing_sessions — not previously fetched on this tab.
+  const [fishingSessions, setFishingSessions] = useState([])
+  useEffect(() => {
+    if (!competition?.id) return
+    supabase.from('competition_fishing_sessions')
+      .select('*')
+      .eq('competition_id', competition.id)
+      .then(({ data }) => setFishingSessions(data || []))
+  }, [competition?.id])
+
+  const cpueData = buildCpueData(catches.filter(c => c.data_quality !== 'rejected'), participants, days, boats, fishingSessions)
 
   const scoringMethod = config?.scoring?.method || 'percentage'
 
@@ -200,7 +213,7 @@ export default function CompetitionAdminScoring({
           </div>
         ) : (
           <>
-            <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '0.75rem', padding: '0 0.25rem' }}>
+            <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '0.75rem', padding: '0 0.25rem', flexWrap: 'wrap' }}>
               <div>
                 <span style={{ fontSize: '0.7rem', color: GREY, textTransform: 'uppercase' }}>Total Fish Caught: </span>
                 <strong style={{ color: NAVY }}>{filteredSpeciesGroups.reduce((s, g) => s + g.fishCount, 0)}</strong>
@@ -209,6 +222,17 @@ export default function CompetitionAdminScoring({
                 <span style={{ fontSize: '0.7rem', color: GREY, textTransform: 'uppercase' }}>Total Species Caught: </span>
                 <strong style={{ color: NAVY }}>{filteredSpeciesGroups.length}</strong>
               </div>
+              {anglerFilter !== 'all' && dayFilter !== 'all' && (() => {
+                const rec = cpueData.byAnglerDay.find(a => a.participantId === anglerFilter && String(a.dayNumber) === String(dayFilter))
+                return (
+                  <div>
+                    <span style={{ fontSize: '0.7rem', color: GREY, textTransform: 'uppercase' }}>CPUE (Fish Per Hour): </span>
+                    {rec?.cpue != null
+                      ? <strong style={{ color: NAVY }}>{rec.cpue.toFixed(2)}</strong>
+                      : <span style={{ color: GREY, fontStyle: 'italic' }}>— add this boat's hours in Setup to see this</span>}
+                  </div>
+                )
+              })()}
             </div>
             {filteredSpeciesGroups.map(g => {
           const groupKey = g.speciesName
@@ -354,12 +378,14 @@ export default function CompetitionAdminScoring({
               {boatSummaryData.map(b => {
                 const totalFish    = b.species.reduce((s, g) => s + g.fishCount, 0)
                 const totalSpecies = b.species.length
+                const boatCpue = cpueData.byBoatDay.find(bd => bd.boatName === b.boatName && String(bd.dayNumber) === String(dayFilter))
                 return (
                   <div key={b.boatName}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.35rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '0.4rem' }}>
                       <div style={{ fontWeight: 600, color: NAVY, fontSize: '0.88rem' }}>{b.boatName}</div>
                       <div style={{ fontSize: '0.78rem', color: GREY }}>
                         <strong style={{ color: NAVY }}>{totalFish}</strong> total fish · <strong style={{ color: NAVY }}>{totalSpecies}</strong> species
+                        {boatCpue?.cpue != null && <> · CPUE (Fish Per Hour): <strong style={{ color: NAVY }}>{boatCpue.cpue.toFixed(2)}</strong></>}
                       </div>
                     </div>
                     <div style={{ display: 'grid', gap: '0.25rem' }}>

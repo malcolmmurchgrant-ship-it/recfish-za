@@ -14,7 +14,7 @@ export function downloadCSV(standings, competition, config) {
   const fields = config?.reporting?.csv_fields || [
     'rank','angler_number','display_name','team_name','angler_percentage',
     'total_points', ...(showWeight ? ['total_weight_kg'] : []),
-    'species_count','catch_count',
+    'species_count','catch_count','cpue',
     'best_fish_species', ...(showWeight ? ['best_fish_weight_kg'] : []),
   ]
 
@@ -32,6 +32,7 @@ export function downloadCSV(standings, competition, config) {
       case 'total_weight_kg':    return (s.totalWeightKg || 0).toFixed(3)
       case 'species_count':      return s.speciesCount || 0
       case 'catch_count':        return s.catchCount || 0
+      case 'cpue':               return s.cpue != null ? s.cpue.toFixed(2) : ''
       case 'best_fish_species':  return s.bestFish?.species_name || ''
       case 'best_fish_weight_kg':return s.bestFish?.weight_kg || ''
       case 'line_class':         return s.lineClass ? `${s.lineClass}kg` : ''
@@ -54,16 +55,16 @@ export function downloadCSV(standings, competition, config) {
 // ── XLSX-compatible HTML download ─────────────────────────────────────────────
 export function downloadXLSX(standings, catches, competition, config, mode = 'multi_sheet', extra = {}) {
   const name = sanitiseName(competition.name)
-  const { participants = [], dailyRecords = [], teamStandings = [] } = extra
+  const { participants = [], dailyRecords = [], teamStandings = [], cpueData = null } = extra
 
   if (mode === 'single_sheet') {
-    const html = buildSingleSheetHTML(standings, catches, competition, config, participants, dailyRecords, teamStandings)
+    const html = buildSingleSheetHTML(standings, catches, competition, config, participants, dailyRecords, teamStandings, cpueData)
     triggerDownload(
       new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' }),
       `${name}_Results.xls`
     )
   } else {
-    const html = buildMultiSheetHTML(standings, catches, competition, config, participants, dailyRecords, teamStandings)
+    const html = buildMultiSheetHTML(standings, catches, competition, config, participants, dailyRecords, teamStandings, cpueData)
     triggerDownload(
       new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' }),
       `${name}_Full.xls`
@@ -72,7 +73,7 @@ export function downloadXLSX(standings, catches, competition, config, mode = 'mu
 }
 
 
-function buildSingleSheetHTML(standings, catches, competition, config, participants = [], dailyRecords = [], teamStandings = []) {
+function buildSingleSheetHTML(standings, catches, competition, config, participants = [], dailyRecords = [], teamStandings = [], cpueData = null) {
   const prizeRows = buildPrizeRows(standings, catches, config)
   const showWeight = config?.scoring?.method !== 'points'
   return `<html xmlns:o="urn:schemas-microsoft-com:office:office"
@@ -93,20 +94,20 @@ function buildSingleSheetHTML(standings, catches, competition, config, participa
 <p>${competition.venue || ''} · ${competition.start_date || ''}</p>
 <div class="section"><h3>Standings</h3>${standingsTable(standings, showWeight)}</div>
 ${teamStandings.length ? `<div class="section"><h3>Team Standings</h3>${teamStandingsTable(teamStandings)}</div>` : ''}
-${dailyRecords.length ? `<div class="section"><h3>Daily Results</h3>${dailyResultsTable(dailyRecords)}</div>` : ''}
+${dailyRecords.length ? `<div class="section"><h3>Daily Results</h3>${dailyResultsTable(dailyRecords, cpueData)}</div>` : ''}
 <div class="section"><h3>Species Summary</h3>${speciesSummaryTable(catches)}</div>
 <div class="section"><h3>All Catches</h3>${catchesTable(catches, participants, showWeight)}</div>
 ${prizeRows.length ? `<div class="section"><h3>Prize Categories</h3>${prizeTable(prizeRows)}</div>` : ''}
 </body></html>`
 }
 
-function buildMultiSheetHTML(standings, catches, competition, config, participants = [], dailyRecords = [], teamStandings = []) {
+function buildMultiSheetHTML(standings, catches, competition, config, participants = [], dailyRecords = [], teamStandings = [], cpueData = null) {
   const prizeRows = buildPrizeRows(standings, catches, config)
   const showWeight = config?.scoring?.method !== 'points'
   const sheets = [
     { name: 'Standings',      content: standingsTable(standings, showWeight) },
     ...(teamStandings.length ? [{ name: 'Team Standings', content: teamStandingsTable(teamStandings) }] : []),
-    ...(dailyRecords.length  ? [{ name: 'Daily Results',  content: dailyResultsTable(dailyRecords) }] : []),
+    ...(dailyRecords.length  ? [{ name: 'Daily Results',  content: dailyResultsTable(dailyRecords, cpueData) }] : []),
     { name: 'Species Summary', content: speciesSummaryTable(catches) },
     { name: 'All Catches',    content: catchesTable(catches, participants, showWeight) },
     ...(prizeRows.length ? [{ name: 'Prize Winners', content: prizeTable(prizeRows) }] : []),
@@ -134,7 +135,7 @@ function standingsTable(standings, showWeight) {
   const headers = [
     'Rank', 'Angler No.', 'Name', 'Team', 'Angler %', 'LC (kg)', 'Points',
     ...(showWeight ? ['Weight (kg)'] : []),
-    'Species', 'Catches', 'Best Fish',
+    'Species', 'Catches', 'CPUE (Fish/Hr)', 'Best Fish',
     ...(showWeight ? ['Best Fish (kg)'] : []),
   ]
   const rows = standings.map(s => [
@@ -144,6 +145,7 @@ function standingsTable(standings, showWeight) {
     (s.totalPoints || 0).toFixed(2),
     ...(showWeight ? [(s.totalWeightKg || 0).toFixed(3)] : []),
     s.speciesCount || 0, s.catchCount || 0,
+    s.cpue != null ? s.cpue.toFixed(2) : '',
     s.bestFish?.species_name || '',
     ...(showWeight ? [s.bestFish?.weight_kg || ''] : []),
   ])
@@ -186,15 +188,21 @@ function speciesSummaryTable(catches) {
   return htmlTable(headers, rows)
 }
 
-function dailyResultsTable(dailyRecords) {
+function dailyResultsTable(dailyRecords, cpueData) {
   const sorted = [...dailyRecords].sort((a, b) =>
     (a.dayNumber ?? 0) - (b.dayNumber ?? 0) || b.rawPoints - a.rawPoints
   )
-  const headers = ['Day', 'Angler', 'Team', 'Boat', 'Raw Points', 'Boat %']
-  const rows = sorted.map(d => [
-    d.dayNumber ?? '', d.displayName, d.teamName || '', d.boatName,
-    d.rawPoints.toFixed(2), `${d.percentage.toFixed(1)}%${d.percentage === 100 ? ' (top)' : ''}`,
-  ])
+  const headers = ['Day', 'Angler', 'Team', 'Boat', 'Raw Points', 'Boat %', 'CPUE (Fish/Hr)']
+  const rows = sorted.map(d => {
+    const anglerCpue = cpueData?.byAnglerDay.find(a =>
+      a.participantId === d.participantId && String(a.dayNumber) === String(d.dayNumber)
+    )
+    return [
+      d.dayNumber ?? '', d.displayName, d.teamName || '', d.boatName,
+      d.rawPoints.toFixed(2), `${d.percentage.toFixed(1)}%${d.percentage === 100 ? ' (top)' : ''}`,
+      anglerCpue?.cpue != null ? anglerCpue.cpue.toFixed(2) : '',
+    ]
+  })
   return htmlTable(headers, rows)
 }
 
