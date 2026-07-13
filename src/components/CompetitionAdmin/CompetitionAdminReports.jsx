@@ -276,7 +276,7 @@ export default function CompetitionAdminReports({
                         <td style={{ padding: '0.4rem 0.6rem', color: GREY }}>{d.teamName || '—'}</td>
                         <td style={{ padding: '0.4rem 0.6rem', color: GREY }}>{d.boatName}</td>
                         <td style={{ padding: '0.4rem 0.6rem', textAlign: 'right', color: GREY }}>{d.rawPoints.toFixed(2)}</td>
-                        <td style={{ padding: '0.4rem 0.6rem', textAlign: 'right', fontWeight: 700, color: d.percentage === 100 ? GREEN : NAVY }}>{d.percentage.toFixed(1)}%{d.percentage === 100 ? ' \ud83e\udd47' : ''}</td>
+                        <td style={{ padding: '0.4rem 0.6rem', textAlign: 'right', fontWeight: 700, color: d.percentage === 100 ? GREEN : NAVY }}>{d.percentage.toFixed(2)}%{d.percentage === 100 ? ' \ud83e\udd47' : ''}</td>
                         <td style={{ padding: '0.4rem 0.6rem', textAlign: 'right', color: GREY }}>{anglerCpue?.cpue != null ? anglerCpue.cpue.toFixed(2) : '—'}</td>
                       </tr>
                     )

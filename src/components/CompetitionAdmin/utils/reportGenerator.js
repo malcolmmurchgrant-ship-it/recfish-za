@@ -27,7 +27,7 @@ export function downloadCSV(standings, competition, config) {
       case 'display_name':       return s.displayName
       case 'team_name':          return s.teamName || ''
       case 'team_suffix':        return s.teamSuffix || ''
-      case 'angler_percentage':  return `${(s.anglerPercentage || 0).toFixed(1)}%`
+      case 'angler_percentage':  return `${(s.anglerPercentage || 0).toFixed(2)}%`
       case 'total_points':       return (s.totalPoints || 0).toFixed(2)
       case 'total_weight_kg':    return (s.totalWeightKg || 0).toFixed(3)
       case 'species_count':      return s.speciesCount || 0
@@ -142,7 +142,7 @@ function standingsTable(standings, showWeight) {
   ]
   const rows = standings.map(s => [
     s.rank, s.anglerNumber || '', s.displayName, s.teamName || '',
-    `${(s.anglerPercentage || 0).toFixed(1)}%`,
+    `${(s.anglerPercentage || 0).toFixed(2)}%`,
     s.lineClass || '',
     (s.totalPoints || 0).toFixed(2),
     ...(showWeight ? [(s.totalWeightKg || 0).toFixed(3)] : []),
@@ -228,7 +228,7 @@ function dailyResultsTable(dailyRecords, cpueData) {
     )
     return [
       d.dayNumber ?? '', d.displayName, d.teamName || '', d.boatName,
-      d.rawPoints.toFixed(2), `${d.percentage.toFixed(1)}%${d.percentage === 100 ? ' (top)' : ''}`,
+      d.rawPoints.toFixed(2), `${d.percentage.toFixed(2)}%${d.percentage === 100 ? ' (top)' : ''}`,
       anglerCpue?.cpue != null ? anglerCpue.cpue.toFixed(2) : '',
     ]
   })
@@ -238,8 +238,8 @@ function dailyResultsTable(dailyRecords, cpueData) {
 function teamStandingsTable(teamStandings) {
   const headers = ['Rank', 'Team', 'Total (Sum of Boat %)', 'Anglers']
   const rows = teamStandings.map(t => [
-    t.rank, t.teamName, `${t.totalPercentage.toFixed(1)}%`,
-    t.members.map(m => `${m.displayName} (${m.percentageSum.toFixed(1)}%)`).join('; '),
+    t.rank, t.teamName, `${t.totalPercentage.toFixed(2)}%`,
+    t.members.map(m => `${m.displayName} (${m.percentageSum.toFixed(2)}%)`).join('; '),
   ])
   return htmlTable(headers, rows)
 }
