@@ -194,10 +194,10 @@ export default function CompetitionAdminScoreboard({
                     <td style={{ padding: '0.5rem 0.75rem', color: GREY, fontSize: '0.82rem', textAlign: 'center' }}>
                       {lineClassKg ? `${lineClassKg}kg` : '—'}
                     </td>
-                    <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right', color: GREY }}>
+                    <td style={{ padding: '0.5rem 0.75rem', fontWeight: 700, color: NAVY, textAlign: 'right' }}>
                       {(s.anglerPercentage || 0).toFixed(1)}%
                     </td>
-                    <td style={{ padding: '0.5rem 0.75rem', fontWeight: 700, color: NAVY, textAlign: 'right' }}>
+                    <td style={{ padding: '0.5rem 0.75rem', color: GREY, textAlign: 'right' }}>
                       {s.totalPoints.toFixed(2)}
                     </td>
                     {showWeight && (
@@ -269,8 +269,8 @@ export default function CompetitionAdminScoreboard({
                     </td>
                     <td style={{ padding: '0.5rem 0.75rem', color: GREY, fontSize: '0.82rem', whiteSpace: 'nowrap' }}>{d.teamName || '—'}</td>
                     <td style={{ padding: '0.5rem 0.75rem', color: GREY, fontSize: '0.82rem', whiteSpace: 'nowrap' }}>{d.boatName}</td>
-                    <td style={{ padding: '0.5rem 0.75rem', fontWeight: 700, color: NAVY, textAlign: 'right' }}>{d.rawPoints.toFixed(2)}</td>
-                    <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right', color: d.percentage === 100 ? GREEN : GREY, fontWeight: d.percentage === 100 ? 700 : 400 }}>
+                    <td style={{ padding: '0.5rem 0.75rem', color: GREY, textAlign: 'right' }}>{d.rawPoints.toFixed(2)}</td>
+                    <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right', color: d.percentage === 100 ? GREEN : NAVY, fontWeight: 700 }}>
                       {d.percentage.toFixed(1)}%{d.percentage === 100 ? ' 🥇' : ''}
                     </td>
                     <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right', color: GREY }}>
