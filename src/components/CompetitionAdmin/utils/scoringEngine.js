@@ -199,21 +199,44 @@ export function aggregateTeamScores(catches, participants, teamConfig, scoringCo
 export function buildBoatPercentageTeamStandings(catches, participants, teams, days, boats) {
   const daily = buildDailyAnglerPercentages(catches, participants, days, boats)
 
+  // Total fish count + points per participant, for the competition — needed
+  // for the confirmed team tiebreak (fish count, then points), same
+  // participant_id/angler_id resolution used throughout.
+  const activeCatches = catches.filter(c => c.data_quality !== 'rejected')
+  const byUserId = {}, byPartId = {}
+  for (const p of participants) {
+    if (p.user_id) byUserId[p.user_id] = p.id
+    byPartId[p.id] = p.id
+  }
+  const fishAndPointsByParticipant = {}
+  for (const c of activeCatches) {
+    const pid = (c.angler_id && byUserId[c.angler_id]) || byPartId[c.participant_id]
+    if (!pid) continue
+    if (!fishAndPointsByParticipant[pid]) fishAndPointsByParticipant[pid] = { fishCount: 0, points: 0 }
+    fishAndPointsByParticipant[pid].fishCount += 1
+    fishAndPointsByParticipant[pid].points += c.data_quality === 'disqualified' ? 0 : parseFloat(c.points || 0)
+  }
+
   const byTeam = {}
   for (const p of participants) {
     if (!p.team_id) continue
     const entries = daily.filter(d => d.participantId === p.id)
     const percentageSum = entries.reduce((s, e) => s + e.percentage, 0)
+    const fp = fishAndPointsByParticipant[p.id] || { fishCount: 0, points: 0 }
     if (!byTeam[p.team_id]) {
       const team = teams?.find(t => t.id === p.team_id)
       byTeam[p.team_id] = {
         teamId:   p.team_id,
         teamName: team?.team_name || team?.province || 'Unknown',
         totalPercentage: 0,
+        totalFishCount: 0,
+        totalPoints: 0,
         members: [],
       }
     }
     byTeam[p.team_id].totalPercentage += percentageSum
+    byTeam[p.team_id].totalFishCount  += fp.fishCount
+    byTeam[p.team_id].totalPoints     += fp.points
     byTeam[p.team_id].members.push({
       participantId: p.id,
       displayName:   p.full_name,
@@ -222,12 +245,14 @@ export function buildBoatPercentageTeamStandings(catches, participants, teams, d
     })
   }
 
+  // Ranking rule (confirmed): total % first, tie broken by total fish count
+  // for the competition, tie broken again by total points scored for the
+  // competition.
   return Object.values(byTeam)
-    .sort((a, b) => b.totalPercentage - a.totalPercentage)
+    .sort((a, b) => b.totalPercentage - a.totalPercentage || b.totalFishCount - a.totalFishCount || b.totalPoints - a.totalPoints)
     .map((t, i) => ({ ...t, rank: i + 1 }))
 }
 
-// ── Individual standings ──────────────────────────────────────────────────────
 // ── Individual standings ──────────────────────────────────────────────────────
 // Ranked by Angler % first (sum of daily boat percentages, same figure used
 // for Team totals), raw points as the tiebreaker — confirmed methodology:
@@ -313,8 +338,12 @@ export function buildIndividualStandings(catches, participants, days, boats) {
     }
   }
 
+  // Ranking rule (confirmed): Angler % first, tie broken by total fish
+  // count, tie broken again by total points scored. catchCount already
+  // counts one per fish (including multi-fish "padding" rows, one row per
+  // fish caught), so it's already the right figure for "total fish count."
   return Object.values(byParticipant)
-    .sort((a, b) => b.anglerPercentage - a.anglerPercentage || b.totalPoints - a.totalPoints)
+    .sort((a, b) => b.anglerPercentage - a.anglerPercentage || b.catchCount - a.catchCount || b.totalPoints - a.totalPoints)
     .map((p, i) => ({ ...p, rank: i + 1 }))
 }
 
@@ -421,4 +450,102 @@ export function buildCpueData(catches, participants, days, boats, fishingSession
   }))
 
   return { byBoatDay, byAnglerDay, byAngler }
+}
+
+// ── Skipper / Boat ranking ───────────────────────────────────────────────
+// A distinct format from individual/team scoring: each day, every boat's
+// TOTAL points (every angler on that boat, summed) gets ranked 1st, 2nd,
+// 3rd... — then a boat's final score is the SUM of its daily positions
+// (grand prix style), lower is better, not the sum of raw points.
+//
+// Confirmed rules:
+//   - Tiebreak: lowest total position wins; ties broken by most fish
+//     caught for the competition; still tied, by total points scored.
+//   - Absent skipper: a boat with no catches recorded for a day it should
+//     have fished gets a position of (number of boats that DID fish that
+//     day) + 1 for that day, rather than being left unscored.
+//
+// One real limitation, flagged rather than silently assumed: "absence" is
+// inferred here purely from having zero catches recorded for a boat on a
+// day other boats fished. A boat that genuinely went out and caught
+// nothing at all that day (e.g. every catch DQ'd) would be
+// indistinguishable from a true no-show with catch data alone. If that
+// distinction ever matters, this would need to check the boat draw
+// (competition_boat_draws) instead — worth flagging to Malcolm/John if a
+// specific day's ranking looks wrong for this reason.
+export function buildSkipperRanking(catches, boats, days) {
+  const activeCatches = catches.filter(c => c.data_quality !== 'rejected')
+
+  const byBoatDay = {}      // "dayNumber|boatId" -> points
+  const fishCountByBoat = {} // boatId -> total fish count, whole competition
+  for (const c of activeCatches) {
+    if (!c.boat_id || !c.competition_day_id) continue
+    const day = days?.find(d => d.id === c.competition_day_id)
+    if (!day) continue
+    const pts = c.data_quality === 'disqualified' ? 0 : parseFloat(c.points || 0)
+    const key = `${day.day_number}|${c.boat_id}`
+    byBoatDay[key] = (byBoatDay[key] || 0) + pts
+    fishCountByBoat[c.boat_id] = (fishCountByBoat[c.boat_id] || 0) + 1
+  }
+
+  const dayNumbers = [...new Set((days || []).map(d => d.day_number))].sort((a, b) => a - b)
+  const boatIds = [...new Set((boats || []).map(b => b.id))]
+
+  // Rank boats within each day by that day's points (highest = position 1),
+  // then apply the absent-skipper penalty to any boat with no catch record
+  // that day, on days where at least one other boat did fish.
+  const positionByBoatDay = {} // "dayNumber|boatId" -> position
+  for (const dayNum of dayNumbers) {
+    const participatingBoatIds = boatIds.filter(id => byBoatDay[`${dayNum}|${id}`] != null)
+    const numParticipating = participatingBoatIds.length
+    if (numParticipating === 0) continue // nobody fished this day at all — nothing to rank
+
+    participatingBoatIds
+      .map(boatId => ({ boatId, points: byBoatDay[`${dayNum}|${boatId}`] }))
+      .sort((a, b) => b.points - a.points)
+      .forEach((e, i) => { positionByBoatDay[`${dayNum}|${e.boatId}`] = i + 1 })
+
+    for (const boatId of boatIds) {
+      if (!participatingBoatIds.includes(boatId)) {
+        positionByBoatDay[`${dayNum}|${boatId}`] = numParticipating + 1
+      }
+    }
+  }
+
+  const results = (boats || []).map(boat => {
+    const dailyPoints = {}
+    const dailyPosition = {}
+    let totalPoints = 0
+    let totalPosition = 0
+    let daysFished = 0
+    for (const dayNum of dayNumbers) {
+      const key = `${dayNum}|${boat.id}`
+      const pts = byBoatDay[key] ?? null
+      const pos = positionByBoatDay[key] ?? null
+      dailyPoints[dayNum] = pts
+      dailyPosition[dayNum] = pos
+      if (pts != null) { totalPoints += pts; daysFished += 1 }
+      if (pos != null) totalPosition += pos
+    }
+    return {
+      boatId: boat.id,
+      boatName: boat.boat_name,
+      skipperName: boat.skipper_name,
+      dailyPoints,
+      dailyPosition,
+      totalPoints,
+      totalFishCount: fishCountByBoat[boat.id] || 0,
+      totalPosition,
+      daysFished,
+    }
+  })
+
+  // Only boats that actually fished at least one real day appear in the
+  // ranking at all — a boat that never fished the whole tournament isn't a
+  // genuine competing entry, distinct from a boat that fished some days
+  // and was absent on others (which IS ranked, with the penalty above).
+  return results
+    .filter(r => r.daysFished > 0)
+    .sort((a, b) => a.totalPosition - b.totalPosition || b.totalFishCount - a.totalFishCount || b.totalPoints - a.totalPoints)
+    .map((r, i) => ({ ...r, rank: i + 1 }))
 }

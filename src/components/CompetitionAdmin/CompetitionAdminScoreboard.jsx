@@ -7,7 +7,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { buildIndividualStandings, aggregateTeamScores, buildBoatPercentageTeamStandings, buildDailyAnglerPercentages, buildCpueData } from './utils/scoringEngine'
+import { buildIndividualStandings, aggregateTeamScores, buildBoatPercentageTeamStandings, buildDailyAnglerPercentages, buildCpueData, buildSkipperRanking } from './utils/scoringEngine'
 
 const NAVY  = '#1e3a8a'
 const GREY  = '#6b7280'
@@ -99,6 +99,12 @@ export default function CompetitionAdminScoreboard({
     [activeCatches, participants, days, boats, fishingSessions]
   )
 
+  const skipperRanking = useMemo(() =>
+    buildSkipperRanking(activeCatches, boats, days),
+    [activeCatches, boats, days]
+  )
+  const dayNumbersForSkipper = [...new Set((days || []).map(d => d.day_number))].sort((a, b) => a - b)
+
   const categories = ['all', ...new Set(participants.map(p => p.category).filter(Boolean))]
   const isLocked   = !!competition?.results_published_at
   // Weight isn't tracked at all in unit-count/'points' competitions (species
@@ -121,6 +127,7 @@ export default function CompetitionAdminScoreboard({
               { id: 'individual', label: '👤 Individual' },
               { id: 'daily',      label: '📅 Daily' },
               { id: 'teams',      label: '🏆 Teams' },
+              { id: 'skipper',    label: '🚤 Boat/Skipper' },
             ].map(m => (
               <button key={m.id} onClick={() => setViewMode(m.id)}
                 style={S.btn(NAVY, 'white', viewMode === m.id)}>
@@ -322,6 +329,68 @@ export default function CompetitionAdminScoreboard({
           {teamStandings.length === 0 && (
             <div style={{ ...S.card, color: GREY, textAlign: 'center', fontStyle: 'italic' }}>No team data available.</div>
           )}
+        </div>
+      )}
+
+      {/* ── Skipper / Boat ranking ──────────────────────────────────────── */}
+      {viewMode === 'skipper' && (
+        <div style={S.card}>
+          <div style={{ fontSize: '0.78rem', color: GREY, marginBottom: '0.75rem' }}>
+            Each day, boats are ranked 1st, 2nd, 3rd... by that day's total points (every
+            angler on the boat, summed). A boat's final ranking is the <strong>sum of its
+            daily positions</strong> — lower is better, same as SADSAA's official Skipper
+            Ranking sheet — not the sum of points, which is shown for reference only. Ties
+            in total position are broken by higher total points.
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+              <thead>
+                <tr style={{ background: NAVY, color: 'white' }}>
+                  <th rowSpan={2} style={{ padding: '0.5rem 0.6rem', textAlign: 'center', fontSize: '0.72rem', textTransform: 'uppercase' }}>Rank</th>
+                  <th rowSpan={2} style={{ padding: '0.5rem 0.6rem', textAlign: 'left', fontSize: '0.72rem', textTransform: 'uppercase' }}>Skipper</th>
+                  <th rowSpan={2} style={{ padding: '0.5rem 0.6rem', textAlign: 'left', fontSize: '0.72rem', textTransform: 'uppercase' }}>Boat</th>
+                  <th colSpan={dayNumbersForSkipper.length + 1} style={{ padding: '0.4rem 0.6rem', textAlign: 'center', fontSize: '0.72rem', textTransform: 'uppercase', borderBottom: '1px solid rgba(255,255,255,0.3)' }}>Points</th>
+                  <th colSpan={dayNumbersForSkipper.length + 1} style={{ padding: '0.4rem 0.6rem', textAlign: 'center', fontSize: '0.72rem', textTransform: 'uppercase', borderBottom: '1px solid rgba(255,255,255,0.3)' }}>Position</th>
+                </tr>
+                <tr style={{ background: NAVY, color: 'white' }}>
+                  {dayNumbersForSkipper.map(d => (
+                    <th key={`pts-${d}`} style={{ padding: '0.4rem 0.5rem', textAlign: 'center', fontSize: '0.7rem' }}>Day {d}</th>
+                  ))}
+                  <th style={{ padding: '0.4rem 0.5rem', textAlign: 'center', fontSize: '0.7rem', color: '#fbbf24' }}>Total</th>
+                  {dayNumbersForSkipper.map(d => (
+                    <th key={`pos-${d}`} style={{ padding: '0.4rem 0.5rem', textAlign: 'center', fontSize: '0.7rem' }}>Day {d}</th>
+                  ))}
+                  <th style={{ padding: '0.4rem 0.5rem', textAlign: 'center', fontSize: '0.7rem', color: '#fbbf24' }}>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {skipperRanking.map((s, i) => (
+                  <tr key={s.boatId} style={{ background: i % 2 === 0 ? 'white' : '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                    <td style={{ padding: '0.5rem 0.6rem', textAlign: 'center', fontWeight: 700, color: RANK_COLORS[s.rank] || NAVY }}>
+                      {s.rank <= 3 ? ['🥇','🥈','🥉'][s.rank - 1] : s.rank}
+                    </td>
+                    <td style={{ padding: '0.5rem 0.6rem', fontWeight: 600, color: NAVY, whiteSpace: 'nowrap' }}>{s.skipperName}</td>
+                    <td style={{ padding: '0.5rem 0.6rem', color: GREY, whiteSpace: 'nowrap' }}>{s.boatName}</td>
+                    {dayNumbersForSkipper.map(d => (
+                      <td key={`pts-${d}`} style={{ padding: '0.5rem 0.5rem', textAlign: 'center', color: GREY }}>
+                        {s.dailyPoints[d] != null ? s.dailyPoints[d].toFixed(2) : '—'}
+                      </td>
+                    ))}
+                    <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', fontWeight: 700, color: NAVY }}>{s.totalPoints.toFixed(2)}</td>
+                    {dayNumbersForSkipper.map(d => (
+                      <td key={`pos-${d}`} style={{ padding: '0.5rem 0.5rem', textAlign: 'center', color: GREY }}>
+                        {s.dailyPosition[d] ?? '—'}
+                      </td>
+                    ))}
+                    <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', fontWeight: 700, color: RED }}>{s.totalPosition}</td>
+                  </tr>
+                ))}
+                {skipperRanking.length === 0 && (
+                  <tr><td colSpan={5 + dayNumbersForSkipper.length * 2} style={{ padding: '1.5rem', textAlign: 'center', color: GREY, fontStyle: 'italic' }}>No catches recorded yet.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
