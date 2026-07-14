@@ -474,6 +474,16 @@ export function buildCpueData(catches, participants, days, boats, fishingSession
 // (competition_boat_draws) instead — worth flagging to Malcolm/John if a
 // specific day's ranking looks wrong for this reason.
 export function buildSkipperRanking(catches, boats, days) {
+  // 'rejected' catches never count anywhere — they represent a data-entry
+  // mistake, not a real catch. 'disqualified' is different: the fish was
+  // genuinely caught, the angler incurred a rules penalty for something
+  // like an equipment infraction — confirmed with Malcolm/John that this
+  // does NOT reduce the skipper's daily total, unlike angler/team scoring
+  // (buildIndividualStandings/buildBoatPercentageTeamStandings), which
+  // correctly still zero a disqualified angler's own points. Verified
+  // against the official U16 Skipper Ranking sheet: Black Magic's Day 2
+  // total only matched once Marinus van der Merwe's disqualified 65 points
+  // were included rather than zeroed.
   const activeCatches = catches.filter(c => c.data_quality !== 'rejected')
 
   const byBoatDay = {}      // "dayNumber|boatId" -> points
@@ -482,7 +492,7 @@ export function buildSkipperRanking(catches, boats, days) {
     if (!c.boat_id || !c.competition_day_id) continue
     const day = days?.find(d => d.id === c.competition_day_id)
     if (!day) continue
-    const pts = c.data_quality === 'disqualified' ? 0 : parseFloat(c.points || 0)
+    const pts = parseFloat(c.points || 0)
     const key = `${day.day_number}|${c.boat_id}`
     byBoatDay[key] = (byBoatDay[key] || 0) + pts
     fishCountByBoat[c.boat_id] = (fishCountByBoat[c.boat_id] || 0) + 1
