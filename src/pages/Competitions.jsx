@@ -65,6 +65,18 @@ function getCompConfig(comp, canEnter) {
         { to: `/scoreboard/4a905558-8a94-4dc2-8305-bce37bfc1fe4`, label: '📊 Scoreboard', primary: true },
       ],
     },
+    '68d766ec-e0bc-4f31-8b0b-8bd06ed5d026': {  // Junior Bottomfish Nationals 2026 - U16
+      hideGenericAdmin: false,
+      links: [
+        { to: `/scoreboard/68d766ec-e0bc-4f31-8b0b-8bd06ed5d026`, label: '📊 Scoreboard', primary: true },
+      ],
+    },
+    '3ddb485c-22de-4f58-bd4f-fa0636feb293': {  // Junior Bottomfish Nationals 2026 - U19
+      hideGenericAdmin: false,
+      links: [
+        { to: `/scoreboard/3ddb485c-22de-4f58-bd4f-fa0636feb293`, label: '📊 Scoreboard', primary: true },
+      ],
+    },
     // ── 2024 historical imports — scoreboards coming soon ──────────────────
     '46b59df9-87ed-47aa-b853-3dc57e2bfc56': {  // EFSA Big Game 2024
       hideGenericAdmin: true,
@@ -135,6 +147,23 @@ function getCompConfig(comp, canEnter) {
   }
 
   if (specific[id]) return specific[id]
+
+  // Auto-detect: a competition that's been genuinely published (Reports
+  // tab → Publish Final Results) but was never manually added to the list
+  // above still gets a real Scoreboard link instead of defaulting to
+  // "Manage Competition" forever. This is what should have existed from
+  // the start — every entry above this point was a one-off manual fix for
+  // a competition someone remembered to add; this makes it automatic for
+  // everything going forward (East London and beyond) without needing
+  // another deploy each time a tournament wraps up.
+  if (comp.status === 'completed' || comp.results_published_at) {
+    return {
+      hideGenericAdmin: false,
+      links: [
+        { to: `/scoreboard/${id}`, label: '📊 Scoreboard', primary: true },
+      ],
+    }
+  }
 
   // Generic fallback
   return {
