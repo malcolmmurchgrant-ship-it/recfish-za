@@ -273,14 +273,20 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
     .sort((a, b) => b.points - a.points || b.fish - a.fish)
 
   // ── Skipper standings ─────────────────────────────────────────────────────
-  // competition_boats has no team_id column — the link runs the other way:
-  // competition_teams.boat_id -> competition_boats.id. So match catches to a
-  // boat via the team that boat belongs to.
+  // Match catches directly by their own boat_id — every catch always
+  // carries the correct boat_id regardless of competition format. The
+  // previous approach matched via competition_teams.boat_id, which assumes
+  // a FIXED team-to-boat relationship — true for 'full_boat' format
+  // competitions (Gamefish, Tuna: a team stays on one boat all event), but
+  // wrong for 'split_boat' format ones (e.g. Junior Bottomfish Nationals,
+  // where teams rotate across different boats each day per the daily boat
+  // draw). competition_teams.boat_id is never populated at all for
+  // split-boat competitions — there's no single fixed boat to assign a
+  // rotating team to — so every skipper's stats silently zeroed out for
+  // this entire competition type until this fix.
+  const isSplitBoat = teamConfig?.team_format === 'split_boat'
   const skipperStandings = boats.map(b => {
-    const team = teams.find(t => t.boat_id === b.id)
-    const tc   = team
-      ? filteredCatches.filter(c => c.team_id === team.id)
-      : []
+    const tc = filteredCatches.filter(c => c.boat_id === b.id)
     const pts  = useMultiplier
       ? calcMultipliedPoints(tc, scoringConfig, dateToDay)
       : tc.reduce((s, c) => s + calcPoints(c, scoringConfig), 0)
@@ -289,7 +295,12 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
       id: b.id,
       skipper: b.skipper_name || '',
       boat: b.boat_name || '',
-      team: team?.team_name || '',
+      // A boat's crew changes team by the day in split-boat formats, so
+      // there's no single accurate team name to show at the boat level —
+      // leave it blank there rather than showing an arbitrary/misleading
+      // one. Full-boat formats keep the original behavior (a team really
+      // is fixed to one boat all event, so this remains meaningful).
+      team: isSplitBoat ? '' : (teams.find(t => t.boat_id === b.id)?.team_name || ''),
       fish: tc.length,
       kg: Math.round(kg * 1000) / 1000,
       points: Math.round(pts * 100) / 100,
@@ -544,7 +555,7 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
                   <span style={{ fontWeight: 700, minWidth: 28 }}>{S.icon(pos)}</span>
                   <div style={{ flex: 1, minWidth: 160 }}>
                     <div style={{ fontWeight: 700 }}>{s.skipper || 'Unknown Skipper'}</div>
-                    <div style={{ fontSize: '0.78rem', color: GREY }}>🚤 {s.boat} · {s.team}</div>
+                    <div style={{ fontSize: '0.78rem', color: GREY }}>🚤 {s.boat}{s.team && ` · ${s.team}`}</div>
                   </div>
                   <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                     <StatPill label="Points"  val={s.points.toLocaleString('en-ZA', { minimumFractionDigits: 2 })} col={NAVY}  />
