@@ -8,6 +8,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
+import { buildIndividualStandings, buildBoatPercentageTeamStandings } from '../components/CompetitionAdmin/utils/scoringEngine'
 
 const NAVY  = '#1e3a8a'
 const GOLD  = '#d97706'
@@ -162,6 +163,21 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
   const discipline    = template?.discipline || ''
   const isPublished   = !!competition?.results_published_at
 
+  // Confirmed methodology (split-boat formats where boats rotate between
+  // teams/anglers day to day — e.g. WPDSAA Inshore League, Junior Bottomfish
+  // Nationals): ranking uses each angler's summed daily boat-relative
+  // percentage (buildIndividualStandings / buildBoatPercentageTeamStandings
+  // in scoringEngine.js — the SAME functions that already correctly power
+  // the Reports/XLS export), not raw points. Raw points alone can rank a
+  // strong-boat angler above a weaker-boat angler who actually outperformed
+  // their own boat's conditions that day. Moved up from the Skipper
+  // standings section below (2026-07-16) so Team/Angler standings use the
+  // identical, already-correct logic instead of a second, simpler, and
+  // wrong points-only sort — see the U19 Nationals medal-position bug this
+  // was fixing: Score-based official rank had Doman/Wasserman at #2/#3,
+  // while the old points-only sort here wrongly showed Mocke/Hewison.
+  const isSplitBoat = teamConfig?.team_format === 'split_boat'
+
   // ── Lookup maps ───────────────────────────────────────────────────────────
   const teamMap    = Object.fromEntries(teams.map(t => [t.id, t]))
   const anglerMap  = Object.fromEntries(participants.map(a => [a.user_id || a.id, a]))
@@ -209,6 +225,19 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
 
   // ── Team standings ────────────────────────────────────────────────────────
   const useMultiplier = !!scoringConfig?.species_multiplier
+
+  // Confirmed-correct boat-relative daily percentage per team, computed via
+  // the same scoringEngine function that already powers the Reports/XLS
+  // export. Only meaningful (and only computed) for split-boat formats —
+  // raw-points-based formats (e.g. Gamefish's species-multiplier scoring)
+  // are untouched by this and keep their existing behavior below.
+  const teamPercentageMap = isSplitBoat
+    ? Object.fromEntries(
+        buildBoatPercentageTeamStandings(filteredCatches, participants, teams, days, boats)
+          .map(t => [t.teamId, t.totalPercentage])
+      )
+    : {}
+
   const teamStandings = teams
     .filter(t => !t.is_disqualified)
     .map(t => {
@@ -229,13 +258,32 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
         fish: tc.length,
         kg: Math.round(kg * 1000) / 1000,
         points: Math.round(pts * 100) / 100,
+        // Angler %-sum equivalent for teams — the confirmed official
+        // ranking metric for split-boat competitions. Null (not shown) for
+        // non-split-boat formats, which rank on points as before.
+        percentage: isSplitBoat ? Math.round((teamPercentageMap[t.id] || 0) * 100) / 100 : null,
         kghr: totalHours > 0 ? Math.round(kg / totalHours * 100) / 100 : 0,
         fhr:  totalHours > 0 ? Math.round(tc.length / totalHours * 100) / 100 : 0,
       }
     })
-    .sort((a, b) => b.points - a.points || b.fish - a.fish)
+    .sort((a, b) => isSplitBoat
+      ? (b.percentage - a.percentage) || (b.fish - a.fish)
+      : (b.points - a.points) || (b.fish - a.fish)
+    )
 
   // ── Angler standings ──────────────────────────────────────────────────────
+  // Confirmed-correct boat-relative daily percentage per angler, computed
+  // via the same scoringEngine function that already powers the
+  // Reports/XLS export (buildIndividualStandings — see its own comments for
+  // the confirmed ranking rule: percentage first, fish count tiebreak,
+  // points tiebreak).
+  const anglerPercentageMap = isSplitBoat
+    ? Object.fromEntries(
+        buildIndividualStandings(filteredCatches, participants, days, boats)
+          .map(p => [p.participantId, p.anglerPercentage])
+      )
+    : {}
+
   const anglerStandings = participants
     .filter(p => p.status !== 'disqualified')
     .map(p => {
@@ -263,6 +311,10 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
         fish: ac.length,
         kg: Math.round(kg * 1000) / 1000,
         points: Math.round(pts * 100) / 100,
+        // Angler % — the confirmed official ranking metric for split-boat
+        // competitions. Null (not shown) for non-split-boat formats, which
+        // rank on points as before — unchanged from prior behavior.
+        percentage: isSplitBoat ? Math.round((anglerPercentageMap[p.id] || 0) * 100) / 100 : null,
         speciesCount: new Set(ac.map(c => c.species_name).filter(Boolean)).size,
         bestFish: [...ac].sort((a, b) => (parseFloat(b.weight_kg) || 0) - (parseFloat(a.weight_kg) || 0))[0],
         kghr: totalHours > 0 ? Math.round(kg / totalHours * 100) / 100 : 0,
@@ -270,7 +322,10 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
         byDay,
       }
     })
-    .sort((a, b) => b.points - a.points || b.fish - a.fish)
+    .sort((a, b) => isSplitBoat
+      ? (b.percentage - a.percentage) || (b.fish - a.fish)
+      : (b.points - a.points) || (b.fish - a.fish)
+    )
 
   // ── Skipper standings ─────────────────────────────────────────────────────
   // Match catches directly by their own boat_id — every catch always
@@ -284,7 +339,8 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
   // split-boat competitions — there's no single fixed boat to assign a
   // rotating team to — so every skipper's stats silently zeroed out for
   // this entire competition type until this fix.
-  const isSplitBoat = teamConfig?.team_format === 'split_boat'
+  // (isSplitBoat itself is now defined earlier, in Derived config, so Team
+  // and Angler standings above can use it too — not redeclared here.)
   const skipperStandings = boats.map(b => {
     const tc = filteredCatches.filter(c => c.boat_id === b.id)
     const pts  = useMultiplier
@@ -455,7 +511,8 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                    <StatPill label="Points" val={t.points.toLocaleString('en-ZA', { minimumFractionDigits: 2 })} col={NAVY} />
+                    {isSplitBoat && <StatPill label="Team %" val={`${t.percentage.toFixed(2)}%`} col={NAVY} />}
+                    <StatPill label="Points" val={t.points.toLocaleString('en-ZA', { minimumFractionDigits: 2 })} col={isSplitBoat ? GREY : NAVY} />
                     <StatPill label="Fish"   val={t.fish}   col={GREEN} />
                     <StatPill label="Kg"     val={t.kg.toFixed(2)} col={GOLD} />
                     {hasCpue && <StatPill label="kg/hr" val={t.kghr.toFixed(2)} col="#7c3aed" />}
@@ -501,7 +558,8 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                    <StatPill label="Points"  val={a.points.toLocaleString('en-ZA', { minimumFractionDigits: 2 })} col={NAVY}  />
+                    {isSplitBoat && <StatPill label="Angler %" val={`${a.percentage.toFixed(2)}%`} col={NAVY} />}
+                    <StatPill label="Points"  val={a.points.toLocaleString('en-ZA', { minimumFractionDigits: 2 })} col={isSplitBoat ? GREY : NAVY}  />
                     <StatPill label="Fish"    val={a.fish}              col={GREEN} />
                     <StatPill label="Kg"      val={a.kg.toFixed(2)}     col={GOLD}  />
                     <StatPill label="Species" val={a.speciesCount}       col={GREY}  />
