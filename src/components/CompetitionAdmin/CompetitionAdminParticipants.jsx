@@ -29,7 +29,14 @@ export default function CompetitionAdminParticipants({ competition, config, days
   const [search,       setSearch]         = useState('')
   const [dqModal,      setDqModal]        = useState(null)   // participant to DQ
   const [dqReason,     setDqReason]       = useState('')
-  const [dqDayScope,   setDqDayScope]     = useState('all')  // 'all' or a competition_day_id
+  // Defaults to '' (nothing selected) rather than 'all' deliberately — a
+  // whole-competition DQ is the more severe, harder-to-undo-cleanly outcome
+  // (it hides the angler from every standings view everywhere), so it
+  // should require a conscious choice, not win by being the dropdown's
+  // first/default option. See 2026-07 Marinus van der Merwe incident: a
+  // single-day leader-length DQ was applied competition-wide because 'all'
+  // was already selected when the reason was typed and Confirm was clicked.
+  const [dqDayScope,   setDqDayScope]     = useState('')  // '' | 'all' | a competition_day_id
   const [saving,       setSaving]         = useState(false)
   const [error,        setError]          = useState('')
 
@@ -287,7 +294,7 @@ export default function CompetitionAdminParticipants({ competition, config, days
                 {(isAdmin || isScorer) && (
                   <div style={{ display: 'flex', gap: '0.4rem' }}>
                     {!isDQ(p) ? (
-                      <button onClick={() => setDqModal(p)}
+                      <button onClick={() => { setDqModal(p); setDqDayScope(days?.length > 0 ? '' : 'all') }}
                         style={{ ...S.btn(RED), padding: '0.3rem 0.7rem', fontSize: '0.78rem' }}>
                         🚫 DQ
                       </button>
@@ -348,15 +355,18 @@ export default function CompetitionAdminParticipants({ competition, config, days
             <div style={{ color: NAVY, fontWeight: 600, marginBottom: '0.75rem' }}>{dqModal.full_name}</div>
             {days?.length > 0 && (
               <>
-                <label style={S.label}>Scope</label>
+                <label style={S.label}>Scope *</label>
                 <select style={{ ...S.select, marginBottom: '0.75rem' }} value={dqDayScope} onChange={e => setDqDayScope(e.target.value)}>
+                  <option value="" disabled>Select scope…</option>
                   <option value="all">Whole competition (marks angler as DQ'd everywhere)</option>
                   {days.map(d => <option key={d.id} value={d.id}>Day {d.day_number} only — {d.date}</option>)}
                 </select>
               </>
             )}
             <div style={{ fontSize: '0.82rem', color: GREY, marginBottom: '0.75rem' }}>
-              {dqDayScope === 'all'
+              {dqDayScope === ''
+                ? 'Choose a scope above — whole-competition DQs hide the angler from every standings view; a single-day DQ only zeroes that day\u2019s points.'
+                : dqDayScope === 'all'
                 ? 'All catches will be retained but scored as 0 points, and the angler will show as disqualified. This action can be reversed by an admin.'
                 : 'Only catches on the selected day will be zeroed — other days are untouched, and the angler will not show as disqualified overall. This action can be reversed by an admin.'}
             </div>
@@ -366,11 +376,11 @@ export default function CompetitionAdminParticipants({ competition, config, days
               value={dqReason} onChange={e => setDqReason(e.target.value)} />
             {error && <div style={{ color: RED, fontSize: '0.85rem', marginBottom: '0.5rem' }}>{error}</div>}
             <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button onClick={handleDQ} disabled={saving || !dqReason.trim()}
-                style={{ ...S.btn(RED), opacity: !dqReason.trim() ? 0.5 : 1 }}>
+              <button onClick={handleDQ} disabled={saving || !dqReason.trim() || !dqDayScope}
+                style={{ ...S.btn(RED), opacity: (!dqReason.trim() || !dqDayScope) ? 0.5 : 1 }}>
                 {saving ? 'Processing…' : '🚫 Confirm DQ'}
               </button>
-              <button onClick={() => { setDqModal(null); setDqReason(''); setDqDayScope('all'); setError('') }} style={S.btn(GREY)}>
+              <button onClick={() => { setDqModal(null); setDqReason(''); setDqDayScope(''); setError('') }} style={S.btn(GREY)}>
                 Cancel
               </button>
             </div>
