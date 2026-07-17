@@ -216,8 +216,47 @@ export default function MyCatches() {
     loadSocialCatches()
   }
 
-  // ── CSV download (social) ──────────────────────────────────────────────────
-  const downloadCSV = () => {
+  // ── Shared XLS export helper ──────────────────────────────────────────────
+  // Excel-compatible HTML table, same technique already used in
+  // CompetitionAdmin/utils/reportGenerator.js — so both parts of the app
+  // produce spreadsheet files the same, already-proven way, and Excel opens
+  // this natively despite it being HTML under the hood. Replaces the old
+  // plain-CSV export: most anglers open these in Excel/phone spreadsheet
+  // apps directly and aren't familiar with raw .csv files or how to import
+  // one properly (delimiters, encoding), so a file that already looks like
+  // a formatted spreadsheet the moment it opens removes that whole class of
+  // confusion.
+  const downloadXLSTable = (title, headers, rows, filename) => {
+    const ths = headers.map(h => `<th>${h}</th>`).join('')
+    const trs = rows.map(row =>
+      `<tr>${row.map(cell => `<td>${String(cell ?? '').replace(/</g, '&lt;')}</td>`).join('')}</tr>`
+    ).join('')
+    const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office"
+    xmlns:x="urn:schemas-microsoft-com:office:excel"
+    xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="UTF-8">
+<style>
+  body { font-family: Arial, sans-serif; font-size: 11pt; }
+  h2 { color: #1e3a8a; }
+  table { border-collapse: collapse; width: 100%; }
+  th { background: #1e3a8a; color: white; padding: 6px 10px; text-align: left; font-size: 10pt; }
+  td { padding: 5px 10px; border-bottom: 1px solid #e5e7eb; font-size: 10pt; }
+  tr:nth-child(even) td { background: #f8fafc; }
+</style></head><body>
+<h2>${title}</h2>
+<table><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table>
+</body></html>`
+    const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  // ── XLS download (social) ─────────────────────────────────────────────────
+  const downloadSocialXLS = () => {
     const headers = ['Date', 'Species', 'Scientific Name', 'Weight (kg)', 'Length (cm)', 'Released', 'Data Quality', 'Notes']
     const rows = socialCatches.map(c => [
       new Date(c.caught_at).toLocaleDateString('en-ZA'),
@@ -229,15 +268,27 @@ export default function MyCatches() {
       QUALITY[c.data_quality || getQualityTier(c)]?.label || 'Personal Log',
       c.notes || ''
     ])
-    const csv = [headers, ...rows]
-      .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `RecFishZA_MyCatches_${new Date().toISOString().slice(0, 10)}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+    downloadXLSTable('My Catches — RecFish ZA', headers, rows,
+      `RecFishZA_MyCatches_${new Date().toISOString().slice(0, 10)}.xls`)
+  }
+
+  // ── XLS download (competition) ────────────────────────────────────────────
+  const downloadCompetitionXLS = () => {
+    const headers = ['Competition', 'Venue', 'Day', 'Date', 'Species', 'Weight (kg)', 'Length (cm)', 'Line Class (kg)', 'Points', 'Status']
+    const rows = competitionCatches.map(c => [
+      c.competition?.name || 'Unknown Competition',
+      c.competition?.venue || '',
+      c.day?.day_number || '',
+      c.fishing_date ? new Date(c.fishing_date).toLocaleDateString('en-ZA') : '',
+      c.species_name || '',
+      c.weight_kg || '',
+      c.length_cm || '',
+      c.line_class_kg || '',
+      c.points || 0,
+      c.retained ? 'Retained' : 'Released'
+    ])
+    downloadXLSTable('Competition History — RecFish ZA', headers, rows,
+      `RecFishZA_CompetitionHistory_${new Date().toISOString().slice(0, 10)}.xls`)
   }
 
   // ── PDF download (social) ──────────────────────────────────────────────────
@@ -298,6 +349,86 @@ export default function MyCatches() {
     w.document.close()
   }
 
+  // ── PDF download (competition) ────────────────────────────────────────────
+  // Grouped by competition, same layout style as the on-screen Competition
+  // History view. Built to directly support Section 15 (Full Details of
+  // Outstanding Personal Catches) of the SADSAA/WPDSAA Nomination Form —
+  // every row here is TD-verified, which is exactly the standard that
+  // section calls for.
+  //
+  // Deliberately NOT included: Team Position/# Teams or Individual
+  // Position/# Anglers (Nomination Form Sections 13, 17 & 19). Those are
+  // competition-day standings/rankings, not properties of an individual
+  // catch — competition_catches has no such column, and computing it here
+  // would mean silently guessing rather than citing the officially
+  // published result. The notice below tells the angler to confirm those
+  // from official results instead, matching the Nomination Form's own
+  // guidance ("Tournament Results available from your Provincial
+  // Secretary"). If this is worth building properly (i.e. querying each
+  // competition's actual standings via scoringEngine.js's
+  // buildIndividualStandings and stamping the angler's rank/field-size onto
+  // each competition group here), that's a distinct, larger piece of work —
+  // flagged for Malcolm rather than approximated.
+  const downloadCompetitionPDF = () => {
+    const grouped = {}
+    competitionCatches.forEach(c => {
+      const compName = c.competition?.name || 'Unknown Competition'
+      if (!grouped[compName]) grouped[compName] = { meta: c.competition, catches: [] }
+      grouped[compName].catches.push(c)
+    })
+
+    const sections = Object.entries(grouped).map(([compName, group]) => {
+      const rows = group.catches.map((c, i) => `
+      <tr style="background:${i % 2 === 0 ? '#f8fafc' : '#ffffff'}">
+        <td>${c.day?.day_number ? `Day ${c.day.day_number} — ` : ''}${c.fishing_date ? new Date(c.fishing_date).toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric' }) : ''}</td>
+        <td><strong>${c.species_name || 'Unknown'}</strong></td>
+        <td>${c.weight_kg ? c.weight_kg + ' kg' : '—'}</td>
+        <td>${c.length_cm ? c.length_cm + ' cm' : '—'}</td>
+        <td>${c.line_class_kg ? c.line_class_kg + ' kg' : '—'}</td>
+        <td>${c.points > 0 ? c.points : '—'}</td>
+        <td>${c.retained ? 'Retained' : 'Released'}</td>
+      </tr>`).join('')
+      return `
+      <h2>${compName}</h2>
+      <div class="subtitle">${group.meta?.venue || ''}${group.meta?.start_date ? ' · ' + new Date(group.meta.start_date).toLocaleDateString('en-ZA', { year: 'numeric', month: 'long' }) : ''}</div>
+      <table>
+        <thead><tr><th>Day / Date</th><th>Species</th><th>Weight</th><th>Length</th><th>Line Class</th><th>Points</th><th>Status</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`
+    }).join('<div style="page-break-after: always;"></div>')
+
+    const html = `<!DOCTYPE html><html><head><title>Competition History — RecFish ZA</title>
+    <style>
+      body { font-family: Arial, sans-serif; font-size: 13px; color: #1f2937; margin: 24px; }
+      h1 { color: #1e3a8a; font-size: 22px; margin-bottom: 4px; }
+      h2 { color: #1e3a8a; font-size: 16px; margin-top: 20px; margin-bottom: 2px; }
+      .subtitle { color: #6b7280; font-size: 13px; margin-bottom: 12px; }
+      .notice { background: #fef3c7; border: 1px solid #fcd34d; border-radius: 6px; padding: 10px 14px; font-size: 11.5px; color: #78350f; margin-bottom: 18px; }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+      th { background: #1e3a8a; color: white; padding: 8px 10px; text-align: left; font-size: 12px; }
+      td { padding: 6px 10px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+      .footer { margin-top: 20px; color: #9ca3af; font-size: 11px; text-align: center; }
+      @media print { body { margin: 12px; } }
+    </style></head><body>
+    <h1>Competition History — RecFish ZA</h1>
+    <div class="subtitle">${stats.competitions} competition${stats.competitions !== 1 ? 's' : ''} · TD-verified catches · Generated ${new Date().toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+    <div class="notice">
+      🥇 <strong>TD-Verified Data.</strong> Every catch below was officially recorded and signed off by a
+      Tournament Director — suitable for Section 15 (Outstanding Personal Catches) of the SADSAA/WPDSAA
+      Nomination Form. Team and Individual finishing positions (Sections 13, 17 &amp; 19) are <strong>not</strong>
+      included here — confirm those against each competition's official published results before submitting a
+      nomination.
+    </div>
+    ${sections}
+    <div class="footer">RecFish ZA • recfish-za.netlify.app</div>
+    <script>window.onload = () => window.print()</script>
+    </body></html>`
+
+    const w = window.open('', '_blank')
+    w.document.write(html)
+    w.document.close()
+  }
+
   // ── Styles ─────────────────────────────────────────────────────────────────
   const TAB_BASE = {
     padding: '0.6rem 1.25rem',
@@ -325,10 +456,20 @@ export default function MyCatches() {
         </div>
         {activeTab === 'social' && socialCatches.length > 0 && (
           <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button onClick={downloadCSV} style={{ padding: '0.5rem 1rem', background: '#166534', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' }}>
-              ⬇ CSV
+            <button onClick={downloadSocialXLS} style={{ padding: '0.5rem 1rem', background: '#166534', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' }}>
+              ⬇ XLS
             </button>
             <button onClick={downloadPDF} style={{ padding: '0.5rem 1rem', background: '#1e3a8a', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' }}>
+              ⬇ PDF
+            </button>
+          </div>
+        )}
+        {activeTab === 'competition' && competitionCatches.length > 0 && (
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button onClick={downloadCompetitionXLS} style={{ padding: '0.5rem 1rem', background: '#166534', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' }}>
+              ⬇ XLS
+            </button>
+            <button onClick={downloadCompetitionPDF} style={{ padding: '0.5rem 1rem', background: '#1e3a8a', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' }}>
               ⬇ PDF
             </button>
           </div>
