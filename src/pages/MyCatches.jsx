@@ -122,7 +122,14 @@ export default function MyCatches() {
 
     if (!profile?.full_name) return
 
-    // Find participant records with matching name not yet claimed by this user
+    // Find participant records with matching name not yet claimed by this
+    // user. IMPORTANT: a plain .neq('user_id', user.id) silently drops every
+    // genuinely-unclaimed row too — in SQL, NULL != anything evaluates to
+    // unknown, not true, so rows with user_id IS NULL (exactly the unclaimed
+    // records this is meant to surface, e.g. historical spreadsheet imports
+    // where no one has ever linked an account) never match a plain .neq()
+    // and were silently excluded. .or() below explicitly includes both
+    // "unclaimed" (IS NULL) and "claimed by someone else" (!= me).
     const { data: matches } = await supabase
       .from('competition_participants')
       .select(`
@@ -130,17 +137,28 @@ export default function MyCatches() {
         competition:competition_id ( id, name, venue, start_date )
       `)
       .ilike('full_name', profile.full_name.trim())
-      .neq('user_id', user.id)
+      .or(`user_id.is.null,user_id.neq.${user.id}`)
 
     if (!matches || matches.length === 0) return
 
-    // For each match get the catch count
+    // For each match get the catch count. Same fix as
+    // CompetitionAdminScoring.jsx / CompetitionAdminParticipants.jsx earlier
+    // today: matching on angler_id alone returns zero rows for any
+    // unregistered/historically-imported angler, since angler_id is only
+    // populated once someone has actually claimed the record — exactly the
+    // case we're trying to detect here. participant_id always lines up with
+    // competition_participants.id regardless of registration status, so use
+    // that as the primary key and only fall back to angler_id if it's
+    // actually set (covers competitions scored live, where angler_id may be
+    // the reliable link instead).
     const withCounts = await Promise.all(matches.map(async (m) => {
-      const { count } = await supabase
+      const query = supabase
         .from('competition_catches')
         .select('id', { count: 'exact', head: true })
-        .eq('angler_id', m.user_id)
         .eq('competition_id', m.competition.id)
+      const { count } = m.user_id
+        ? await query.eq('angler_id', m.user_id)
+        : await query.eq('participant_id', m.id)
       return { ...m, catch_count: count || 0 }
     }))
 
@@ -157,12 +175,18 @@ export default function MyCatches() {
     setClaimMessage('')
 
     try {
-      // 1. Update competition_catches: swap old placeholder UUID for real auth.uid()
-      const { error: catchError } = await supabase
+      // 1. Update competition_catches: swap old placeholder UUID for real
+      // auth.uid(). Same participant_id/angler_id fallback as above — for
+      // historically-imported catches, angler_id is null and matching on it
+      // here would silently update zero rows while still reporting success
+      // below, leaving every catch permanently orphaned from the claim.
+      const catchQuery = supabase
         .from('competition_catches')
         .update({ angler_id: user.id })
-        .eq('angler_id', participant.user_id)
         .eq('competition_id', participant.competition.id)
+      const { error: catchError } = participant.user_id
+        ? await catchQuery.eq('angler_id', participant.user_id)
+        : await catchQuery.eq('participant_id', participant.id)
 
       if (catchError) throw catchError
 
