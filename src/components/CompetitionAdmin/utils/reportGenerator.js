@@ -4,6 +4,20 @@
 // PDF generation is handled server-side via Supabase Edge Function.
 
 import { groupCatchesBySpecies } from './scoringEngine'
+// Static import, matching every other file in the codebase. This used to be
+// a dynamic import() inside downloadPDF only -- Vite's own build warning
+// flagged that as the reason it couldn't split supabase.js into its own
+// chunk (a module can't be both statically and dynamically imported and
+// still get code-split), which forced the ENTIRE app into one single
+// ~1.35MB bundle. That made the whole app's module evaluation order
+// fragile to any new import edge added anywhere in the graph -- which is
+// what actually broke production on 2026-07-20 (a "can't access lexical
+// declaration before initialization" TDZ error on every page, not just
+// Reports) when disqualificationActions.js was added as a new shared
+// dependency elsewhere. The dynamic import here was never actually
+// achieving anything, since supabase.js was already needed eagerly by ~30
+// other files regardless.
+import { supabase } from '../../../lib/supabase'
 
 // ── CSV download ──────────────────────────────────────────────────────────────
 export function downloadCSV(standings, competition, config) {
@@ -284,7 +298,6 @@ function htmlTable(headers, rows) {
 
 export async function downloadPDF(competitionId, reportType = 'full_results') {
   try {
-    const { supabase } = await import('../../../lib/supabase')
     const { data, error } = await supabase.functions.invoke(
       'generate-competition-pdf',
       { body: { competition_id: competitionId, report_type: reportType } }
