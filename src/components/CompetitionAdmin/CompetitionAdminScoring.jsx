@@ -53,6 +53,17 @@ export default function CompetitionAdminScoring({
   const [dqDayReason, setDqDayReason] = useState('')
   const [dqDaySaving, setDqDaySaving] = useState(false)
 
+  // Moved up from much further down the file (2026-07-20) -- it used to be
+  // declared right before the JSX return, but canBulkDqDay (below) started
+  // referencing it before that line ever ran. A const referenced before its
+  // own declaration line executes throws a real, uncatchable
+  // ReferenceError at runtime (the "temporal dead zone") -- valid syntax,
+  // so it doesn't show up in any build or lint check, only when the
+  // component actually renders. That's exactly what broke production:
+  // white screen on every page, since App.jsx statically imports this file
+  // regardless of which tab is active.
+  const isLocked = !!competition?.results_published_at
+
   // CPUE ("Fish Per Hour") needs Lines In/Up hours from
   // competition_fishing_sessions — not previously fetched on this tab.
   const [fishingSessions, setFishingSessions] = useState([])
@@ -202,8 +213,6 @@ export default function CompetitionAdminScoring({
   // Whole competition, every angler, every day, every boat — the overall
   // species tally for the event so far.
   const competitionSpeciesGroups = groupCatchesBySpecies(catches.filter(c => c.data_quality !== 'rejected'))
-
-  const isLocked = !!competition?.results_published_at
 
   return (
     <div>
