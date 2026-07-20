@@ -5,6 +5,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { calculateCatchPoints, groupCatchesBySpecies, buildCpueData } from './utils/scoringEngine'
+import { disqualifyParticipant } from './utils/disqualificationActions'
 
 const NAVY  = '#1e3a8a'
 const GREY  = '#6b7280'
@@ -42,6 +43,15 @@ export default function CompetitionAdminScoring({
   const [expandedGroups, setExpandedGroups] = useState({}) // species key -> bool, per-group raw-row reveal
   const [showBoatSummary, setShowBoatSummary] = useState(false)
   const [showCompSummary, setShowCompSummary] = useState(false)
+  // Bulk "disqualify this angler's day" — right here in Scoring, where a
+  // data capturer actually has the day+angler already in view while
+  // tabulating results, instead of needing to go find them in the
+  // Participants tab. See disqualificationActions.js for why this shares
+  // one implementation with Participants' DQ button rather than being a
+  // fourth copy of the same logic.
+  const [dqDayModal, setDqDayModal] = useState(false)
+  const [dqDayReason, setDqDayReason] = useState('')
+  const [dqDaySaving, setDqDaySaving] = useState(false)
 
   // CPUE ("Fish Per Hour") needs Lines In/Up hours from
   // competition_fishing_sessions — not previously fetched on this tab.
@@ -91,6 +101,35 @@ export default function CompetitionAdminScoring({
     if (anglerFilter !== 'all' && c.participant_id !== anglerFilter && c.angler_id !== anglerFilter) return false
     return true
   })
+
+  // ── Bulk DQ: the angler + day currently selected in the filters above ────
+  // dayFilter is a day_number (matches the <select> options), but
+  // competition_catches.competition_day_id is a UUID FK — resolve it here
+  // rather than passing the wrong kind of value through.
+  const selectedDay = dayFilter !== 'all' ? days.find(d => String(d.day_number) === String(dayFilter)) : null
+  const selectedAngler = anglerFilter !== 'all' ? participants.find(p => p.id === anglerFilter) : null
+  const canBulkDqDay = (isAdmin || isScorer) && !isLocked && selectedDay && selectedAngler
+
+  async function handleDqDay() {
+    if (!dqDayReason.trim()) return
+    setDqDaySaving(true)
+    try {
+      await disqualifyParticipant({
+        participantId: selectedAngler.id,
+        competitionId: competition.id,
+        reason: dqDayReason,
+        competitionDayId: selectedDay.id,
+      })
+    } catch (err) {
+      setError(err.message)
+      setDqDaySaving(false)
+      return
+    }
+    setDqDaySaving(false)
+    setDqDayModal(false)
+    setDqDayReason('')
+    onCatchUpdate()
+  }
 
   const totalFish   = filtered.filter(c => c.data_quality !== 'rejected').length
   const totalPoints = filtered.reduce((s, c) =>
@@ -235,7 +274,48 @@ export default function CompetitionAdminScoring({
             ))}
           </select>
         </div>
+        {canBulkDqDay && (
+          <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+            <button onClick={() => setDqDayModal(true)}
+              style={{ ...S.btn(RED), padding: '0.6rem 0.9rem', fontSize: '0.85rem' }}>
+              🚫 Disqualify {selectedAngler.full_name} — Day {selectedDay.day_number}
+            </button>
+          </div>
+        )}
       </div>
+
+      {dqDayModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 1000, overflowY: 'auto', padding: '1rem' }}>
+          <div style={{ background: 'white', borderRadius: 10, padding: '1.5rem', maxWidth: 480, width: '100%', marginTop: '4rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+              <div style={{ fontWeight: 700, color: NAVY }}>
+                Disqualify {selectedAngler?.full_name} — Day {selectedDay?.day_number}
+              </div>
+              <button onClick={() => { setDqDayModal(false); setDqDayReason('') }}
+                style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: GREY }}>✕</button>
+            </div>
+            <div style={{ fontSize: '0.82rem', color: GREY, marginBottom: '0.75rem' }}>
+              Only this day's catches will be zeroed — {selectedAngler?.full_name}'s other days and their
+              standing overall are untouched, and they will not show as disqualified anywhere else.
+              To disqualify the whole competition instead, use the Participants tab.
+            </div>
+            <label style={S.label}>Reason for disqualification *</label>
+            <textarea style={{ ...S.input, minHeight: 80, marginBottom: '0.75rem', resize: 'vertical' }}
+              placeholder="Enter DQ reason…"
+              value={dqDayReason} onChange={e => setDqDayReason(e.target.value)} />
+            {error && <div style={{ color: RED, fontSize: '0.85rem', marginBottom: '0.5rem' }}>{error}</div>}
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button onClick={handleDqDay} disabled={dqDaySaving || !dqDayReason.trim()}
+                style={{ ...S.btn(RED), opacity: !dqDayReason.trim() ? 0.5 : 1 }}>
+                {dqDaySaving ? 'Processing…' : '🚫 Confirm DQ'}
+              </button>
+              <button onClick={() => { setDqDayModal(false); setDqDayReason('') }} style={S.btn(GREY)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Species summary (points-method competitions) ─────────────────── */}
       {scoringMethod === 'points' ? (

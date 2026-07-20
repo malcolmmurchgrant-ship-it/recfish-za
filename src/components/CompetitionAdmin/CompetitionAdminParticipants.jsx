@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import { disqualifyParticipant, reinstateParticipant } from './utils/disqualificationActions'
 
 const NAVY = '#1e3a8a'
 const GREY = '#6b7280'
@@ -92,66 +93,37 @@ export default function CompetitionAdminParticipants({ competition, config, days
   }
 
   // ── DQ angler ─────────────────────────────────────────────────────────────
+  // Delegates to disqualificationActions.js -- see that file for why (three
+  // independent copies of this logic used to exist and drift apart).
   async function handleDQ() {
     if (!dqReason.trim()) { setError('Please enter a DQ reason'); return }
     setSaving(true); setError('')
-
-    // Only mark the participant record itself 'disqualified' for a
-    // whole-competition DQ — a single-day DQ shouldn't make the angler
-    // show as disqualified everywhere, just zero that one day's points.
-    if (dqDayScope === 'all') {
-      const { error: err } = await supabase
-        .from('competition_participants')
-        .update({ status: 'disqualified', notes: dqReason.trim() })
-        .eq('id', dqModal.id)
-      if (err) { setError(err.message); setSaving(false); return }
+    try {
+      await disqualifyParticipant({
+        participantId: dqModal.id,
+        competitionId: competition.id,
+        reason: dqReason,
+        competitionDayId: dqDayScope === 'all' ? null : dqDayScope,
+      })
+    } catch (err) {
+      setError(err.message); setSaving(false); return
     }
-
-    // Zero the actual catches. Previously this only matched angler_id,
-    // which lines up with a REGISTERED angler's user_id — but dqModal.id is
-    // a competition_participants.id, not a user_id, so this matched zero
-    // rows for any unregistered angler (the common case for junior
-    // anglers, e.g. exactly what happened with a Day 2 DQ that silently
-    // never zeroed the points). participant_id always lines up with
-    // competition_participants.id regardless of registration status.
-    let query = supabase
-      .from('competition_catches')
-      .update({ data_quality: 'disqualified', scoring: false, notes: dqReason.trim() })
-      .eq('competition_id', competition.id)
-
-    query = dqModal.user_id
-      ? query.eq('angler_id', dqModal.user_id)
-      : query.eq('participant_id', dqModal.id)
-
-    if (dqDayScope !== 'all') {
-      query = query.eq('competition_day_id', dqDayScope)
-    }
-
-    const { error: catchErr } = await query
-    if (catchErr) { setError(catchErr.message); setSaving(false); return }
-
     setSaving(false)
     setDqModal(null)
     setDqReason('')
-    setDqDayScope('all')
+    setDqDayScope('')
     load()
   }
 
   // ── Reinstate DQ'd angler ─────────────────────────────────────────────────
   async function handleReinstate(participant) {
-    await supabase
-      .from('competition_participants')
-      .update({ status: 'registered', notes: null })
-      .eq('id', participant.id)
-    // Same participant_id/angler_id fix as handleDQ above.
-    let query = supabase
-      .from('competition_catches')
-      .update({ data_quality: 'unverified', scoring: true })
-      .eq('competition_id', competition.id)
-    query = participant.user_id
-      ? query.eq('angler_id', participant.user_id)
-      : query.eq('participant_id', participant.id)
-    await query
+    setError('')
+    try {
+      await reinstateParticipant({ participantId: participant.id, competitionId: competition.id })
+    } catch (err) {
+      setError(err.message)
+      return
+    }
     load()
   }
 
