@@ -149,15 +149,28 @@ export function scoreDraftFish(fish, speciesCfg, scoringConfig, multiplier = 1) 
     const pointsPerFish = speciesCfg.points_per_fish ?? scoringConfig?.points_per_fish ?? 3
     const speciesBonus  = speciesCfg.species_bonus   ?? scoringConfig?.species_bonus_points ?? 3
     const overLineBonus = speciesCfg.over_line_bonus ?? scoringConfig?.over_line_bonus ?? 0
+    // Weight-formula species (currently just Red Steenbras): the over-line
+    // bonus is the fish's converted weight in whole kilograms, computed
+    // from each entered fork length via estimateWeightFromLength — not a
+    // flat per-fish value. UniversalCatchLogger computes this asynchronously
+    // (weight lookups need a Supabase round trip) and attaches the already-
+    // resolved total as fish.overLineBonusPoints before scoring; this
+    // function stays synchronous and just uses whatever total it's given.
+    const isWeightFormulaBonus = speciesCfg.over_line_bonus_type === 'weight_formula'
+    const overLineBonusPoints = isWeightFormulaBonus ? (fish.overLineBonusPoints ?? 0) : null
     const pts = calcPointsScoring({
       fishCount,
       pointsPerFish,
       speciesBonus,
       overLineCount,
       overLineBonus,
+      overLineBonusPoints,
       isFirstFish: !!fish.isFirstOfSpecies,
     })
-    return { points: pts, method, detail: `${fishCount} fish × ${pointsPerFish}pts${fish.isFirstOfSpecies ? ` + ${speciesBonus} species bonus` : ''}${overLineCount > 0 ? ` + ${overLineCount}× over-line bonus` : ''}` }
+    const overLineDetail = isWeightFormulaBonus
+      ? (overLineCount > 0 ? ` + ${overLineBonusPoints} weight-formula OL bonus` : '')
+      : (overLineCount > 0 ? ` + ${overLineCount}× over-line bonus` : '')
+    return { points: pts, method, detail: `${fishCount} fish × ${pointsPerFish}pts${fish.isFirstOfSpecies ? ` + ${speciesBonus} species bonus` : ''}${overLineDetail}` }
   }
 
   return { points: 0, method, detail: 'Unsupported scoring method' }

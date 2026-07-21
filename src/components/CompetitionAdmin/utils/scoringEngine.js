@@ -28,6 +28,12 @@ export function calcPointsScoring({
   speciesBonus    = 3,
   overLineCount   = 0,
   overLineBonus   = 5,
+  // Explicit total over-line bonus, in points. When provided (not null/
+  // undefined), this REPLACES overLineCount × overLineBonus entirely —
+  // used for species with a variable, weight-derived over-line bonus (e.g.
+  // Red Steenbras: bonus = floor(weight_kg), not a flat 5) rather than the
+  // usual fixed-per-fish bonus every other species gets.
+  overLineBonusPoints = null,
   isFirstFish     = false,  // first fish of a species gets speciesBonus
 }) {
   if (!fishCount || fishCount <= 0) return 0
@@ -37,7 +43,7 @@ export function calcPointsScoring({
     ? pointsPerFish + speciesBonus
     : pointsPerFish
   const additional = fishCount > 1 ? pointsPerFish * (fishCount - 1) : 0
-  const overLine   = overLineCount * overLineBonus
+  const overLine   = overLineBonusPoints != null ? overLineBonusPoints : overLineCount * overLineBonus
   return base + additional + overLine
 }
 
@@ -454,26 +460,43 @@ export function buildCpueData(catches, participants, days, boats, fishingSession
 
 // ── Skipper / Boat ranking ───────────────────────────────────────────────
 // A distinct format from individual/team scoring: each day, every boat's
-// TOTAL points (every angler on that boat, summed) gets ranked 1st, 2nd,
-// 3rd... — then a boat's final score is the SUM of its daily positions
-// (grand prix style), lower is better, not the sum of raw points.
+// AVERAGE points per angler (total points on that boat ÷ number of anglers
+// drawn to it that day) gets ranked 1st, 2nd, 3rd... — then a boat's final
+// score is the SUM of its daily positions (grand prix style), lower is
+// better, not the sum of raw points.
 //
 // Confirmed rules:
+//   - Averaging (not summing) exists specifically to keep the format fair
+//     if a boat ever carries 4 anglers instead of the usual 3 — without it,
+//     a 4-angler boat would be structurally favoured just by having an
+//     extra rod in the water. Confirmed with Malcolm: implement this even
+//     though every boat at East London 2026 happens to carry exactly 3
+//     anglers (no boat's ranking changes today, dividing every boat by the
+//     same constant), so it's ready for the day a mixed-crew tournament
+//     actually shows up.
 //   - Tiebreak: lowest total position wins; ties broken by most fish
-//     caught for the competition; still tied, by total points scored.
+//     caught for the competition; still tied, by total points scored
+//     (raw total, not average — matches the original tiebreak rule).
 //   - Absent skipper: a boat with no catches recorded for a day it should
 //     have fished gets a position of (number of boats that DID fish that
 //     day) + 1 for that day, rather than being left unscored.
+//
+// Crew size source: competition_boat_draws (participant_id × boat_id ×
+// competition_day_id) is the authoritative roster — it correctly counts an
+// angler who was on the boat but blanked that day, unlike counting distinct
+// anglers with catches recorded. boatDraws is optional; if it's not passed
+// (or has no rows for a given boat/day), this falls back to counting
+// distinct anglers who have catches recorded for that boat/day, so older
+// competitions without boat_draws data still rank sensibly.
 //
 // One real limitation, flagged rather than silently assumed: "absence" is
 // inferred here purely from having zero catches recorded for a boat on a
 // day other boats fished. A boat that genuinely went out and caught
 // nothing at all that day (e.g. every catch DQ'd) would be
-// indistinguishable from a true no-show with catch data alone. If that
-// distinction ever matters, this would need to check the boat draw
-// (competition_boat_draws) instead — worth flagging to Malcolm/John if a
-// specific day's ranking looks wrong for this reason.
-export function buildSkipperRanking(catches, boats, days) {
+// indistinguishable from a true no-show with catch data alone. Worth
+// flagging to Malcolm/John if a specific day's ranking looks wrong for this
+// reason.
+export function buildSkipperRanking(catches, boats, days, boatDraws = []) {
   // 'rejected' catches never count anywhere — they represent a data-entry
   // mistake, not a real catch. 'disqualified' is different: the fish was
   // genuinely caught, the angler incurred a rules penalty for something
@@ -486,8 +509,9 @@ export function buildSkipperRanking(catches, boats, days) {
   // were included rather than zeroed.
   const activeCatches = catches.filter(c => c.data_quality !== 'rejected')
 
-  const byBoatDay = {}      // "dayNumber|boatId" -> points
+  const byBoatDay = {}       // "dayNumber|boatId" -> summed points, all anglers on the boat
   const fishCountByBoat = {} // boatId -> total fish count, whole competition
+  const catchAnglersByBoatDay = {} // "dayNumber|boatId" -> Set(participant_id) — fallback crew source
   for (const c of activeCatches) {
     if (!c.boat_id || !c.competition_day_id) continue
     const day = days?.find(d => d.id === c.competition_day_id)
@@ -496,14 +520,33 @@ export function buildSkipperRanking(catches, boats, days) {
     const key = `${day.day_number}|${c.boat_id}`
     byBoatDay[key] = (byBoatDay[key] || 0) + pts
     fishCountByBoat[c.boat_id] = (fishCountByBoat[c.boat_id] || 0) + 1
+    if (!catchAnglersByBoatDay[key]) catchAnglersByBoatDay[key] = new Set()
+    if (c.participant_id) catchAnglersByBoatDay[key].add(c.participant_id)
+  }
+
+  const drawCrewByBoatDay = {} // "dayNumber|boatId" -> Set(participant_id), from the boat draw roster
+  for (const draw of (boatDraws || [])) {
+    if (!draw.boat_id || !draw.competition_day_id) continue
+    const day = days?.find(d => d.id === draw.competition_day_id)
+    if (!day) continue
+    const key = `${day.day_number}|${draw.boat_id}`
+    if (!drawCrewByBoatDay[key]) drawCrewByBoatDay[key] = new Set()
+    if (draw.participant_id) drawCrewByBoatDay[key].add(draw.participant_id)
+  }
+  function crewSizeFor(key) {
+    if (drawCrewByBoatDay[key]?.size) return drawCrewByBoatDay[key].size
+    if (catchAnglersByBoatDay[key]?.size) return catchAnglersByBoatDay[key].size
+    return 1 // no roster and no catches to infer from — avoid divide-by-zero
   }
 
   const dayNumbers = [...new Set((days || []).map(d => d.day_number))].sort((a, b) => a - b)
   const boatIds = [...new Set((boats || []).map(b => b.id))]
 
-  // Rank boats within each day by that day's points (highest = position 1),
-  // then apply the absent-skipper penalty to any boat with no catch record
-  // that day, on days where at least one other boat did fish.
+  // Rank boats within each day by that day's AVERAGE points per angler
+  // (highest = position 1), then apply the absent-skipper penalty to any
+  // boat with no catch record that day, on days where at least one other
+  // boat did fish.
+  const averageByBoatDay = {}  // "dayNumber|boatId" -> average points
   const positionByBoatDay = {} // "dayNumber|boatId" -> position
   for (const dayNum of dayNumbers) {
     const participatingBoatIds = boatIds.filter(id => byBoatDay[`${dayNum}|${id}`] != null)
@@ -511,8 +554,13 @@ export function buildSkipperRanking(catches, boats, days) {
     if (numParticipating === 0) continue // nobody fished this day at all — nothing to rank
 
     participatingBoatIds
-      .map(boatId => ({ boatId, points: byBoatDay[`${dayNum}|${boatId}`] }))
-      .sort((a, b) => b.points - a.points)
+      .map(boatId => {
+        const key = `${dayNum}|${boatId}`
+        const avg = byBoatDay[key] / crewSizeFor(key)
+        averageByBoatDay[key] = avg
+        return { boatId, avg }
+      })
+      .sort((a, b) => b.avg - a.avg)
       .forEach((e, i) => { positionByBoatDay[`${dayNum}|${e.boatId}`] = i + 1 })
 
     for (const boatId of boatIds) {
@@ -524,6 +572,7 @@ export function buildSkipperRanking(catches, boats, days) {
 
   const results = (boats || []).map(boat => {
     const dailyPoints = {}
+    const dailyAverage = {}
     const dailyPosition = {}
     let totalPoints = 0
     let totalPosition = 0
@@ -531,8 +580,10 @@ export function buildSkipperRanking(catches, boats, days) {
     for (const dayNum of dayNumbers) {
       const key = `${dayNum}|${boat.id}`
       const pts = byBoatDay[key] ?? null
+      const avg = averageByBoatDay[key] ?? null
       const pos = positionByBoatDay[key] ?? null
       dailyPoints[dayNum] = pts
+      dailyAverage[dayNum] = avg
       dailyPosition[dayNum] = pos
       if (pts != null) { totalPoints += pts; daysFished += 1 }
       if (pos != null) totalPosition += pos
@@ -542,6 +593,7 @@ export function buildSkipperRanking(catches, boats, days) {
       boatName: boat.boat_name,
       skipperName: boat.skipper_name,
       dailyPoints,
+      dailyAverage,
       dailyPosition,
       totalPoints,
       totalFishCount: fishCountByBoat[boat.id] || 0,

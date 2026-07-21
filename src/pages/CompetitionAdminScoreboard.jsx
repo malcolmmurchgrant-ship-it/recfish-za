@@ -4,8 +4,10 @@
 // Delegates to UniversalScoreboard when it's built (Phase 4).
 // For now renders standings directly from catches + participants.
 
-import { useState } from 'react'
-import UniversalScoreboard from '../../pages/UniversalScoreboard'
+import { useState, useMemo, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { supabase } from '../../lib/supabase'
+import { buildIndividualStandings, aggregateTeamScores, buildBoatPercentageTeamStandings, buildDailyAnglerPercentages, buildCpueData, buildSkipperRanking } from './utils/scoringEngine'
 
 const NAVY  = '#1e3a8a'
 const GREY  = '#6b7280'
@@ -24,22 +26,15 @@ const S = {
 const RANK_COLORS = { 1: GOLD, 2: '#9ca3af', 3: '#b45309' }
 
 export default function CompetitionAdminScoreboard({
-  competition, config, catches, participants, teams, isAdmin,
+  competition, config, catches, participants, teams, days, boats, isAdmin,
 }) {
-  if (!competition?.id) return null
-  return (
-    <UniversalScoreboard
-      competitionId={competition.id}
-      embedded={true}
-      isAdmin={isAdmin}
-    />
-  )
-}
-
-// Keep original implementation below for reference during Phase 9 cleanup
-function _OriginalScoreboard({
-  competition, config, catches, participants, teams, isAdmin,
-}) {
+  const navigate = useNavigate()
+  // Takes you straight to that angler's real scorecard on the Catch Logger
+  // page ("Lutz's Card" style view), not a same-page tab switch — that's
+  // the actual page editing happens on.
+  function goToAnglersCard(participantId) {
+    navigate(`/competition-catch-logger/${competition.id}?participantId=${participantId}`)
+  }
   const [viewMode,        setViewMode]        = useState('individual')
   const [showPending,     setShowPending]      = useState(true)
   const [categoryFilter,  setCategoryFilter]   = useState('all')
@@ -51,8 +46,8 @@ function _OriginalScoreboard({
   )
 
   const individualStandings = useMemo(() =>
-    buildIndividualStandings(activeCatches, participants),
-    [activeCatches, participants]
+    buildIndividualStandings(activeCatches, participants, days, boats),
+    [activeCatches, participants, days, boats]
   )
 
   const filteredStandings = useMemo(() => {
@@ -62,34 +57,77 @@ function _OriginalScoreboard({
       .map((s, i) => ({ ...s, rank: i + 1 }))
   }, [individualStandings, categoryFilter])
 
-  // Team standings
-  const teamStandings = useMemo(() => {
-    const byTeam = {}
-    for (const s of individualStandings) {
-      if (!s.teamId) continue
-      if (!byTeam[s.teamId]) {
-        const team = teams?.find(t => t.id === s.teamId)
-        byTeam[s.teamId] = {
-          teamId:      s.teamId,
-          teamName:    team?.team_name || team?.province || 'Unknown',
-          totalPoints: 0,
-          totalWeight: 0,
-          memberCount: 0,
-          members:     [],
-        }
-      }
-      byTeam[s.teamId].totalPoints += s.totalPoints
-      byTeam[s.teamId].totalWeight += s.totalWeightKg
-      byTeam[s.teamId].memberCount += 1
-      byTeam[s.teamId].members.push(s)
-    }
-    return Object.values(byTeam)
-      .sort((a, b) => b.totalPoints - a.totalPoints)
-      .map((t, i) => ({ ...t, rank: i + 1 }))
-  }, [individualStandings, teams])
+  // Team standings — boat-percentage based (see buildBoatPercentageTeamStandings
+  // in scoringEngine.js for the full methodology). This was previously a
+  // plain sum of raw points per team, which didn't match the actual scoring
+  // rules for this format (top scorer on each boat/day = 100%, others scored
+  // relative to them, regardless of which team they're from).
+  const teamStandings = useMemo(() =>
+    buildBoatPercentageTeamStandings(activeCatches, participants, teams, days, boats),
+    [activeCatches, participants, teams, days, boats]
+  )
+
+  // Per-day, per-angler raw points + boat percentage, for the new Daily view
+  // and for anyone wanting to see "who was top on this boat, this day"
+  // directly (raw points decide the daily award, percentage is what feeds
+  // team totals — both matter, shown side by side rather than collapsed
+  // into a single figure).
+  const dailyRecords = useMemo(() =>
+    buildDailyAnglerPercentages(activeCatches, participants, days, boats),
+    [activeCatches, participants, days, boats]
+  )
+  const [dailyDayFilter, setDailyDayFilter] = useState('all')
+  const filteredDaily = useMemo(() => {
+    const rows = dailyDayFilter === 'all'
+      ? dailyRecords
+      : dailyRecords.filter(d => String(d.dayNumber) === String(dailyDayFilter))
+    // Raw points first — that's what decides the daily top-angler award
+    return [...rows].sort((a, b) => b.rawPoints - a.rawPoints)
+  }, [dailyRecords, dailyDayFilter])
+
+  // CPUE ("Fish Per Hour") — not previously fetched on this tab
+  const [fishingSessions, setFishingSessions] = useState([])
+  useEffect(() => {
+    if (!competition?.id) return
+    supabase.from('competition_fishing_sessions')
+      .select('*')
+      .eq('competition_id', competition.id)
+      .then(({ data }) => setFishingSessions(data || []))
+  }, [competition?.id])
+  const cpueData = useMemo(() =>
+    buildCpueData(activeCatches, participants, days, boats, fishingSessions),
+    [activeCatches, participants, days, boats, fishingSessions]
+  )
+
+  // Boat draws — the authoritative crew roster per boat/day, needed so
+  // buildSkipperRanking can average a boat's points by the number of
+  // anglers actually drawn to it that day, not just assume every boat
+  // carries the same crew size.
+  const [boatDraws, setBoatDraws] = useState([])
+  useEffect(() => {
+    if (!competition?.id) return
+    supabase.from('competition_boat_draws')
+      .select('*')
+      .eq('competition_id', competition.id)
+      .then(({ data }) => setBoatDraws(data || []))
+  }, [competition?.id])
+
+  const skipperRanking = useMemo(() =>
+    buildSkipperRanking(activeCatches, boats, days, boatDraws),
+    [activeCatches, boats, days, boatDraws]
+  )
+  const dayNumbersForSkipper = [...new Set((days || []).map(d => d.day_number))].sort((a, b) => a - b)
 
   const categories = ['all', ...new Set(participants.map(p => p.category).filter(Boolean))]
   const isLocked   = !!competition?.results_published_at
+  // Weight isn't tracked at all in unit-count/'points' competitions (species
+  // are tallied, not weighed) — showing a column of 0.00s for every angler
+  // is just noise. Line class is fixed competition-wide here (not per
+  // angler — competition_participants has no such column), so pull it from
+  // the template's scoring_config rather than a per-row field that never
+  // existed.
+  const showWeight = config?.scoring?.method !== 'points'
+  const lineClassKg = config?.scoring?.line_class_kg ?? competition?.default_line_class_kg ?? null
 
   return (
     <div>
@@ -100,7 +138,9 @@ function _OriginalScoreboard({
           <div style={{ display: 'flex', gap: 0, borderRadius: 6, overflow: 'hidden', border: '1px solid #e5e7eb' }}>
             {[
               { id: 'individual', label: '👤 Individual' },
+              { id: 'daily',      label: '📅 Daily' },
               { id: 'teams',      label: '🏆 Teams' },
+              { id: 'skipper',    label: '🚤 Boat/Skipper' },
             ].map(m => (
               <button key={m.id} onClick={() => setViewMode(m.id)}
                 style={S.btn(NAVY, 'white', viewMode === m.id)}>
@@ -145,47 +185,122 @@ function _OriginalScoreboard({
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
               <thead>
                 <tr style={{ background: NAVY, color: 'white' }}>
-                  {['Rank','Angler','Team','LC','Category','Points','Weight','Spp','Catches'].map(h => (
+                  {['Rank','Angler','Team','LC','Angler %','Points', ...(showWeight ? ['Weight'] : []), 'Species','Catches','CPUE'].map(h => (
                     <th key={h} style={{ padding: '0.5rem 0.75rem', textAlign: h === 'Rank' ? 'center' : 'left', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {filteredStandings.map((s, i) => (
+                {filteredStandings.map((s, i) => {
+                  const anglerOverallCpue = cpueData.byAngler.find(a => a.participantId === s.participantId)
+                  return (
                   <tr key={s.participantId}
                     style={{ background: i % 2 === 0 ? 'white' : '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
                     <td style={{ padding: '0.5rem 0.75rem', textAlign: 'center', fontWeight: 700, color: RANK_COLORS[s.rank] || NAVY }}>
                       {s.rank <= 3 ? ['🥇','🥈','🥉'][s.rank - 1] : s.rank}
                     </td>
                     <td style={{ padding: '0.5rem 0.75rem', fontWeight: 600, color: NAVY, whiteSpace: 'nowrap' }}>
-                      {s.displayName}
+                      <button
+                        onClick={() => goToAnglersCard(s.participantId)}
+                        title="Open this angler's card in the Catch Logger"
+                        style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: NAVY, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 3 }}>
+                        {s.displayName}
+                      </button>
                       {s.anglerNumber && <span style={{ color: GREY, fontWeight: 400 }}> #{s.anglerNumber}</span>}
                     </td>
                     <td style={{ padding: '0.5rem 0.75rem', color: GREY, fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
                       {s.teamName || '—'}
                     </td>
                     <td style={{ padding: '0.5rem 0.75rem', color: GREY, fontSize: '0.82rem', textAlign: 'center' }}>
-                      {s.lineClass ? `${s.lineClass}kg` : '—'}
-                    </td>
-                    <td style={{ padding: '0.5rem 0.75rem' }}>
-                      {s.category && <span style={S.badge(s.category === 'junior' ? '#7c3aed' : s.category === 'ladies' ? '#db2777' : NAVY)}>{s.category}</span>}
+                      {lineClassKg ? `${lineClassKg}kg` : '—'}
                     </td>
                     <td style={{ padding: '0.5rem 0.75rem', fontWeight: 700, color: NAVY, textAlign: 'right' }}>
-                      {s.totalPoints.toFixed(2)}
+                      {(s.anglerPercentage || 0).toFixed(2)}%
                     </td>
                     <td style={{ padding: '0.5rem 0.75rem', color: GREY, textAlign: 'right' }}>
-                      {s.totalWeightKg.toFixed(2)}
+                      {s.totalPoints.toFixed(2)}
                     </td>
+                    {showWeight && (
+                      <td style={{ padding: '0.5rem 0.75rem', color: GREY, textAlign: 'right' }}>
+                        {s.totalWeightKg.toFixed(2)}
+                      </td>
+                    )}
                     <td style={{ padding: '0.5rem 0.75rem', textAlign: 'center', color: GREY }}>
                       {s.speciesCount}
                     </td>
                     <td style={{ padding: '0.5rem 0.75rem', textAlign: 'center', color: GREY }}>
                       {s.catchCount}
                     </td>
+                    <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right', color: GREY }}>
+                      {anglerOverallCpue?.cpue != null ? anglerOverallCpue.cpue.toFixed(2) : '—'}
+                    </td>
                   </tr>
-                ))}
+                  )
+                })}
                 {filteredStandings.length === 0 && (
-                  <tr><td colSpan={9} style={{ padding: '1.5rem', textAlign: 'center', color: GREY, fontStyle: 'italic' }}>No catches recorded yet.</td></tr>
+                  <tr><td colSpan={showWeight ? 10 : 9} style={{ padding: '1.5rem', textAlign: 'center', color: GREY, fontStyle: 'italic' }}>No catches recorded yet.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── Daily standings (raw points + boat %, side by side) ─────────── */}
+      {viewMode === 'daily' && (
+        <div style={S.card}>
+          <div style={{ marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <label style={S.label}>Day</label>
+            <select style={S.select} value={dailyDayFilter} onChange={e => setDailyDayFilter(e.target.value)}>
+              <option value="all">All Days</option>
+              {[...new Set(dailyRecords.map(d => d.dayNumber))].filter(n => n != null).sort((a, b) => a - b).map(n => (
+                <option key={n} value={n}>Day {n}</option>
+              ))}
+            </select>
+          </div>
+          <div style={{ fontSize: '0.78rem', color: GREY, marginBottom: '0.75rem' }}>
+            Sorted by raw points — that's what decides each day's top-angler award.
+            Percentage is relative to the top scorer on that same boat that day (any team), and is what feeds into Team totals.
+            CPUE is Fish Per Hour, based on that boat's Lines In/Up times (Setup tab).
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
+              <thead>
+                <tr style={{ background: NAVY, color: 'white' }}>
+                  {['Day','Angler','Team','Boat','Raw Points','Boat %','CPUE'].map(h => (
+                    <th key={h} style={{ padding: '0.5rem 0.75rem', textAlign: 'left', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredDaily.map((d, i) => {
+                  const anglerCpue = cpueData.byAnglerDay.find(a => a.participantId === d.participantId && String(a.dayNumber) === String(d.dayNumber))
+                  return (
+                  <tr key={`${d.dayId}-${d.participantId}`}
+                    style={{ background: i % 2 === 0 ? 'white' : '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                    <td style={{ padding: '0.5rem 0.75rem', whiteSpace: 'nowrap' }}>Day {d.dayNumber}</td>
+                    <td style={{ padding: '0.5rem 0.75rem', fontWeight: 600, color: NAVY, whiteSpace: 'nowrap' }}>
+                      <button
+                        onClick={() => goToAnglersCard(d.participantId)}
+                        title="Open this angler's card in the Catch Logger"
+                        style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: NAVY, fontWeight: 600, cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 3 }}>
+                        {d.displayName}
+                      </button>
+                    </td>
+                    <td style={{ padding: '0.5rem 0.75rem', color: GREY, fontSize: '0.82rem', whiteSpace: 'nowrap' }}>{d.teamName || '—'}</td>
+                    <td style={{ padding: '0.5rem 0.75rem', color: GREY, fontSize: '0.82rem', whiteSpace: 'nowrap' }}>{d.boatName}</td>
+                    <td style={{ padding: '0.5rem 0.75rem', color: GREY, textAlign: 'right' }}>{d.rawPoints.toFixed(2)}</td>
+                    <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right', color: d.percentage === 100 ? GREEN : NAVY, fontWeight: 700 }}>
+                      {d.percentage.toFixed(2)}%{d.percentage === 100 ? ' 🥇' : ''}
+                    </td>
+                    <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right', color: GREY }}>
+                      {anglerCpue?.cpue != null ? anglerCpue.cpue.toFixed(2) : '—'}
+                    </td>
+                  </tr>
+                  )
+                })}
+                {filteredDaily.length === 0 && (
+                  <tr><td colSpan={7} style={{ padding: '1.5rem', textAlign: 'center', color: GREY, fontStyle: 'italic' }}>No catches recorded yet.</td></tr>
                 )}
               </tbody>
             </table>
@@ -204,15 +319,22 @@ function _OriginalScoreboard({
                     {t.rank <= 3 ? ['🥇','🥈','🥉'][t.rank - 1] + ' ' : `${t.rank}. `}
                     {t.teamName}
                   </div>
-                  <div style={{ fontSize: '0.8rem', color: GREY }}>{t.memberCount} anglers · {t.totalWeight.toFixed(2)} kg</div>
+                  <div style={{ fontSize: '0.8rem', color: GREY }}>{t.members.length} anglers · sum of daily boat %</div>
                 </div>
-                <div style={{ fontWeight: 800, fontSize: '1.3rem', color: NAVY }}>{t.totalPoints.toFixed(2)}</div>
+                <div style={{ fontWeight: 800, fontSize: '1.3rem', color: NAVY }}>{t.totalPercentage.toFixed(2)}%</div>
               </div>
-              {t.members.sort((a, b) => b.totalPoints - a.totalPoints).map(m => (
+              {t.members.sort((a, b) => b.percentageSum - a.percentageSum).map(m => (
                 <div key={m.participantId} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.3rem 0.5rem', background: '#f8fafc', borderRadius: 5, marginBottom: '0.25rem' }}>
-                  <div style={{ flex: 1, fontSize: '0.85rem' }}>{m.displayName}</div>
-                  <div style={{ fontSize: '0.78rem', color: GREY }}>{m.catchCount} fish</div>
-                  <div style={{ fontWeight: 700, color: NAVY, minWidth: 60, textAlign: 'right' }}>{m.totalPoints.toFixed(2)}</div>
+                  <div style={{ flex: 1, fontSize: '0.85rem' }}>
+                    <button
+                      onClick={() => goToAnglersCard(m.participantId)}
+                      title="Open this angler's card in the Catch Logger"
+                      style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 3 }}>
+                      {m.displayName}
+                    </button>
+                  </div>
+                  <div style={{ fontSize: '0.78rem', color: GREY }}>{m.daysCounted} day{m.daysCounted === 1 ? '' : 's'} fished</div>
+                  <div style={{ fontWeight: 700, color: NAVY, minWidth: 60, textAlign: 'right' }}>{m.percentageSum.toFixed(2)}%</div>
                 </div>
               ))}
             </div>
@@ -220,6 +342,79 @@ function _OriginalScoreboard({
           {teamStandings.length === 0 && (
             <div style={{ ...S.card, color: GREY, textAlign: 'center', fontStyle: 'italic' }}>No team data available.</div>
           )}
+        </div>
+      )}
+
+      {/* ── Skipper / Boat ranking ──────────────────────────────────────── */}
+      {viewMode === 'skipper' && (
+        <div style={S.card}>
+          <div style={{ fontSize: '0.78rem', color: GREY, marginBottom: '0.75rem' }}>
+            Each day, boats are ranked 1st, 2nd, 3rd... by that day's <strong>average points
+            per angler</strong> (total points on the boat, divided by the number of anglers
+            actually drawn to it that day — disqualified anglers' points still count toward
+            the total). Averaging keeps the ranking fair if a boat ever carries a different
+            number of anglers than the rest (e.g. 4 instead of 3); with equal crew sizes
+            across every boat, it produces the same ranking as a plain total. A boat's final
+            ranking is the <strong>sum of its daily positions</strong> — lower is better, same
+            as SADSAA's official Skipper Ranking sheet. Total points (raw sum, unaveraged) is
+            shown for reference and as the second tiebreaker. Ties in total position are
+            broken first by most fish caught for the competition, then by total points scored
+            if still tied.
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+              <thead>
+                <tr style={{ background: NAVY, color: 'white' }}>
+                  <th rowSpan={2} style={{ padding: '0.5rem 0.6rem', textAlign: 'center', fontSize: '0.72rem', textTransform: 'uppercase' }}>Rank</th>
+                  <th rowSpan={2} style={{ padding: '0.5rem 0.6rem', textAlign: 'left', fontSize: '0.72rem', textTransform: 'uppercase' }}>Skipper</th>
+                  <th rowSpan={2} style={{ padding: '0.5rem 0.6rem', textAlign: 'left', fontSize: '0.72rem', textTransform: 'uppercase' }}>Boat</th>
+                  <th colSpan={dayNumbersForSkipper.length + 1} style={{ padding: '0.4rem 0.6rem', textAlign: 'center', fontSize: '0.72rem', textTransform: 'uppercase', borderBottom: '1px solid rgba(255,255,255,0.3)' }}>Points</th>
+                  <th colSpan={dayNumbersForSkipper.length + 1} style={{ padding: '0.4rem 0.6rem', textAlign: 'center', fontSize: '0.72rem', textTransform: 'uppercase', borderBottom: '1px solid rgba(255,255,255,0.3)' }}>Position</th>
+                </tr>
+                <tr style={{ background: NAVY, color: 'white' }}>
+                  {dayNumbersForSkipper.map(d => (
+                    <th key={`pts-${d}`} style={{ padding: '0.4rem 0.5rem', textAlign: 'center', fontSize: '0.7rem' }}>Day {d}</th>
+                  ))}
+                  <th style={{ padding: '0.4rem 0.5rem', textAlign: 'center', fontSize: '0.7rem', color: '#fbbf24' }}>Total</th>
+                  {dayNumbersForSkipper.map(d => (
+                    <th key={`pos-${d}`} style={{ padding: '0.4rem 0.5rem', textAlign: 'center', fontSize: '0.7rem' }}>Day {d}</th>
+                  ))}
+                  <th style={{ padding: '0.4rem 0.5rem', textAlign: 'center', fontSize: '0.7rem', color: '#fbbf24' }}>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {skipperRanking.map((s, i) => (
+                  <tr key={s.boatId} style={{ background: i % 2 === 0 ? 'white' : '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
+                    <td style={{ padding: '0.5rem 0.6rem', textAlign: 'center', fontWeight: 700, color: RANK_COLORS[s.rank] || NAVY }}>
+                      {s.rank <= 3 ? ['🥇','🥈','🥉'][s.rank - 1] : s.rank}
+                    </td>
+                    <td style={{ padding: '0.5rem 0.6rem', fontWeight: 600, color: NAVY, whiteSpace: 'nowrap' }}>{s.skipperName}</td>
+                    <td style={{ padding: '0.5rem 0.6rem', color: GREY, whiteSpace: 'nowrap' }}>{s.boatName}</td>
+                    {dayNumbersForSkipper.map(d => (
+                      <td key={`pts-${d}`} style={{ padding: '0.5rem 0.5rem', textAlign: 'center', color: GREY }}>
+                        {s.dailyPoints[d] != null ? (
+                          <>
+                            {s.dailyPoints[d].toFixed(2)}
+                            <div style={{ fontSize: '0.68rem', color: GOLD }}>avg {s.dailyAverage[d].toFixed(2)}</div>
+                          </>
+                        ) : '—'}
+                      </td>
+                    ))}
+                    <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', fontWeight: 700, color: NAVY }}>{s.totalPoints.toFixed(2)}</td>
+                    {dayNumbersForSkipper.map(d => (
+                      <td key={`pos-${d}`} style={{ padding: '0.5rem 0.5rem', textAlign: 'center', color: GREY }}>
+                        {s.dailyPosition[d] ?? '—'}
+                      </td>
+                    ))}
+                    <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', fontWeight: 700, color: RED }}>{s.totalPosition}</td>
+                  </tr>
+                ))}
+                {skipperRanking.length === 0 && (
+                  <tr><td colSpan={5 + dayNumbersForSkipper.length * 2} style={{ padding: '1.5rem', textAlign: 'center', color: GREY, fontStyle: 'italic' }}>No catches recorded yet.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
