@@ -112,10 +112,15 @@ function rowToMeasuredDraft(row) {
 // against them individually (rather than against one synthetic row).
 function aggregateUnitCountRows(rows, speciesName) {
   const matching = rows.filter(r => r.species_name === speciesName)
+  const overLineRows = matching.filter(r => r.is_over_line)
   return {
     species: speciesName,
     fishCount: matching.length,
-    overLineCount: matching.filter(r => r.is_over_line).length,
+    overLineCount: overLineRows.length,
+    // Per-over-line-fish measured length (cm) — only populated/used for
+    // weight-formula-bonus species (Red Steenbras); empty for everything
+    // else, matching the old behaviour exactly.
+    overLineLengths: overLineRows.map(r => (r.length_cm != null ? String(r.length_cm) : '')),
     _rowIds: matching.map(r => r.id),
   }
 }
@@ -385,6 +390,49 @@ export default function UniversalCatchLogger({ competitionId }) {
     setUnitCountDraft(prev => prev.map(r => r.species === speciesName ? { ...r, ...patch } : r))
   }
 
+  // ── Over-line weight-formula bonus (unit-count rows) ────────────────────────
+  // For species with over_line_bonus_type === 'weight_formula' (currently
+  // just Red Steenbras at East London 2026), each entered over-line fork
+  // length is converted to weight via the same species-formula lookup
+  // measured-mode rows already use (estimateWeightFromLength), then floored
+  // to whole kilograms per fish and summed — matching the tournament rule
+  // that this species' over-line bonus equals its converted weight in kg,
+  // not the flat over_line_bonus every other species gets. Async (needs a
+  // Supabase round trip for the formula), same pattern as tryAutoCalc below.
+  const [weightFormulaBonuses, setWeightFormulaBonuses] = useState({}) // species -> { total, computing, error }
+
+  useEffect(() => {
+    let cancelled = false
+    async function computeAll() {
+      for (const row of unitCountDraft) {
+        const cfg = findSpeciesConfig(config?.species, row.species)
+        if (cfg?.over_line_bonus_type !== 'weight_formula') continue
+        const lengths = (row.overLineLengths || []).filter(l => l !== '' && l != null)
+        if (lengths.length === 0) {
+          setWeightFormulaBonuses(prev => ({ ...prev, [row.species]: { total: 0, computing: false } }))
+          continue
+        }
+        setWeightFormulaBonuses(prev => ({ ...prev, [row.species]: { ...(prev[row.species] || {}), computing: true } }))
+        const speciesRow = await findSpeciesRowByName(supabase, row.species)
+        if (cancelled) return
+        if (!speciesRow) {
+          setWeightFormulaBonuses(prev => ({ ...prev, [row.species]: { total: 0, computing: false, error: 'No formula found for this species' } }))
+          continue
+        }
+        let total = 0
+        for (const len of lengths) {
+          const est = await estimateWeightFromLength(supabase, speciesRow, len, speciesRow.default_length_type)
+          if (est) total += Math.floor(est.weightKg)
+        }
+        if (cancelled) return
+        setWeightFormulaBonuses(prev => ({ ...prev, [row.species]: { total, computing: false } }))
+      }
+    }
+    computeAll()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unitCountDraft.map(r => `${r.species}|${(r.overLineLengths || []).join(',')}`).join(';'), config])
+
   // ── Live scoring ──────────────────────────────────────────────────────────────
   const scoringMethod = config?.scoring?.method || 'percentage'
   const usesMultiplier = !!config?.scoring?.species_multiplier
@@ -405,11 +453,12 @@ export default function UniversalCatchLogger({ competitionId }) {
     return unitCountDraft.map(row => {
       const cfg = findSpeciesConfig(config?.species, row.species)
       const isFirstOfSpecies = row.fishCount > 0 // each species is its own row here, so "first" = "has any"
-      const scored = scoreDraftFish({ ...row, isFirstOfSpecies }, cfg, config?.scoring)
+      const bonusEntry = cfg?.over_line_bonus_type === 'weight_formula' ? weightFormulaBonuses[row.species] : null
+      const scored = scoreDraftFish({ ...row, isFirstOfSpecies, overLineBonusPoints: bonusEntry?.total }, cfg, config?.scoring)
       const warning = validateDraftFish(row, cfg)
-      return { ...row, _cfg: cfg, _scored: scored, _warning: warning }
+      return { ...row, _cfg: cfg, _scored: scored, _warning: warning, _overLineBonusComputing: !!bonusEntry?.computing, _overLineBonusError: bonusEntry?.error }
     })
-  }, [unitCountDraft, config])
+  }, [unitCountDraft, config, weightFormulaBonuses])
 
   const { speciesCount, multiplier } = useMemo(() => {
     const combined = [
@@ -429,6 +478,12 @@ export default function UniversalCatchLogger({ competitionId }) {
   const validMeasuredCount = scoredMeasured.filter(f => f.species && !f._warning).length
   const validUnitCountTotal = scoredUnitCount.reduce((sum, r) => sum + (r._warning ? 0 : (r.fishCount || 0)), 0)
   const totalValidFish = validMeasuredCount + validUnitCountTotal
+
+  // Blocks saving mid-calculation: without this, hitting Save while a
+  // Red-Steenbras-style weight-formula bonus is still resolving would
+  // persist that fish's over-line bonus as 0 (the not-yet-computed
+  // default) instead of waiting for the real figure.
+  const overLineBonusPending = scoredUnitCount.some(r => r._overLineBonusComputing)
 
   // ── Save: diff both drafts against originalRows ─────────────────────────────
   const handleSave = async () => {
@@ -510,15 +565,21 @@ export default function UniversalCatchLogger({ competitionId }) {
         if (!row.fishCount || row.fishCount <= 0 || row._warning) continue
 
         const existingIds = row._rowIds || []
+        const overLineLengths = row.overLineLengths || []
         for (let i = 0; i < row.fishCount; i++) {
           const isOverLine = i < (row.overLineCount || 0)
+          // Weight-formula species record the actual measured fork length
+          // against the specific over-line fish it belongs to (audit trail,
+          // and what the bonus was computed from) — null for everything
+          // else, same as before.
+          const measuredLength = isOverLine && overLineLengths[i] ? parseFloat(overLineLengths[i]) : null
           const noteForThisRow = !recordNoteAttached && recordNote ? recordNote : null
           if (!recordNoteAttached && recordNote) recordNoteAttached = true
           const payload = {
             ...baseFields,
             species_name: row.species,
             weight_kg: null,
-            length_cm: null,
+            length_cm: measuredLength,
             line_class_kg: config?.scoring?.line_class_kg ?? 0,
             retained: true,
             is_over_line: isOverLine,
@@ -766,15 +827,18 @@ export default function UniversalCatchLogger({ competitionId }) {
                 const isBlankNew = totalValidFish === 0 && originalRows.length === 0
                 return (
                   <>
-                    <button onClick={handleSave} disabled={saving || isBlankNew}
-                      style={{ ...S.btn(), padding: '0.75rem 2rem', fontSize: '1rem', opacity: (saving || isBlankNew) ? 0.5 : 1 }}>
-                      {saving ? 'Saving…' : originalRows.length > 0 ? '💾 Update Scorecard' : '💾 Save Scorecard'}
+                    <button onClick={handleSave} disabled={saving || isBlankNew || overLineBonusPending}
+                      style={{ ...S.btn(), padding: '0.75rem 2rem', fontSize: '1rem', opacity: (saving || isBlankNew || overLineBonusPending) ? 0.5 : 1 }}>
+                      {saving ? 'Saving…' : overLineBonusPending ? '⏳ Calculating bonus…' : originalRows.length > 0 ? '💾 Update Scorecard' : '💾 Save Scorecard'}
                     </button>
                     {isBlankNew && (
                       <span style={{ fontSize: '0.82rem', color: '#9ca3af', marginLeft: '0.75rem' }}>Add at least 1 valid catch to save</span>
                     )}
                     {!isBlankNew && totalValidFish === 0 && originalRows.length > 0 && (
                       <span style={{ fontSize: '0.82rem', color: RED, marginLeft: '0.75rem' }}>⚠ Saving will remove all logged catches for this angler on this day</span>
+                    )}
+                    {overLineBonusPending && (
+                      <span style={{ fontSize: '0.82rem', color: GOLD, marginLeft: '0.75rem' }}>Waiting for the over-line bonus calculation to finish…</span>
                     )}
                   </>
                 )
@@ -894,16 +958,42 @@ function MeasuredFishRow({ fish, index, speciesPicker, autoWeight, calculating, 
 function UnitCountSpeciesRow({ row, onChange }) {
   const cfg = row._cfg
   const maxReached = cfg?.bag_limit && row.fishCount >= cfg.bag_limit
+  const isWeightFormula = cfg?.over_line_bonus_type === 'weight_formula'
+  const overLineLengths = row.overLineLengths || []
   const canAddOverLine = cfg?.over_line_length_cm && row.overLineCount < row.fishCount
 
   const addFish = () => { if (!maxReached) onChange({ fishCount: row.fishCount + 1 }) }
   const removeFish = () => {
     if (row.fishCount === 0) return
     const newCount = row.fishCount - 1
-    onChange({ fishCount: newCount, overLineCount: Math.min(row.overLineCount, newCount) })
+    const cappedOverLine = Math.min(row.overLineCount, newCount)
+    onChange({
+      fishCount: newCount,
+      overLineCount: cappedOverLine,
+      overLineLengths: overLineLengths.slice(0, cappedOverLine),
+    })
   }
+
+  // Fixed-bonus species (everyone except Red Steenbras): unchanged simple counter.
   const addOverLine = () => { if (canAddOverLine) onChange({ overLineCount: row.overLineCount + 1 }) }
   const removeOverLine = () => { if (row.overLineCount > 0) onChange({ overLineCount: row.overLineCount - 1 }) }
+
+  // Weight-formula species: each over-line fish needs its own measured
+  // length, since the bonus is derived from that specific measurement, not
+  // a flat per-fish value.
+  const addOverLineLength = () => {
+    if (!canAddOverLine) return
+    onChange({ overLineCount: overLineLengths.length + 1, overLineLengths: [...overLineLengths, ''] })
+  }
+  const removeOverLineLength = (i) => {
+    const next = overLineLengths.filter((_, idx) => idx !== i)
+    onChange({ overLineCount: next.length, overLineLengths: next })
+  }
+  const setOverLineLength = (i, val) => {
+    const next = [...overLineLengths]
+    next[i] = val
+    onChange({ overLineLengths: next })
+  }
 
   const pts = row._scored?.points || 0
   const rowBg = row.fishCount > 0 ? '#f0fdf4' : 'white'
@@ -916,8 +1006,15 @@ function UnitCountSpeciesRow({ row, onChange }) {
           <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#111827' }}>{row.species}</div>
           <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
             Bag: {cfg?.bag_limit ?? '—'} {cfg?.min_size_cm ? `• Min: ${cfg.min_size_cm}cm` : ''} • {cfg?.points_per_fish}pts/fish • Sp.bonus: {cfg?.species_bonus}pts
-            {cfg?.over_line_length_cm ? ` • OL: >${cfg.over_line_length_cm}cm(${cfg.over_line_length_type})+${cfg.over_line_bonus}pts` : ''}
+            {cfg?.over_line_length_cm
+              ? (isWeightFormula
+                  ? ` • OL: >${cfg.over_line_length_cm}cm(${cfg.over_line_length_type}) — bonus = weight in kg`
+                  : ` • OL: >${cfg.over_line_length_cm}cm(${cfg.over_line_length_type})+${cfg.over_line_bonus}pts`)
+              : ''}
           </div>
+          {row._overLineBonusError && (
+            <div style={{ fontSize: '0.72rem', color: RED, marginTop: '0.2rem' }}>⚠ {row._overLineBonusError} — enter this fish's bonus points manually via Reports/SQL after saving</div>
+          )}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
@@ -933,21 +1030,47 @@ function UnitCountSpeciesRow({ row, onChange }) {
           </div>
 
           {cfg?.over_line_length_cm ? (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '0.7rem', color: '#6b7280', marginBottom: 2 }}>OVER LINE</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <button onClick={removeOverLine} disabled={row.overLineCount === 0}
-                  style={{ width: 28, height: 28, borderRadius: '50%', border: '1px solid #d1d5db', background: 'white', cursor: row.overLineCount === 0 ? 'default' : 'pointer', opacity: row.overLineCount === 0 ? 0.4 : 1 }}>−</button>
-                <span style={{ minWidth: 20, textAlign: 'center', fontWeight: 700, fontSize: '1.1rem', color: row.overLineCount > 0 ? GOLD : '#374151' }}>{row.overLineCount}</span>
-                <button onClick={addOverLine} disabled={!canAddOverLine}
-                  style={{ width: 28, height: 28, borderRadius: '50%', border: '1px solid #d1d5db', background: canAddOverLine ? '#fef3c7' : '#f3f4f6', cursor: canAddOverLine ? 'pointer' : 'default', opacity: canAddOverLine ? 1 : 0.4 }}>+</button>
+            isWeightFormula ? (
+              <div style={{ minWidth: 190 }}>
+                <div style={{ fontSize: '0.7rem', color: '#6b7280', marginBottom: 2 }}>
+                  OVER LINE — {cfg.over_line_length_type || 'FL'} length (cm)
+                </div>
+                {overLineLengths.map((len, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+                    <input
+                      type="number" inputMode="decimal" value={len}
+                      onChange={e => setOverLineLength(i, e.target.value)}
+                      placeholder="cm"
+                      style={{ width: 56, padding: '0.25rem 0.4rem', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '0.8rem' }}
+                    />
+                    <button onClick={() => removeOverLineLength(i)}
+                      style={{ width: 22, height: 22, borderRadius: '50%', border: '1px solid #d1d5db', background: 'white', cursor: 'pointer', fontSize: '0.75rem', lineHeight: 1 }}>×</button>
+                  </div>
+                ))}
+                <button onClick={addOverLineLength} disabled={!canAddOverLine}
+                  style={{ fontSize: '0.72rem', color: canAddOverLine ? GOLD : '#9ca3af', background: 'none', border: 'none', cursor: canAddOverLine ? 'pointer' : 'default', padding: 0 }}>
+                  + add over-line fish
+                </button>
               </div>
-            </div>
+            ) : (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '0.7rem', color: '#6b7280', marginBottom: 2 }}>OVER LINE</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <button onClick={removeOverLine} disabled={row.overLineCount === 0}
+                    style={{ width: 28, height: 28, borderRadius: '50%', border: '1px solid #d1d5db', background: 'white', cursor: row.overLineCount === 0 ? 'default' : 'pointer', opacity: row.overLineCount === 0 ? 0.4 : 1 }}>−</button>
+                  <span style={{ minWidth: 20, textAlign: 'center', fontWeight: 700, fontSize: '1.1rem', color: row.overLineCount > 0 ? GOLD : '#374151' }}>{row.overLineCount}</span>
+                  <button onClick={addOverLine} disabled={!canAddOverLine}
+                    style={{ width: 28, height: 28, borderRadius: '50%', border: '1px solid #d1d5db', background: canAddOverLine ? '#fef3c7' : '#f3f4f6', cursor: canAddOverLine ? 'pointer' : 'default', opacity: canAddOverLine ? 1 : 0.4 }}>+</button>
+                </div>
+              </div>
+            )
           ) : <div style={{ width: 80 }} />}
 
           <div style={{ minWidth: 44, textAlign: 'center' }}>
             <div style={{ fontSize: '0.7rem', color: '#6b7280', marginBottom: 2 }}>PTS</div>
-            <div style={{ fontWeight: 700, fontSize: '1.1rem', color: pts > 0 ? NAVY : '#9ca3af' }}>{pts}</div>
+            <div style={{ fontWeight: 700, fontSize: '1.1rem', color: pts > 0 ? NAVY : '#9ca3af' }}>
+              {row._overLineBonusComputing ? '…' : pts}
+            </div>
           </div>
         </div>
       </div>

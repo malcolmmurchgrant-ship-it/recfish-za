@@ -99,9 +99,22 @@ export default function CompetitionAdminScoreboard({
     [activeCatches, participants, days, boats, fishingSessions]
   )
 
+  // Boat draws — the authoritative crew roster per boat/day, needed so
+  // buildSkipperRanking can average a boat's points by the number of
+  // anglers actually drawn to it that day, not just assume every boat
+  // carries the same crew size.
+  const [boatDraws, setBoatDraws] = useState([])
+  useEffect(() => {
+    if (!competition?.id) return
+    supabase.from('competition_boat_draws')
+      .select('*')
+      .eq('competition_id', competition.id)
+      .then(({ data }) => setBoatDraws(data || []))
+  }, [competition?.id])
+
   const skipperRanking = useMemo(() =>
-    buildSkipperRanking(activeCatches, boats, days),
-    [activeCatches, boats, days]
+    buildSkipperRanking(activeCatches, boats, days, boatDraws),
+    [activeCatches, boats, days, boatDraws]
   )
   const dayNumbersForSkipper = [...new Set((days || []).map(d => d.day_number))].sort((a, b) => a - b)
 
@@ -336,13 +349,17 @@ export default function CompetitionAdminScoreboard({
       {viewMode === 'skipper' && (
         <div style={S.card}>
           <div style={{ fontSize: '0.78rem', color: GREY, marginBottom: '0.75rem' }}>
-            Each day, boats are ranked 1st, 2nd, 3rd... by that day's total points (every
-            angler on the boat, summed — disqualified anglers' points still count toward
-            the skipper's total). A boat's final ranking is the <strong>sum of its daily
-            positions</strong> — lower is better, same as SADSAA's official Skipper Ranking
-            sheet — not the sum of points, which is shown for reference only. Ties in total
-            position are broken first by most fish caught for the competition, then by
-            total points scored if still tied.
+            Each day, boats are ranked 1st, 2nd, 3rd... by that day's <strong>average points
+            per angler</strong> (total points on the boat, divided by the number of anglers
+            actually drawn to it that day — disqualified anglers' points still count toward
+            the total). Averaging keeps the ranking fair if a boat ever carries a different
+            number of anglers than the rest (e.g. 4 instead of 3); with equal crew sizes
+            across every boat, it produces the same ranking as a plain total. A boat's final
+            ranking is the <strong>sum of its daily positions</strong> — lower is better, same
+            as SADSAA's official Skipper Ranking sheet. Total points (raw sum, unaveraged) is
+            shown for reference and as the second tiebreaker. Ties in total position are
+            broken first by most fish caught for the competition, then by total points scored
+            if still tied.
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
@@ -375,7 +392,12 @@ export default function CompetitionAdminScoreboard({
                     <td style={{ padding: '0.5rem 0.6rem', color: GREY, whiteSpace: 'nowrap' }}>{s.boatName}</td>
                     {dayNumbersForSkipper.map(d => (
                       <td key={`pts-${d}`} style={{ padding: '0.5rem 0.5rem', textAlign: 'center', color: GREY }}>
-                        {s.dailyPoints[d] != null ? s.dailyPoints[d].toFixed(2) : '—'}
+                        {s.dailyPoints[d] != null ? (
+                          <>
+                            {s.dailyPoints[d].toFixed(2)}
+                            <div style={{ fontSize: '0.68rem', color: GOLD }}>avg {s.dailyAverage[d].toFixed(2)}</div>
+                          </>
+                        ) : '—'}
                       </td>
                     ))}
                     <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', fontWeight: 700, color: NAVY }}>{s.totalPoints.toFixed(2)}</td>

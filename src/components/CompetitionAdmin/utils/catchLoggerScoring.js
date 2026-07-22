@@ -71,17 +71,33 @@ export async function estimateWeightFromLength(supabase, speciesRow, lengthCm, m
 export async function findSpeciesRowByName(supabase, speciesName) {
   if (!speciesName) return null
   try {
-    const { data, error } = await supabase
-      .from('species')
-      .select('id, common_name, scientific_name, afrikaans_name, catalogue_name, default_length_type, formulas')
-      .or(`catalogue_name.ilike.${speciesName},common_name.ilike.${speciesName}`)
-      .limit(2)
-    if (error) {
-      console.error('findSpeciesRowByName error:', error)
-      return null
+    const tryMatch = async (name) => {
+      const { data, error } = await supabase
+        .from('species')
+        .select('id, common_name, scientific_name, afrikaans_name, catalogue_name, default_length_type, formulas')
+        .or(`catalogue_name.ilike.${name},common_name.ilike.${name}`)
+        .limit(2)
+      if (error) { console.error('findSpeciesRowByName error:', error); return null }
+      if (!data || data.length !== 1) return null // 0 or ambiguous (>1) — don't guess
+      return data[0]
     }
-    if (!data || data.length !== 1) return null // 0 or ambiguous (>1) — don't guess
-    return data[0]
+
+    // Exact match first — cheap and precise for plain single names ('Kob').
+    const exact = await tryMatch(speciesName)
+    if (exact) return exact
+
+    // Many competition species_config names are combined aliases
+    // ('Red Steenbras / Copper', 'Geelbek / Cape Salmon') that won't
+    // exact-match a single common_name/catalogue_name in the species
+    // table. Fall back to a wildcard match on each '/'-separated segment —
+    // still requires an unambiguous single result, so this never guesses
+    // between two real candidates, it just tolerates the alias suffix.
+    const parts = speciesName.split('/').map(p => p.trim()).filter(Boolean)
+    for (const part of parts) {
+      const match = await tryMatch(`%${part}%`)
+      if (match) return match
+    }
+    return null
   } catch (err) {
     console.error('findSpeciesRowByName error:', err)
     return null
