@@ -399,7 +399,7 @@ export default function UniversalCatchLogger({ competitionId }) {
   // that this species' over-line bonus equals its converted weight in kg,
   // not the flat over_line_bonus every other species gets. Async (needs a
   // Supabase round trip for the formula), same pattern as tryAutoCalc below.
-  const [weightFormulaBonuses, setWeightFormulaBonuses] = useState({}) // species -> { total, computing, error }
+  const [weightFormulaBonuses, setWeightFormulaBonuses] = useState({}) // species -> { total, computing, error, byLength: { [lengthStr]: weightKg } }
 
   useEffect(() => {
     let cancelled = false
@@ -409,23 +409,27 @@ export default function UniversalCatchLogger({ competitionId }) {
         if (cfg?.over_line_bonus_type !== 'weight_formula') continue
         const lengths = (row.overLineLengths || []).filter(l => l !== '' && l != null)
         if (lengths.length === 0) {
-          setWeightFormulaBonuses(prev => ({ ...prev, [row.species]: { total: 0, computing: false } }))
+          setWeightFormulaBonuses(prev => ({ ...prev, [row.species]: { total: 0, computing: false, byLength: {} } }))
           continue
         }
         setWeightFormulaBonuses(prev => ({ ...prev, [row.species]: { ...(prev[row.species] || {}), computing: true } }))
         const speciesRow = await findSpeciesRowByName(supabase, row.species)
         if (cancelled) return
         if (!speciesRow) {
-          setWeightFormulaBonuses(prev => ({ ...prev, [row.species]: { total: 0, computing: false, error: 'No formula found for this species' } }))
+          setWeightFormulaBonuses(prev => ({ ...prev, [row.species]: { total: 0, computing: false, error: 'No formula found for this species', byLength: {} } }))
           continue
         }
         let total = 0
+        const byLength = {}
         for (const len of lengths) {
           const est = await estimateWeightFromLength(supabase, speciesRow, len, speciesRow.default_length_type)
-          if (est) total += Math.floor(est.weightKg)
+          if (est) {
+            total += Math.floor(est.weightKg)
+            byLength[len] = est.weightKg
+          }
         }
         if (cancelled) return
-        setWeightFormulaBonuses(prev => ({ ...prev, [row.species]: { total, computing: false } }))
+        setWeightFormulaBonuses(prev => ({ ...prev, [row.species]: { total, computing: false, byLength } }))
       }
     }
     computeAll()
@@ -456,7 +460,7 @@ export default function UniversalCatchLogger({ competitionId }) {
       const bonusEntry = cfg?.over_line_bonus_type === 'weight_formula' ? weightFormulaBonuses[row.species] : null
       const scored = scoreDraftFish({ ...row, isFirstOfSpecies, overLineBonusPoints: bonusEntry?.total }, cfg, config?.scoring)
       const warning = validateDraftFish(row, cfg)
-      return { ...row, _cfg: cfg, _scored: scored, _warning: warning, _overLineBonusComputing: !!bonusEntry?.computing, _overLineBonusError: bonusEntry?.error }
+      return { ...row, _cfg: cfg, _scored: scored, _warning: warning, _overLineBonusComputing: !!bonusEntry?.computing, _overLineBonusError: bonusEntry?.error, _overLineWeightByLength: bonusEntry?.byLength || {} }
     })
   }, [unitCountDraft, config, weightFormulaBonuses])
 
@@ -1031,7 +1035,7 @@ function UnitCountSpeciesRow({ row, onChange }) {
 
           {cfg?.over_line_length_cm ? (
             isWeightFormula ? (
-              <div style={{ minWidth: 190 }}>
+              <div style={{ minWidth: 250 }}>
                 <div style={{ fontSize: '0.7rem', color: '#6b7280', marginBottom: 2 }}>
                   OVER LINE — {cfg.over_line_length_type || 'FL'} length (cm)
                 </div>
@@ -1043,6 +1047,11 @@ function UnitCountSpeciesRow({ row, onChange }) {
                       placeholder="cm"
                       style={{ width: 56, padding: '0.25rem 0.4rem', border: '1px solid #d1d5db', borderRadius: 4, fontSize: '0.8rem' }}
                     />
+                    <span style={{ fontSize: '0.72rem', color: GOLD, minWidth: 78 }}>
+                      {row._overLineWeightByLength?.[len] != null
+                        ? `≈${row._overLineWeightByLength[len].toFixed(2)}kg`
+                        : (len ? '…' : '')}
+                    </span>
                     <button onClick={() => removeOverLineLength(i)}
                       style={{ width: 22, height: 22, borderRadius: '50%', border: '1px solid #d1d5db', background: 'white', cursor: 'pointer', fontSize: '0.75rem', lineHeight: 1 }}>×</button>
                   </div>
