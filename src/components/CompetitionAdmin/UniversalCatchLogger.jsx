@@ -412,7 +412,7 @@ export default function UniversalCatchLogger({ competitionId }) {
           setWeightFormulaBonuses(prev => ({ ...prev, [row.species]: { total: 0, computing: false, byLength: {} } }))
           continue
         }
-        setWeightFormulaBonuses(prev => ({ ...prev, [row.species]: { ...(prev[row.species] || {}), computing: true } }))
+        setWeightFormulaBonuses(prev => ({ ...prev, [row.species]: { total: prev[row.species]?.total ?? 0, computing: true, byLength: {} } }))
         const speciesRow = await findSpeciesRowByName(supabase, row.species)
         if (cancelled) return
         if (!speciesRow) {
@@ -423,6 +423,7 @@ export default function UniversalCatchLogger({ competitionId }) {
         const byLength = {}
         for (const len of lengths) {
           const est = await estimateWeightFromLength(supabase, speciesRow, len, speciesRow.default_length_type)
+          if (cancelled) return // a newer edit superseded this run mid-loop — don't let a stale, still-resolving fish overwrite it
           if (est) {
             total += Math.floor(est.weightKg)
             byLength[len] = est.weightKg
