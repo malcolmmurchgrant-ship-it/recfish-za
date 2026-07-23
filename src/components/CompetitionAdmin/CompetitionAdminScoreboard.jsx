@@ -67,6 +67,31 @@ export default function CompetitionAdminScoreboard({
     [activeCatches, participants, teams, days, boats]
   )
 
+  // SADSAA runs two separate team competitions from the same field —
+  // confirmed with Malcolm/John: ladies' teams (tagged via
+  // competition_teams.team_type = 'ladies') compete for their own team
+  // medals, separate from every other team (the general/open field, which
+  // includes any Mixed teams) — even though everyone fishes together and is
+  // individually ranked together in one open field (see the Individual
+  // Category filter for the equivalent "Top Lady" individual split).
+  // Re-ranking a subset of the already-correctly-ordered combined list
+  // (rather than recomputing standings from scratch) preserves the exact
+  // same ranking/tiebreak logic — splitting is purely "which teams appear
+  // in which table," nothing about how a team's own score is calculated.
+  const ladiesTeamIds = useMemo(() =>
+    new Set((teams || []).filter(t => t.team_type === 'ladies').map(t => t.id)),
+    [teams]
+  )
+  const hasLadiesDivision = ladiesTeamIds.size > 0
+  const generalTeamStandings = useMemo(() =>
+    teamStandings.filter(t => !ladiesTeamIds.has(t.teamId)).map((t, i) => ({ ...t, rank: i + 1 })),
+    [teamStandings, ladiesTeamIds]
+  )
+  const ladiesTeamStandings = useMemo(() =>
+    teamStandings.filter(t => ladiesTeamIds.has(t.teamId)).map((t, i) => ({ ...t, rank: i + 1 })),
+    [teamStandings, ladiesTeamIds]
+  )
+
   // Per-day, per-angler raw points + boat percentage, for the new Daily view
   // and for anyone wanting to see "who was top on this boat, this day"
   // directly (raw points decide the daily award, percentage is what feeds
@@ -311,7 +336,10 @@ export default function CompetitionAdminScoreboard({
       {/* ── Team standings ───────────────────────────────────────────────── */}
       {viewMode === 'teams' && (
         <div>
-          {teamStandings.map((t, i) => (
+          {hasLadiesDivision && (
+            <div style={{ fontWeight: 700, color: NAVY, fontSize: '1.05rem', margin: '0.5rem 0 0.75rem' }}>Team Standings</div>
+          )}
+          {generalTeamStandings.map((t) => (
             <div key={t.teamId} style={{ ...S.card, borderLeft: `4px solid ${RANK_COLORS[t.rank] || '#e5e7eb'}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
                 <div>
@@ -339,8 +367,45 @@ export default function CompetitionAdminScoreboard({
               ))}
             </div>
           ))}
-          {teamStandings.length === 0 && (
+          {generalTeamStandings.length === 0 && (
             <div style={{ ...S.card, color: GREY, textAlign: 'center', fontStyle: 'italic' }}>No team data available.</div>
+          )}
+
+          {hasLadiesDivision && (
+            <>
+              <div style={{ fontWeight: 700, color: NAVY, fontSize: '1.05rem', margin: '1.5rem 0 0.75rem' }}>Ladies' Team Standings</div>
+              {ladiesTeamStandings.map((t) => (
+                <div key={t.teamId} style={{ ...S.card, borderLeft: `4px solid ${RANK_COLORS[t.rank] || '#e5e7eb'}` }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                    <div>
+                      <div style={{ fontWeight: 700, color: NAVY, fontSize: '1rem' }}>
+                        {t.rank <= 3 ? ['🥇','🥈','🥉'][t.rank - 1] + ' ' : `${t.rank}. `}
+                        {t.teamName}
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: GREY }}>{t.members.length} anglers · sum of daily boat %</div>
+                    </div>
+                    <div style={{ fontWeight: 800, fontSize: '1.3rem', color: NAVY }}>{t.totalPercentage.toFixed(2)}%</div>
+                  </div>
+                  {t.members.sort((a, b) => b.percentageSum - a.percentageSum).map(m => (
+                    <div key={m.participantId} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.3rem 0.5rem', background: '#f8fafc', borderRadius: 5, marginBottom: '0.25rem' }}>
+                      <div style={{ flex: 1, fontSize: '0.85rem' }}>
+                        <button
+                          onClick={() => goToAnglersCard(m.participantId)}
+                          title="Open this angler's card in the Catch Logger"
+                          style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 3 }}>
+                          {m.displayName}
+                        </button>
+                      </div>
+                      <div style={{ fontSize: '0.78rem', color: GREY }}>{m.daysCounted} day{m.daysCounted === 1 ? '' : 's'} fished</div>
+                      <div style={{ fontWeight: 700, color: NAVY, minWidth: 60, textAlign: 'right' }}>{m.percentageSum.toFixed(2)}%</div>
+                    </div>
+                  ))}
+                </div>
+              ))}
+              {ladiesTeamStandings.length === 0 && (
+                <div style={{ ...S.card, color: GREY, textAlign: 'center', fontStyle: 'italic' }}>No ladies' team data available.</div>
+              )}
+            </>
           )}
         </div>
       )}
