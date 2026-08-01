@@ -131,6 +131,20 @@ export default function CompetitionAdminReports({
     return standings.map(s => ({ ...s, cpue: byParticipant[s.participantId] ?? null }))
   }, [standings, cpueData])
 
+  // Same open/ladies split as Team Standings, applied to the individual
+  // field — everyone still fishes and is scored together (this doesn't
+  // change anything about how anglerPercentage/points are calculated),
+  // it's purely which report section an angler's row appears in and what
+  // position they're numbered at within that section.
+  const openStandings = useMemo(() =>
+    standingsWithCpue.filter(s => s.category !== 'ladies').map((s, i) => ({ ...s, rank: i + 1 })),
+    [standingsWithCpue]
+  )
+  const ladiesStandings = useMemo(() =>
+    standingsWithCpue.filter(s => s.category === 'ladies').map((s, i) => ({ ...s, rank: i + 1 })),
+    [standingsWithCpue]
+  )
+
   // ── Save reporting config ─────────────────────────────────────────────────
   async function saveReportingConfig() {
     setSavingConfig(true); setError('')
@@ -181,7 +195,7 @@ export default function CompetitionAdminReports({
       if (type === 'csv') {
         downloadCSV(standingsWithCpue, competition, config)
       } else if (type === 'xlsx') {
-        downloadXLSX(standingsWithCpue, catches, competition, config, xlsxMode, { participants, dailyRecords, teamStandings: generalTeamStandings, ladiesTeamStandings, cpueData })
+        downloadXLSX(standingsWithCpue, catches, competition, config, xlsxMode, { participants, dailyRecords, teamStandings: generalTeamStandings, ladiesTeamStandings, cpueData, openStandings, ladiesStandings })
       } else if (type === 'pdf') {
         await downloadPDF(competition.id, 'full_results')
       } else if (type === 'pdf_prize') {
