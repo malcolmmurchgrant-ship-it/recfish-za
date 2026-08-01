@@ -69,16 +69,16 @@ export function downloadCSV(standings, competition, config) {
 // ── XLSX-compatible HTML download ─────────────────────────────────────────────
 export function downloadXLSX(standings, catches, competition, config, mode = 'multi_sheet', extra = {}) {
   const name = sanitiseName(competition.name)
-  const { participants = [], dailyRecords = [], teamStandings = [], ladiesTeamStandings = [], cpueData = null, openStandings = [], ladiesStandings = [] } = extra
+  const { participants = [], dailyRecords = [], teamStandings = [], ladiesTeamStandings = [], cpueData = null, openStandings = [], ladiesStandings = [], skipperRanking = [] } = extra
 
   if (mode === 'single_sheet') {
-    const html = buildSingleSheetHTML(standings, catches, competition, config, participants, dailyRecords, teamStandings, cpueData, ladiesTeamStandings, openStandings, ladiesStandings)
+    const html = buildSingleSheetHTML(standings, catches, competition, config, participants, dailyRecords, teamStandings, cpueData, ladiesTeamStandings, openStandings, ladiesStandings, skipperRanking)
     triggerDownload(
       new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' }),
       `${name}_Results.xls`
     )
   } else {
-    const html = buildMultiSheetHTML(standings, catches, competition, config, participants, dailyRecords, teamStandings, cpueData, ladiesTeamStandings, openStandings, ladiesStandings)
+    const html = buildMultiSheetHTML(standings, catches, competition, config, participants, dailyRecords, teamStandings, cpueData, ladiesTeamStandings, openStandings, ladiesStandings, skipperRanking)
     triggerDownload(
       new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' }),
       `${name}_Full.xls`
@@ -87,7 +87,7 @@ export function downloadXLSX(standings, catches, competition, config, mode = 'mu
 }
 
 
-function buildSingleSheetHTML(standings, catches, competition, config, participants = [], dailyRecords = [], teamStandings = [], cpueData = null, ladiesTeamStandings = [], openStandings = [], ladiesStandings = []) {
+function buildSingleSheetHTML(standings, catches, competition, config, participants = [], dailyRecords = [], teamStandings = [], cpueData = null, ladiesTeamStandings = [], openStandings = [], ladiesStandings = [], skipperRanking = []) {
   const prizeRows = buildPrizeRows(standings, catches, config)
   const showWeight = config?.scoring?.method !== 'points'
   // If a ladies division exists (ladiesStandings non-empty), replace the
@@ -118,6 +118,7 @@ function buildSingleSheetHTML(standings, catches, competition, config, participa
 ${standingsSection}
 ${teamStandings.length ? `<div class="section"><h3>Team Standings</h3>${teamStandingsTable(teamStandings)}</div>` : ''}
 ${ladiesTeamStandings.length ? `<div class="section"><h3>Ladies' Team Standings</h3>${teamStandingsTable(ladiesTeamStandings)}</div>` : ''}
+${skipperRanking.length ? `<div class="section"><h3>Skipper Standings</h3>${skipperStandingsTable(skipperRanking)}</div>` : ''}
 ${dailyRecords.length ? `<div class="section"><h3>Daily Results</h3>${dailyResultsTable(dailyRecords, cpueData)}</div>` : ''}
 <div class="section"><h3>Species Summary</h3>${speciesSummaryTable(catches)}</div>
 <div class="section"><h3>Species by Angler</h3>${catchesSummaryTable(catches, participants)}</div>
@@ -126,7 +127,7 @@ ${prizeRows.length ? `<div class="section"><h3>Prize Categories</h3>${prizeTable
 </body></html>`
 }
 
-function buildMultiSheetHTML(standings, catches, competition, config, participants = [], dailyRecords = [], teamStandings = [], cpueData = null, ladiesTeamStandings = [], openStandings = [], ladiesStandings = []) {
+function buildMultiSheetHTML(standings, catches, competition, config, participants = [], dailyRecords = [], teamStandings = [], cpueData = null, ladiesTeamStandings = [], openStandings = [], ladiesStandings = [], skipperRanking = []) {
   const prizeRows = buildPrizeRows(standings, catches, config)
   const showWeight = config?.scoring?.method !== 'points'
   const sheets = [
@@ -138,6 +139,7 @@ function buildMultiSheetHTML(standings, catches, competition, config, participan
       : [{ name: 'Standings', content: standingsTable(standings, showWeight) }]),
     ...(teamStandings.length ? [{ name: 'Team Standings', content: teamStandingsTable(teamStandings) }] : []),
     ...(ladiesTeamStandings.length ? [{ name: 'Ladies Team Standings', content: teamStandingsTable(ladiesTeamStandings) }] : []),
+    ...(skipperRanking.length ? [{ name: 'Skipper Standings', content: skipperStandingsTable(skipperRanking) }] : []),
     ...(dailyRecords.length  ? [{ name: 'Daily Results',  content: dailyResultsTable(dailyRecords, cpueData) }] : []),
     { name: 'Species Summary', content: speciesSummaryTable(catches) },
     { name: 'Species by Angler', content: catchesSummaryTable(catches, participants) },
@@ -270,6 +272,18 @@ function teamStandingsTable(teamStandings) {
   const rows = teamStandings.map(t => [
     t.rank, t.teamName, `${t.totalPercentage.toFixed(2)}%`,
     t.members.map(m => `${m.displayName} (${m.percentageSum.toFixed(2)}%)`).join('; '),
+  ])
+  return htmlTable(headers, rows)
+}
+
+// Grand-prix style: lower totalPosition is better (sum of daily 1st/2nd/3rd...
+// positions, ranked by each day's average points per angler on the boat).
+// See buildSkipperRanking in scoringEngine.js for the full methodology.
+function skipperStandingsTable(skipperRanking) {
+  const headers = ['Rank', 'Boat', 'Skipper', 'Days Fished', 'Total Fish', 'Total Points', 'Total Position (Grand Prix)']
+  const rows = skipperRanking.map(s => [
+    s.rank, s.boatName, s.skipperName, s.daysFished, s.totalFishCount,
+    s.totalPoints.toFixed(2), s.totalPosition,
   ])
   return htmlTable(headers, rows)
 }

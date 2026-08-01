@@ -7,7 +7,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { downloadCSV, downloadXLSX, downloadPDF } from './utils/reportGenerator'
-import { buildIndividualStandings, buildDailyAnglerPercentages, buildBoatPercentageTeamStandings, buildCpueData } from './utils/scoringEngine'
+import { buildIndividualStandings, buildDailyAnglerPercentages, buildBoatPercentageTeamStandings, buildCpueData, buildSkipperRanking } from './utils/scoringEngine'
 
 // Flip to true once generate-competition-pdf is actually built and deployed
 // as a Supabase Edge Function (confirmed none exist on this project yet).
@@ -57,6 +57,22 @@ export default function CompetitionAdminReports({
 
   const isLocked   = !!competition?.results_published_at || published
   const standings  = useMemo(() => buildIndividualStandings(catches, participants, days, boats), [catches, participants, days, boats])
+
+  // Boat draws, needed for crew-size-aware skipper averaging (same as the
+  // Scoreboard tab) — this tab never fetched them, which is why Skipper
+  // Standings was missing from every report entirely, not just unsplit.
+  const [boatDraws, setBoatDraws] = useState([])
+  useEffect(() => {
+    if (!competition?.id) return
+    supabase.from('competition_boat_draws')
+      .select('*')
+      .eq('competition_id', competition.id)
+      .then(({ data }) => setBoatDraws(data || []))
+  }, [competition?.id])
+  const skipperRanking = useMemo(() =>
+    buildSkipperRanking(catches.filter(c => c.data_quality !== 'rejected'), boats, days, boatDraws),
+    [catches, boats, days, boatDraws]
+  )
   // Weight isn't tracked at all for 'points'-method (unit-count) competitions
   // like this one — species are tallied, not weighed — so a "Total Weight"
   // stat would just show 0.0kg regardless of how much fishing actually
@@ -195,7 +211,7 @@ export default function CompetitionAdminReports({
       if (type === 'csv') {
         downloadCSV(standingsWithCpue, competition, config)
       } else if (type === 'xlsx') {
-        downloadXLSX(standingsWithCpue, catches, competition, config, xlsxMode, { participants, dailyRecords, teamStandings: generalTeamStandings, ladiesTeamStandings, cpueData, openStandings, ladiesStandings })
+        downloadXLSX(standingsWithCpue, catches, competition, config, xlsxMode, { participants, dailyRecords, teamStandings: generalTeamStandings, ladiesTeamStandings, cpueData, openStandings, ladiesStandings, skipperRanking })
       } else if (type === 'pdf') {
         await downloadPDF(competition.id, 'full_results')
       } else if (type === 'pdf_prize') {
