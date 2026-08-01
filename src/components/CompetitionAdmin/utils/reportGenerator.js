@@ -69,16 +69,16 @@ export function downloadCSV(standings, competition, config) {
 // ── XLSX-compatible HTML download ─────────────────────────────────────────────
 export function downloadXLSX(standings, catches, competition, config, mode = 'multi_sheet', extra = {}) {
   const name = sanitiseName(competition.name)
-  const { participants = [], dailyRecords = [], teamStandings = [], cpueData = null } = extra
+  const { participants = [], dailyRecords = [], teamStandings = [], ladiesTeamStandings = [], cpueData = null } = extra
 
   if (mode === 'single_sheet') {
-    const html = buildSingleSheetHTML(standings, catches, competition, config, participants, dailyRecords, teamStandings, cpueData)
+    const html = buildSingleSheetHTML(standings, catches, competition, config, participants, dailyRecords, teamStandings, cpueData, ladiesTeamStandings)
     triggerDownload(
       new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' }),
       `${name}_Results.xls`
     )
   } else {
-    const html = buildMultiSheetHTML(standings, catches, competition, config, participants, dailyRecords, teamStandings, cpueData)
+    const html = buildMultiSheetHTML(standings, catches, competition, config, participants, dailyRecords, teamStandings, cpueData, ladiesTeamStandings)
     triggerDownload(
       new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' }),
       `${name}_Full.xls`
@@ -87,7 +87,7 @@ export function downloadXLSX(standings, catches, competition, config, mode = 'mu
 }
 
 
-function buildSingleSheetHTML(standings, catches, competition, config, participants = [], dailyRecords = [], teamStandings = [], cpueData = null) {
+function buildSingleSheetHTML(standings, catches, competition, config, participants = [], dailyRecords = [], teamStandings = [], cpueData = null, ladiesTeamStandings = []) {
   const prizeRows = buildPrizeRows(standings, catches, config)
   const showWeight = config?.scoring?.method !== 'points'
   return `<html xmlns:o="urn:schemas-microsoft-com:office:office"
@@ -108,6 +108,7 @@ function buildSingleSheetHTML(standings, catches, competition, config, participa
 <p>${competition.venue || ''} · ${competition.start_date || ''}</p>
 <div class="section"><h3>Standings</h3>${standingsTable(standings, showWeight)}</div>
 ${teamStandings.length ? `<div class="section"><h3>Team Standings</h3>${teamStandingsTable(teamStandings)}</div>` : ''}
+${ladiesTeamStandings.length ? `<div class="section"><h3>Ladies' Team Standings</h3>${teamStandingsTable(ladiesTeamStandings)}</div>` : ''}
 ${dailyRecords.length ? `<div class="section"><h3>Daily Results</h3>${dailyResultsTable(dailyRecords, cpueData)}</div>` : ''}
 <div class="section"><h3>Species Summary</h3>${speciesSummaryTable(catches)}</div>
 <div class="section"><h3>Species by Angler</h3>${catchesSummaryTable(catches, participants)}</div>
@@ -116,12 +117,13 @@ ${prizeRows.length ? `<div class="section"><h3>Prize Categories</h3>${prizeTable
 </body></html>`
 }
 
-function buildMultiSheetHTML(standings, catches, competition, config, participants = [], dailyRecords = [], teamStandings = [], cpueData = null) {
+function buildMultiSheetHTML(standings, catches, competition, config, participants = [], dailyRecords = [], teamStandings = [], cpueData = null, ladiesTeamStandings = []) {
   const prizeRows = buildPrizeRows(standings, catches, config)
   const showWeight = config?.scoring?.method !== 'points'
   const sheets = [
     { name: 'Standings',      content: standingsTable(standings, showWeight) },
     ...(teamStandings.length ? [{ name: 'Team Standings', content: teamStandingsTable(teamStandings) }] : []),
+    ...(ladiesTeamStandings.length ? [{ name: 'Ladies Team Standings', content: teamStandingsTable(ladiesTeamStandings) }] : []),
     ...(dailyRecords.length  ? [{ name: 'Daily Results',  content: dailyResultsTable(dailyRecords, cpueData) }] : []),
     { name: 'Species Summary', content: speciesSummaryTable(catches) },
     { name: 'Species by Angler', content: catchesSummaryTable(catches, participants) },

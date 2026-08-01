@@ -75,6 +75,22 @@ export default function CompetitionAdminReports({
     buildBoatPercentageTeamStandings(catches.filter(c => c.data_quality !== 'rejected'), participants, teams, days, boats),
     [catches, participants, teams, days, boats]
   )
+  // Same ladies'-division split as the Scoreboard tab — this is a
+  // genuinely separate code path (its own buildBoatPercentageTeamStandings
+  // call), so it needed its own split; fixing the Scoreboard tab didn't
+  // automatically fix reports.
+  const ladiesTeamIds = useMemo(() =>
+    new Set((teams || []).filter(t => t.team_type === 'ladies').map(t => t.id)),
+    [teams]
+  )
+  const generalTeamStandings = useMemo(() =>
+    teamStandings.filter(t => !ladiesTeamIds.has(t.teamId)).map((t, i) => ({ ...t, rank: i + 1 })),
+    [teamStandings, ladiesTeamIds]
+  )
+  const ladiesTeamStandings = useMemo(() =>
+    teamStandings.filter(t => ladiesTeamIds.has(t.teamId)).map((t, i) => ({ ...t, rank: i + 1 })),
+    [teamStandings, ladiesTeamIds]
+  )
   const dailyByDay = useMemo(() => {
     const byDay = {}
     for (const r of dailyRecords) {
@@ -165,7 +181,7 @@ export default function CompetitionAdminReports({
       if (type === 'csv') {
         downloadCSV(standingsWithCpue, competition, config)
       } else if (type === 'xlsx') {
-        downloadXLSX(standingsWithCpue, catches, competition, config, xlsxMode, { participants, dailyRecords, teamStandings, cpueData })
+        downloadXLSX(standingsWithCpue, catches, competition, config, xlsxMode, { participants, dailyRecords, teamStandings: generalTeamStandings, ladiesTeamStandings, cpueData })
       } else if (type === 'pdf') {
         await downloadPDF(competition.id, 'full_results')
       } else if (type === 'pdf_prize') {
