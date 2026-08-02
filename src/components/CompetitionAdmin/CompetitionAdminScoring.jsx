@@ -211,8 +211,14 @@ export default function CompetitionAdminScoring({
   })()
 
   // Whole competition, every angler, every day, every boat — the overall
-  // species tally for the event so far.
-  const competitionSpeciesGroups = groupCatchesBySpecies(catches.filter(c => c.data_quality !== 'rejected'))
+  // species tally for the event so far. groupCatchesBySpecies sorts by
+  // points by default (right for most of the other places it's used in
+  // this file), but the Competition Summary is specifically about "most
+  // common fish caught" — re-sorted by fish count here so it actually
+  // answers that question, without changing the shared helper's default
+  // for its other callers (the per-boat/per-day breakdowns below).
+  const competitionSpeciesGroups = [...groupCatchesBySpecies(catches.filter(c => c.data_quality !== 'rejected'))]
+    .sort((a, b) => b.fishCount - a.fishCount)
 
   return (
     <div>
