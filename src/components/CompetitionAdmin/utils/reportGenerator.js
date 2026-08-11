@@ -169,16 +169,43 @@ export function downloadPDFReport(standings, catches, competition, config, extra
       skipperRanking.map(s => [s.rank, s.boatName, s.skipperName, s.daysFished, s.totalFishCount, s.totalPoints.toFixed(2), s.totalPosition]))
   }
 
-  // Species Summary
-  // Sorted by fish count (most common first), not groupCatchesBySpecies'
-  // default points-sort — same fix already applied to the on-screen
-  // Competition Summary, for the same reason: this section answers "what's
-  // the most common fish caught," not "which species scored the most."
+  // Species Summary — a horizontal bar chart (species most-caught first),
+  // matching the on-screen Competition Summary's look, rather than a table.
+  // Sorted by fish count, not groupCatchesBySpecies' default points-sort —
+  // same fix already applied on-screen and in the earlier tabular version:
+  // this answers "what's the most common fish caught," not "which species
+  // scored the most."
   const speciesGroups = [...groupCatchesBySpecies(catches.filter(c => c.data_quality !== 'rejected'))]
     .sort((a, b) => b.fishCount - a.fishCount)
   if (speciesGroups.length) {
     sectionHeading('Species Summary')
-    table(['Species', 'Fish Count', 'Total Points'], speciesGroups.map(g => [g.speciesName, g.fishCount, (g.totalPoints || 0).toFixed(2)]))
+    const chartTop = 100
+    const labelWidth = 170
+    const countLabelWidth = 55
+    const barAreaX = 40 + labelWidth
+    const barMaxWidth = pageWidth - 40 - labelWidth - countLabelWidth - 40
+    const rowHeight = 16
+    const maxCount = Math.max(...speciesGroups.map(g => g.fishCount), 1)
+    let y = chartTop
+    const pageHeight = doc.internal.pageSize.getHeight()
+    doc.setFontSize(8)
+    for (const g of speciesGroups) {
+      if (y > pageHeight - 40) {
+        doc.addPage()
+        doc.setFontSize(13); doc.setTextColor(...NAVY); doc.setFont(undefined, 'bold')
+        doc.text('Species Summary (continued)', 40, 40)
+        doc.setFontSize(8); doc.setFont(undefined, 'normal')
+        y = 70
+      }
+      doc.setTextColor(31, 41, 55)
+      doc.text(String(g.speciesName), 40, y + 7, { maxWidth: labelWidth - 10 })
+      const barWidth = Math.max((g.fishCount / maxCount) * barMaxWidth, 1)
+      doc.setFillColor(...NAVY)
+      doc.rect(barAreaX, y, barWidth, 10, 'F')
+      doc.setTextColor(107, 114, 128)
+      doc.text(`${g.fishCount} fish`, barAreaX + barMaxWidth + 5, y + 7)
+      y += rowHeight
+    }
   }
 
   doc.save(`${name}_Results.pdf`)
