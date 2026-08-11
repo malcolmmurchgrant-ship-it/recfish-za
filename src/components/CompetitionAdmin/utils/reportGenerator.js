@@ -1,8 +1,14 @@
 // ─── reportGenerator.js ──────────────────────────────────────────────────────
-// Generates CSV and XLSX-compatible HTML reports from competition standings.
-// No external packages required — uses only browser built-ins.
-// PDF generation is handled server-side via Supabase Edge Function.
+// Generates CSV, XLSX-compatible HTML, and PDF reports from competition
+// standings. CSV/XLSX use only browser built-ins; PDF uses jsPDF +
+// jspdf-autotable (already project dependencies — see package.json —
+// previously only used by the legacy, hardcoded competitionPDF.js for two
+// specific old competitions). Generated entirely client-side; no server
+// component required, unlike the old downloadPDF() below, which called a
+// Supabase Edge Function that was never actually built or deployed.
 
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 import { groupCatchesBySpecies } from './scoringEngine'
 // Static import, matching every other file in the codebase. This used to be
 // a dynamic import() inside downloadPDF only -- Vite's own build warning
@@ -86,6 +92,92 @@ export function downloadXLSX(standings, catches, competition, config, mode = 'mu
   }
 }
 
+
+// ── PDF ──────────────────────────────────────────────────────────────────
+// A summary report, not a raw-data dump — covers Standings, Team
+// Standings, Skipper Standings, and Species Summary (same open/ladies
+// split as the XLSX export), plus Prize Winners if configured. Deliberately
+// leaves out the row-level detail (Species by Angler, All Catches) that
+// the XLSX/CSV already cover — a PDF is for reading and printing, not for
+// re-importing data, so it stays to a readable length instead of matching
+// the XLSX section-for-section.
+export function downloadPDFReport(standings, catches, competition, config, extra = {}) {
+  const { teamStandings = [], ladiesTeamStandings = [], openStandings = [], ladiesStandings = [], skipperRanking = [] } = extra
+  const name = sanitiseName(competition.name)
+  const showWeight = config?.scoring?.method !== 'points'
+  const hasLadies = ladiesStandings.length > 0
+
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' })
+  const NAVY = [30, 58, 138]
+  const pageWidth = doc.internal.pageSize.getWidth()
+  let firstSection = true
+
+  function sectionHeading(title) {
+    if (!firstSection) doc.addPage()
+    firstSection = false
+    doc.setFontSize(16); doc.setTextColor(...NAVY); doc.setFont(undefined, 'bold')
+    doc.text(competition.name || 'Results', 40, 40)
+    doc.setFontSize(10); doc.setTextColor(107, 114, 128); doc.setFont(undefined, 'normal')
+    doc.text(`${competition.venue || ''}${competition.venue && competition.start_date ? ' · ' : ''}${competition.start_date || ''}`, 40, 56)
+    doc.setFontSize(13); doc.setTextColor(...NAVY); doc.setFont(undefined, 'bold')
+    doc.text(title, 40, 80)
+  }
+
+  function table(headers, rows) {
+    autoTable(doc, {
+      startY: 90, margin: { left: 40, right: 40 },
+      head: [headers], body: rows,
+      headStyles: { fillColor: NAVY, textColor: 255, fontSize: 8 },
+      styles: { fontSize: 8, cellPadding: 4 },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+    })
+  }
+
+  // Standings (Open/Ladies split, same as XLSX)
+  const standingsHeaders = ['Rank', 'Name', 'Team', 'Angler %', 'Points', 'Species', 'Catches', 'Best Fish']
+  const standingsRows = s => s.map(x => [
+    x.rank, x.displayName, x.teamName || '', `${(x.anglerPercentage || 0).toFixed(2)}%`,
+    (x.totalPoints || 0).toFixed(2), x.speciesCount || 0, x.catchCount || 0, x.bestFish?.species_name || '',
+  ])
+  sectionHeading('Standings')
+  table(standingsHeaders, standingsRows(hasLadies ? openStandings : standings))
+  if (hasLadies) {
+    sectionHeading("Ladies' Standings")
+    table(standingsHeaders, standingsRows(ladiesStandings))
+  }
+
+  // Team Standings (Open/Ladies split)
+  if (teamStandings.length) {
+    sectionHeading('Team Standings')
+    table(['Rank', 'Team', 'Total %', 'Anglers'], teamStandings.map(t => [
+      t.rank, t.teamName, `${t.totalPercentage.toFixed(2)}%`,
+      t.members.map(m => `${m.displayName} (${m.percentageSum.toFixed(2)}%)`).join('; '),
+    ]))
+  }
+  if (ladiesTeamStandings.length) {
+    sectionHeading("Ladies' Team Standings")
+    table(['Rank', 'Team', 'Total %', 'Anglers'], ladiesTeamStandings.map(t => [
+      t.rank, t.teamName, `${t.totalPercentage.toFixed(2)}%`,
+      t.members.map(m => `${m.displayName} (${m.percentageSum.toFixed(2)}%)`).join('; '),
+    ]))
+  }
+
+  // Skipper Standings
+  if (skipperRanking.length) {
+    sectionHeading('Skipper Standings')
+    table(['Rank', 'Boat', 'Skipper', 'Days Fished', 'Total Fish', 'Total Points', 'Total Position (Grand Prix)'],
+      skipperRanking.map(s => [s.rank, s.boatName, s.skipperName, s.daysFished, s.totalFishCount, s.totalPoints.toFixed(2), s.totalPosition]))
+  }
+
+  // Species Summary
+  const speciesGroups = groupCatchesBySpecies(catches.filter(c => c.data_quality !== 'rejected'))
+  if (speciesGroups.length) {
+    sectionHeading('Species Summary')
+    table(['Species', 'Fish Count', 'Total Points'], speciesGroups.map(g => [g.speciesName, g.fishCount, (g.totalPoints || 0).toFixed(2)]))
+  }
+
+  doc.save(`${name}_Results.pdf`)
+}
 
 function buildSingleSheetHTML(standings, catches, competition, config, participants = [], dailyRecords = [], teamStandings = [], cpueData = null, ladiesTeamStandings = [], openStandings = [], ladiesStandings = [], skipperRanking = []) {
   const prizeRows = buildPrizeRows(standings, catches, config)

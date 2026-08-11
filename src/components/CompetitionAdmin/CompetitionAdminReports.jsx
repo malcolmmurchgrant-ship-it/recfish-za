@@ -6,12 +6,12 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
-import { downloadCSV, downloadXLSX, downloadPDF } from './utils/reportGenerator'
+import { downloadCSV, downloadXLSX, downloadPDFReport } from './utils/reportGenerator'
 import { buildIndividualStandings, buildDailyAnglerPercentages, buildBoatPercentageTeamStandings, buildCpueData, buildSkipperRanking } from './utils/scoringEngine'
 
 // Flip to true once generate-competition-pdf is actually built and deployed
 // as a Supabase Edge Function (confirmed none exist on this project yet).
-const PDF_ENABLED = false
+const PDF_ENABLED = true // Full Results only — see handleDownload; Prize Giving/Scorer's Sheet PDFs still not built
 
 const NAVY  = '#1e3a8a'
 const GREY  = '#6b7280'
@@ -213,11 +213,9 @@ export default function CompetitionAdminReports({
       } else if (type === 'xlsx') {
         downloadXLSX(standingsWithCpue, catches, competition, config, xlsxMode, { participants, dailyRecords, teamStandings: generalTeamStandings, ladiesTeamStandings, cpueData, openStandings, ladiesStandings, skipperRanking })
       } else if (type === 'pdf') {
-        await downloadPDF(competition.id, 'full_results')
-      } else if (type === 'pdf_prize') {
-        await downloadPDF(competition.id, 'prize_giving')
-      } else if (type === 'pdf_scorer') {
-        await downloadPDF(competition.id, 'scorer_sheet')
+        downloadPDFReport(standingsWithCpue, catches, competition, config, { teamStandings: generalTeamStandings, ladiesTeamStandings, openStandings, ladiesStandings, skipperRanking })
+      } else if (type === 'pdf_prize' || type === 'pdf_scorer') {
+        throw new Error('This PDF type isn\'t built yet — only Full Results PDF is available so far.')
       }
     } catch (err) {
       setError(`Download failed: ${err.message}`)
@@ -443,9 +441,7 @@ export default function CompetitionAdminReports({
             // Flip PDF_ENABLED to true once that function is built and
             // deployed; no other change needed here.
             ...(PDF_ENABLED ? [
-              { type: 'pdf',        label: '📋 Full Results PDF',       desc: 'Complete results report' },
-              { type: 'pdf_prize',  label: '🏆 Prize Giving PDF',      desc: 'Category winners summary' },
-              { type: 'pdf_scorer', label: '📝 Scorer\'s Sheet PDF',   desc: 'Internal audit sheet' },
+              { type: 'pdf',        label: '📋 Full Results PDF',       desc: 'Standings, teams, skippers, species — printable summary' },
             ] : []),
           ].map(r => (
             <button key={r.type} onClick={() => handleDownload(r.type)}
