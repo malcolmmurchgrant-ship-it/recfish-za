@@ -93,6 +93,61 @@ function hoursBetween(linesIn, linesUp) {
 }
 
 // ─── STEP 1: COMPETITION ───────────────────────────────────────────────────────
+// Creates/updates competition_days to match the competition's start_date +
+// num_fishing_days — the Wizard never did this at all before, which is the
+// root cause of the fishing_date/competition_day_id inconsistency found
+// during East London 2026 (boat draws and fishing sessions had nothing
+// real to link to). Also reusable any time the schedule changes later
+// (e.g. a weather cancellation shifting dates) — call this again and the
+// day rows just resync, instead of needing hand-written SQL each time.
+//
+// Existing days are updated in place (never deleted-and-recreated) so
+// their id stays stable for anything already referencing competition_day_id.
+// A day beyond the new num_fishing_days is only deleted if nothing's been
+// logged against it yet — a day with real catches is left alone rather
+// than silently destroyed by shortening the schedule.
+async function syncCompetitionDays(competitionId, startDate, numDays) {
+  if (!competitionId || !startDate || !numDays) return { error: null }
+
+  const { data: existing, error: fetchErr } = await supabase
+    .from('competition_days')
+    .select('*')
+    .eq('competition_id', competitionId)
+  if (fetchErr) return { error: fetchErr }
+
+  const targetDays = Array.from({ length: numDays }, (_, i) => {
+    const d = new Date(startDate + 'T00:00:00')
+    d.setDate(d.getDate() + i)
+    return { day_number: i + 1, date: d.toISOString().slice(0, 10) }
+  })
+  const byDayNumber = Object.fromEntries((existing || []).map(d => [d.day_number, d]))
+
+  for (const t of targetDays) {
+    const cur = byDayNumber[t.day_number]
+    if (!cur) {
+      const { error } = await supabase.from('competition_days')
+        .insert({ competition_id: competitionId, day_number: t.day_number, date: t.date })
+      if (error) return { error }
+    } else if (cur.date !== t.date) {
+      const { error } = await supabase.from('competition_days')
+        .update({ date: t.date }).eq('id', cur.id)
+      if (error) return { error }
+    }
+  }
+
+  const extraDays = (existing || []).filter(d => d.day_number > numDays)
+  for (const d of extraDays) {
+    const { count } = await supabase.from('competition_catches')
+      .select('id', { count: 'exact', head: true }).eq('competition_day_id', d.id)
+    if (!count) {
+      await supabase.from('competition_days').delete().eq('id', d.id)
+    }
+    // else: real catches exist against this day — leave it, don't delete silently.
+  }
+
+  return { error: null }
+}
+
 function CompetitionStep({ competition, onSaved, recentComps, onPickExisting }) {
   const [federations, setFederations]   = useState([])
   const [associations, setAssociations] = useState([])
@@ -214,6 +269,20 @@ function CompetitionStep({ competition, onSaved, recentComps, onPickExisting }) 
       }
     }
     if (saveError) { setError(saveError.message); setSaving(false); return }
+
+    // Keep competition_days in sync with start_date/num_fishing_days —
+    // creates them on first save, resyncs dates if the schedule changes
+    // later. Doesn't block the save if this fails; the competition itself
+    // is already saved, but the person needs to know days aren't right.
+    if (savedData?.id && payload.start_date && payload.num_fishing_days) {
+      const { error: daysError } = await syncCompetitionDays(savedData.id, payload.start_date, payload.num_fishing_days)
+      if (daysError) {
+        setError(`Competition saved, but fishing days couldn't be synced automatically (${daysError.message}). Boat draws and the catch logger depend on these — check with Malcolm before continuing.`)
+        setSaving(false)
+        return
+      }
+    }
+
     setSaving(false); setSaved(true)
     setTimeout(() => { setSaved(false); onSaved(savedData) }, 1800)
   }
@@ -862,6 +931,7 @@ function BoatDrawStep({ competition }) {
   const [teams, setTeams] = useState([])
   const [participants, setParticipants] = useState([])
   const [draws, setDraws] = useState([])
+  const [compDays, setCompDays] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -873,13 +943,14 @@ function BoatDrawStep({ competition }) {
   const load = useCallback(async () => {
     if (!competition?.id) return
     setLoading(true)
-    const [{ data: b }, { data: t }, { data: p }, { data: d }] = await Promise.all([
+    const [{ data: b }, { data: t }, { data: p }, { data: d }, { data: cd }] = await Promise.all([
       supabase.from('competition_boats').select('*').eq('competition_id', competition.id).order('boat_name'),
       supabase.from('competition_teams').select('*').eq('competition_id', competition.id).order('team_name'),
       supabase.from('competition_participants').select('*').eq('competition_id', competition.id).order('full_name'),
       supabase.from('competition_boat_draws').select('*').eq('competition_id', competition.id),
+      supabase.from('competition_days').select('*').eq('competition_id', competition.id).order('day_number'),
     ])
-    setBoats(b || []); setTeams(t || []); setParticipants(p || []); setDraws(d || [])
+    setBoats(b || []); setTeams(t || []); setParticipants(p || []); setDraws(d || []); setCompDays(cd || [])
     setLoading(false)
   }, [competition?.id])
 
@@ -906,28 +977,35 @@ function BoatDrawStep({ competition }) {
     </div>
   )
   if (loading) return <div style={{ color: GREY }}>Loading…</div>
+  if (compDays.length === 0) return (
+    <div style={{ ...S.card, color: GREY, fontStyle: 'italic' }}>
+      No fishing days found for this competition yet — go back to the first
+      step and re-save the competition (with a start date and number of
+      fishing days set) to create them, then come back here.
+    </div>
+  )
 
-  const datesForDays = {}
-  for (const dayNum of days) {
-    if (!competition.start_date) continue
-    const d = new Date(competition.start_date + 'T00:00:00')
-    d.setDate(d.getDate() + (dayNum - 1))
-    datesForDays[dayNum] = d.toISOString().slice(0, 10)
-  }
+  // dayByNumber uses the REAL competition_days rows (created/synced when the
+  // Competition step is saved — see syncCompetitionDays above), not a
+  // client-computed guess. This is what actually fixes the fishing_date/
+  // competition_day_id inconsistency found during East London 2026: both
+  // columns get written together, from the same source of truth, every time.
+  const dayByNumber = Object.fromEntries(compDays.map(d => [d.day_number, d]))
 
   const findDraw = (participantId, dayNum) => {
-    const dateStr = datesForDays[dayNum]
-    return draws.find(d => d.participant_id === participantId && d.fishing_date === dateStr)
+    const day = dayByNumber[dayNum]
+    if (!day) return null
+    return draws.find(d => d.participant_id === participantId && d.competition_day_id === day.id)
   }
 
   const saveDraw = async (participantId, dayNum, boatId) => {
-    const dateStr = datesForDays[dayNum]
-    if (!dateStr) return
+    const day = dayByNumber[dayNum]
+    if (!day) return
     setSaving(true)
     const existing = findDraw(participantId, dayNum)
     const payload = {
       competition_id: competition.id, participant_id: participantId,
-      boat_id: boatId || null, fishing_date: dateStr,
+      boat_id: boatId || null, competition_day_id: day.id, fishing_date: day.date,
     }
     const { error: err } = existing
       ? await supabase.from('competition_boat_draws').update(payload).eq('id', existing.id)
@@ -943,11 +1021,12 @@ function BoatDrawStep({ competition }) {
   // than each call reloading independently and showing flickering,
   // partially-saved intermediate state.
   const saveTeamDrawRaw = async (teamId, dayNum, boatId) => {
+    const day = dayByNumber[dayNum]
+    if (!day) return
     const teamAnglers = participants.filter(p => p.team_id === teamId)
     for (const p of teamAnglers) {
-      const dateStr = datesForDays[dayNum]
       const existing = findDraw(p.id, dayNum)
-      const payload = { competition_id: competition.id, participant_id: p.id, boat_id: boatId || null, fishing_date: dateStr }
+      const payload = { competition_id: competition.id, participant_id: p.id, boat_id: boatId || null, competition_day_id: day.id, fishing_date: day.date }
       if (existing) await supabase.from('competition_boat_draws').update(payload).eq('id', existing.id)
       else await supabase.from('competition_boat_draws').insert(payload)
     }
@@ -1018,7 +1097,7 @@ function BoatDrawStep({ competition }) {
             <thead>
               <tr>
                 <th style={{ textAlign: 'left', padding: '0.5rem' }}>Team</th>
-                {days.map(d => <th key={d} style={{ textAlign: 'left', padding: '0.5rem' }}>Day {d}</th>)}
+                {days.map(d => <th key={d} style={{ textAlign: 'left', padding: '0.5rem' }}>Day {d}{dayByNumber[d]?.date ? <div style={{ fontWeight: 400, fontSize: '0.72rem', color: '#6b7280' }}>{dayByNumber[d].date}</div> : null}</th>)}
               </tr>
             </thead>
             <tbody>
@@ -1057,7 +1136,7 @@ function BoatDrawStep({ competition }) {
               <tr>
                 <th style={{ textAlign: 'left', padding: '0.5rem' }}>Angler</th>
                 <th style={{ textAlign: 'left', padding: '0.5rem' }}>Team</th>
-                {days.map(d => <th key={d} style={{ textAlign: 'left', padding: '0.5rem' }}>Day {d}</th>)}
+                {days.map(d => <th key={d} style={{ textAlign: 'left', padding: '0.5rem' }}>Day {d}{dayByNumber[d]?.date ? <div style={{ fontWeight: 400, fontSize: '0.72rem', color: '#6b7280' }}>{dayByNumber[d].date}</div> : null}</th>)}
               </tr>
             </thead>
             <tbody>
