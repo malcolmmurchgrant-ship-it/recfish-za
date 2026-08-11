@@ -47,6 +47,14 @@ export default function CompetitionAdminParticipants({ competition, config, days
     full_name: '', angler_number: '', team_id: '', line_class_kg: '', category: 'open', is_captain: false,
   })
 
+  // Edit existing angler state — same field shape as add, but keyed to a
+  // participant id being edited in place. This was the gap flagged during
+  // East London 2026: renaming/replacing an angler had to go through SQL
+  // because there was no way to edit one after registration, only add or
+  // disqualify.
+  const [editingAnglerId, setEditingAnglerId] = useState(null)
+  const [editAngler,      setEditAngler]      = useState(null)
+
   useEffect(() => { 
     if (competition?.id) load() 
   }, [competition?.id])
@@ -90,6 +98,44 @@ export default function CompetitionAdminParticipants({ competition, config, days
     setSaving(false)
     // Small delay to ensure DB write is committed before re-fetching
     setTimeout(() => load(), 300)
+  }
+
+  // ── Edit existing angler ─────────────────────────────────────────────────
+  function handleStartEdit(p) {
+    setEditingAnglerId(p.id)
+    setEditAngler({
+      full_name: p.full_name || '', angler_number: p.angler_number || '',
+      team_id: p.team_id || '', line_class_kg: p.line_class_kg ? String(p.line_class_kg) : '',
+      category: p.category || 'open', is_captain: !!p.is_captain,
+    })
+    setError('')
+  }
+
+  function handleCancelEdit() {
+    setEditingAnglerId(null)
+    setEditAngler(null)
+    setError('')
+  }
+
+  async function handleSaveEdit() {
+    if (!editAngler?.full_name?.trim()) { setError('Name is required'); return }
+    setSaving(true); setError('')
+    const { error: err } = await supabase
+      .from('competition_participants')
+      .update({
+        full_name:      editAngler.full_name.trim(),
+        angler_number:  editAngler.angler_number.trim() || null,
+        team_id:        editAngler.team_id || null,
+        line_class_kg:  editAngler.line_class_kg ? parseInt(editAngler.line_class_kg) : null,
+        category:       editAngler.category,
+        is_captain:     editAngler.is_captain,
+      })
+      .eq('id', editingAnglerId)
+    if (err) { setError(err.message); setSaving(false); return }
+    setSaving(false)
+    setEditingAnglerId(null)
+    setEditAngler(null)
+    load()
   }
 
   // ── DQ angler ─────────────────────────────────────────────────────────────
@@ -244,7 +290,74 @@ export default function CompetitionAdminParticipants({ competition, config, days
             <div style={{ ...S.card, color: GREY, textAlign: 'center', fontStyle: 'italic' }}>
               {search ? 'No anglers match your search.' : 'No anglers registered yet.'}
             </div>
-          ) : filtered.map(p => (
+          ) : filtered.map(p => editingAnglerId === p.id ? (
+            <div key={p.id} style={{ ...S.card, border: '2px solid #93c5fd' }}>
+              <div style={S.section}>Edit Angler</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                <div>
+                  <label style={S.label}>Full Name *</label>
+                  <input style={S.input} placeholder="First Last"
+                    value={editAngler.full_name}
+                    onChange={e => setEditAngler(a => ({ ...a, full_name: e.target.value }))} />
+                </div>
+                <div>
+                  <label style={S.label}>Angler Number</label>
+                  <input style={S.input} placeholder="e.g. A01"
+                    value={editAngler.angler_number}
+                    onChange={e => setEditAngler(a => ({ ...a, angler_number: e.target.value }))} />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                {hasTeams && (
+                  <div>
+                    <label style={S.label}>Team</label>
+                    <select style={S.select} value={editAngler.team_id}
+                      onChange={e => setEditAngler(a => ({ ...a, team_id: e.target.value }))}>
+                      <option value="">— No team —</option>
+                      {teams.map(t => <option key={t.id} value={t.id}>{t.team_name || t.province}</option>)}
+                    </select>
+                  </div>
+                )}
+                <div>
+                  <label style={S.label}>Category</label>
+                  <select style={S.select} value={editAngler.category}
+                    onChange={e => setEditAngler(a => ({ ...a, category: e.target.value }))}>
+                    <option value="open">Open</option>
+                    <option value="junior">Junior</option>
+                    <option value="ladies">Ladies</option>
+                    <option value="senior">Senior</option>
+                  </select>
+                </div>
+                {hasLineClass && lineClasses.length > 0 && (
+                  <div>
+                    <label style={S.label}>Line Class (kg)</label>
+                    <select style={S.select} value={editAngler.line_class_kg}
+                      onChange={e => setEditAngler(a => ({ ...a, line_class_kg: e.target.value }))}>
+                      <option value="">— Select —</option>
+                      {lineClasses.map(lc => <option key={lc} value={lc}>{lc} kg</option>)}
+                    </select>
+                  </div>
+                )}
+                {hasTeams && (
+                  <div style={{ display: 'flex', alignItems: 'flex-end', paddingBottom: '0.6rem' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.9rem' }}>
+                      <input type="checkbox" checked={editAngler.is_captain}
+                        onChange={e => setEditAngler(a => ({ ...a, is_captain: e.target.checked }))} />
+                      Team Captain
+                    </label>
+                  </div>
+                )}
+              </div>
+              {error && <div style={{ color: RED, fontSize: '0.85rem', marginBottom: '0.5rem' }}>{error}</div>}
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button onClick={handleSaveEdit} disabled={saving || !editAngler.full_name}
+                  style={{ ...S.btn(GREEN), opacity: !editAngler.full_name ? 0.5 : 1 }}>
+                  {saving ? 'Saving…' : '✓ Save Changes'}
+                </button>
+                <button onClick={handleCancelEdit} style={S.btn(GREY)}>Cancel</button>
+              </div>
+            </div>
+          ) : (
             <div key={p.id} style={{ ...S.card, borderLeft: `4px solid ${isDQ(p) ? RED : GREEN}`, opacity: isDQ(p) ? 0.75 : 1 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
                 <div>
@@ -265,6 +378,12 @@ export default function CompetitionAdminParticipants({ competition, config, days
                 </div>
                 {(isAdmin || isScorer) && (
                   <div style={{ display: 'flex', gap: '0.4rem' }}>
+                    {isAdmin && !isDQ(p) && (
+                      <button onClick={() => handleStartEdit(p)}
+                        style={{ ...S.btn(NAVY), padding: '0.3rem 0.7rem', fontSize: '0.78rem' }}>
+                        ✎ Edit
+                      </button>
+                    )}
                     {!isDQ(p) ? (
                       <button onClick={() => { setDqModal(p); setDqDayScope(days?.length > 0 ? '' : 'all') }}
                         style={{ ...S.btn(RED), padding: '0.3rem 0.7rem', fontSize: '0.78rem' }}>
