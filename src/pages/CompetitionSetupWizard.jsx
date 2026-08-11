@@ -17,6 +17,19 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
+// Date.toISOString() converts to UTC first — for anyone in a timezone
+// ahead of UTC (South Africa is UTC+2), a Date built from local midnight
+// lands on the PREVIOUS day once converted to UTC and sliced, silently
+// shifting every computed date back by one. This formats from the Date
+// object's own local getters instead, so "21 August" entered stays
+// "21 August" saved, regardless of the browser's timezone.
+function toLocalDateStr(d) {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 const NAVY  = '#1e3a8a'
 const GOLD  = '#d97706'
@@ -118,7 +131,7 @@ async function syncCompetitionDays(competitionId, startDate, numDays) {
   const targetDays = Array.from({ length: numDays }, (_, i) => {
     const d = new Date(startDate + 'T00:00:00')
     d.setDate(d.getDate() + i)
-    return { day_number: i + 1, date: d.toISOString().slice(0, 10) }
+    return { day_number: i + 1, date: toLocalDateStr(d) }
   })
   const byDayNumber = Object.fromEntries((existing || []).map(d => [d.day_number, d]))
 
@@ -897,7 +910,7 @@ function SessionsStep({ competition }) {
     if (!startDate) return ''
     const d = new Date(startDate + 'T00:00:00')
     d.setDate(d.getDate() + (dayNum - 1))
-    return d.toISOString().slice(0, 10)
+    return toLocalDateStr(d)
   }
 
   // Local, editable copy of each boat/day's session — seeded from whatever's
