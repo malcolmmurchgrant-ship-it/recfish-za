@@ -148,11 +148,62 @@ async function syncCompetitionDays(competitionId, startDate, numDays) {
   return { error: null }
 }
 
+// Turns a competition_templates row's scoring/species/team config into a
+// short list of plain-English bullets — the "written explanation" that
+// lets an organizer actually judge whether a past competition's scoring
+// protocol matches what they need this time, instead of guessing from a
+// name. Deliberately doesn't try to explain every field — just the ones
+// that have actually turned out to matter (points-per-fish tiers, the
+// over-line bonus, weight-formula species, skipper scoring) plus a clear
+// note about what ISN'T decided at the template level (ladies division,
+// exact bag limits per venue) so nobody assumes more than what's really here.
+function describeTemplateConfig(tpl) {
+  if (!tpl) return ['No scoring template linked to this competition — nothing to inherit.']
+
+  const bullets = []
+  const sc = tpl.scoring_config || {}
+  const species = tpl.species_config?.eligible_species || []
+  const team = tpl.team_config || {}
+
+  bullets.push(`${tpl.discipline || 'Unknown discipline'}${tpl.level ? ` · ${tpl.level}` : ''}${tpl.category ? ` · ${tpl.category}` : ''}`)
+
+  if (sc.method === 'points') {
+    bullets.push('Scoring: points per fish (varies by species tier), plus a bonus for the first catch of each species')
+  } else if (sc.method) {
+    bullets.push(`Scoring method: ${sc.method}`)
+  }
+  if (sc.line_class_kg) bullets.push(`Line class: ${sc.line_class_kg}kg`)
+
+  if (team.team_format === 'split_boat') {
+    bullets.push(`Team format: boats rotate crews day to day (${team.team_size_min ?? tpl.team_size ?? '?'}-angler crews) — no fixed boat for the whole event`)
+  } else if (tpl.team_format) {
+    bullets.push(`Team format: ${tpl.team_format}`)
+  }
+
+  if (species.length) {
+    const tiers = [...new Set(species.map(s => s.points_per_fish).filter(v => v != null))].sort((a, b) => a - b)
+    bullets.push(`${species.length} species configured${tiers.length ? `, ${tiers.join('/')} points per fish depending on species` : ''}`)
+    const weightFormulaSpecies = species.filter(s => s.over_line_bonus_type === 'weight_formula').map(s => s.name)
+    if (weightFormulaSpecies.length) {
+      bullets.push(`⚠ Variable (weight-calculated) over-line bonus for: ${weightFormulaSpecies.join(', ')} — not a flat bonus like the rest`)
+    }
+  }
+
+  if (tpl.skipper_competition) {
+    bullets.push(`Skipper standings: yes${tpl.skipper_scoring_method === 'average_gp' ? ', ranked by each boat\'s average points per angler per day (grand-prix style, not raw total)' : ''}`)
+  }
+
+  bullets.push("Not set at this level — decided later when teams are added: ladies' division split, exact team names/provinces")
+
+  return bullets
+}
+
 function CompetitionStep({ competition, onSaved, recentComps, onPickExisting }) {
   const [federations, setFederations]   = useState([])
   const [associations, setAssociations] = useState([])
   const [templates, setTemplates]       = useState([])
   const [showPicker, setShowPicker]     = useState(!competition?.id)
+  const [expandedCompId, setExpandedCompId] = useState(null)
   const [form, setForm] = useState({
     name: '', short_name: '', federation_id: '', association_id: '',
     template_id: '', discipline: '', level: '', category: 'open',
@@ -289,16 +340,33 @@ function CompetitionStep({ competition, onSaved, recentComps, onPickExisting }) 
 
   const selectedTpl = templates.find(t => t.id === form.template_id)
 
+  // A "draft" is genuinely unfinished — never published, no status yet.
+  // Everything else is done-and-dusted: reference material to start FROM,
+  // never something to reopen and edit (that was the actual problem —
+  // clicking a finished competition used to navigate straight into
+  // editing its real, already-scored data).
+  const drafts = recentComps.filter(c => c.status !== 'completed' && !c.results_published_at)
+  const pastComps = recentComps.filter(c => c.status === 'completed' || c.results_published_at)
+
+  const handleUseAsTemplate = (templateId) => {
+    if (templateId) handleTemplateChange(templateId)
+    setShowPicker(false)
+  }
+
   return (
     <div>
       {showPicker && (
         <div style={{ ...S.card, borderLeft: `4px solid ${GOLD}` }}>
           <div style={{ fontWeight: 700, color: NAVY, marginBottom: '0.75rem' }}>
-            Start a new competition, or continue one already in progress
+            Start a new competition
           </div>
-          {recentComps.length > 0 && (
-            <div style={{ marginBottom: '0.75rem' }}>
-              {recentComps.map(c => (
+
+          {drafts.length > 0 && (
+            <div style={{ marginBottom: '1.25rem' }}>
+              <div style={{ fontSize: '0.78rem', fontWeight: 700, color: GREY, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.4rem' }}>
+                Continue a draft
+              </div>
+              {drafts.map(c => (
                 <div key={c.id} onClick={() => { onPickExisting(c.id); setShowPicker(false) }}
                   style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 0.75rem', borderRadius: 6, cursor: 'pointer', marginBottom: '0.25rem', background: '#f9fafb' }}
                   onMouseEnter={e => e.currentTarget.style.background='#eff6ff'}
@@ -309,7 +377,47 @@ function CompetitionStep({ competition, onSaved, recentComps, onPickExisting }) 
               ))}
             </div>
           )}
-          <button onClick={() => setShowPicker(false)} style={S.btn(GREEN)}>+ Set Up a New Competition</button>
+
+          {pastComps.length > 0 && (
+            <div style={{ marginBottom: '0.75rem' }}>
+              <div style={{ fontSize: '0.78rem', fontWeight: 700, color: GREY, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.4rem' }}>
+                Or use a past competition as a starting point
+              </div>
+              <div style={{ fontSize: '0.8rem', color: GREY, marginBottom: '0.6rem' }}>
+                These are finished — picking one never reopens or edits them. It just carries over the same scoring
+                protocol into a brand-new competition, which you'll still name and configure yourself. Expand one to
+                see exactly what that protocol is before deciding.
+              </div>
+              {pastComps.map(c => {
+                const tpl = templates.find(t => t.id === c.template_id)
+                const isExpanded = expandedCompId === c.id
+                return (
+                  <div key={c.id} style={{ borderRadius: 6, marginBottom: '0.4rem', background: '#f9fafb', overflow: 'hidden' }}>
+                    <div onClick={() => setExpandedCompId(isExpanded ? null : c.id)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 0.75rem', cursor: 'pointer' }}
+                      onMouseEnter={e => e.currentTarget.style.background='#eff6ff'}
+                      onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+                      <span style={{ color: GREY, fontSize: '0.75rem', width: 14 }}>{isExpanded ? '▾' : '▸'}</span>
+                      <span style={{ fontWeight: 600, flex: 1 }}>{c.name}</span>
+                      {c.start_date && <span style={{ fontSize: '0.78rem', color: GREY }}>{c.start_date}</span>}
+                    </div>
+                    {isExpanded && (
+                      <div style={{ padding: '0 0.75rem 0.75rem 2.3rem' }}>
+                        <ul style={{ margin: '0 0 0.6rem', paddingLeft: '1rem', fontSize: '0.82rem', color: '#374151' }}>
+                          {describeTemplateConfig(tpl).map((b, i) => <li key={i} style={{ marginBottom: '0.2rem' }}>{b}</li>)}
+                        </ul>
+                        <button onClick={() => handleUseAsTemplate(c.template_id)} style={{ ...S.btn(GREEN), fontSize: '0.82rem', padding: '0.4rem 0.9rem' }}>
+                          Use this scoring protocol as a starting point
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          <button onClick={() => setShowPicker(false)} style={S.btn(GREY)}>Start from scratch instead</button>
         </div>
       )}
 
@@ -1290,7 +1398,7 @@ export default function CompetitionSetupWizard() {
   }, [competitionId])
 
   useEffect(() => {
-    supabase.from('competitions').select('id,name,start_date')
+    supabase.from('competitions').select('id,name,start_date,template_id,status,results_published_at')
       .order('created_at', { ascending: false }).limit(20)
       .then(({ data }) => setRecentComps(data || []))
   }, [])
