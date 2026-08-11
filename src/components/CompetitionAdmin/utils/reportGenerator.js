@@ -170,7 +170,12 @@ export function downloadPDFReport(standings, catches, competition, config, extra
   }
 
   // Species Summary
-  const speciesGroups = groupCatchesBySpecies(catches.filter(c => c.data_quality !== 'rejected'))
+  // Sorted by fish count (most common first), not groupCatchesBySpecies'
+  // default points-sort — same fix already applied to the on-screen
+  // Competition Summary, for the same reason: this section answers "what's
+  // the most common fish caught," not "which species scored the most."
+  const speciesGroups = [...groupCatchesBySpecies(catches.filter(c => c.data_quality !== 'rejected'))]
+    .sort((a, b) => b.fishCount - a.fishCount)
   if (speciesGroups.length) {
     sectionHeading('Species Summary')
     table(['Species', 'Fish Count', 'Total Points'], speciesGroups.map(g => [g.speciesName, g.fishCount, (g.totalPoints || 0).toFixed(2)]))
