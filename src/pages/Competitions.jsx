@@ -11,7 +11,7 @@ const CATCH_ROLES = ['admin', 'tournament_director']
 
 // ─── Competition-specific page links ─────────────────────────────────────────
 // Return { links, hideGenericAdmin } per competition
-function getCompConfig(comp, canEnter) {
+function resolveCompLinks(comp, canEnter) {
   const id = comp.id
 
   // Historical-import competitions (no live scoring — browse + claim only)
@@ -154,21 +154,14 @@ function getCompConfig(comp, canEnter) {
   // "Manage Competition" forever. This is what should have existed from
   // the start — every entry above this point was a one-off manual fix for
   // a competition someone remembered to add; this makes it automatic for
-  // everything going forward (East London and beyond) without needing
-  // another deploy each time a tournament wraps up.
-  //
-  // Also adds a direct, clearly-labeled Download Reports link — before
-  // this, the only way to reach the CSV/XLSX/PDF downloads after
-  // publishing was the small grey "⚙️ Admin" button, easy to miss next to
-  // the bold primary Scoreboard button, and it didn't even land on the
-  // right tab (Reports tab lives three clicks deep, not the default tab).
-  // Deep-links straight to ?tab=reports instead.
+  // everything going forward without needing another deploy each time a
+  // tournament wraps up. (Download Reports is added uniformly below, for
+  // this branch and every hardcoded one above — see getCompConfig.)
   if (comp.status === 'completed' || comp.results_published_at) {
     return {
       hideGenericAdmin: false,
       links: [
         { to: `/scoreboard/${id}`, label: '📊 Scoreboard', primary: true },
-        { to: `/competition-admin-v2/${id}?tab=reports`, label: '📄 Download Reports' },
       ],
     }
   }
@@ -180,6 +173,26 @@ function getCompConfig(comp, canEnter) {
       { to: `/competition-admin-v2/${id}`, label: '⚙️ Manage Competition', primary: true },
     ],
   }
+}
+
+// Wraps resolveCompLinks so every published/completed competition gets a
+// direct "📄 Download Reports" link, regardless of whether its links came
+// from the ~30-entry hardcoded list above or the auto-detect fallback —
+// fixes it uniformly for every past competition (Junior Bottomfish
+// Nationals, Gamefish Nationals, Tuna Nationals, All Coastal Bottomfish
+// IP, etc.), not just ones that happen to have no hardcoded entry, and
+// without needing to hand-edit every existing entry in that list.
+function getCompConfig(comp, canEnter) {
+  const config = resolveCompLinks(comp, canEnter)
+  const isFinished = comp.status === 'completed' || comp.results_published_at
+  const alreadyHasReportsLink = config.links.some(l => l.to?.includes('tab=reports'))
+  if (isFinished && !alreadyHasReportsLink) {
+    return {
+      ...config,
+      links: [...config.links, { to: `/competition-admin-v2/${comp.id}?tab=reports`, label: '📄 Download Reports' }],
+    }
+  }
+  return config
 }
 
 // ─── Discipline colours & labels ─────────────────────────────────────────────
