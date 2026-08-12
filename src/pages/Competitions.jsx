@@ -156,11 +156,19 @@ function getCompConfig(comp, canEnter) {
   // a competition someone remembered to add; this makes it automatic for
   // everything going forward (East London and beyond) without needing
   // another deploy each time a tournament wraps up.
+  //
+  // Also adds a direct, clearly-labeled Download Reports link — before
+  // this, the only way to reach the CSV/XLSX/PDF downloads after
+  // publishing was the small grey "⚙️ Admin" button, easy to miss next to
+  // the bold primary Scoreboard button, and it didn't even land on the
+  // right tab (Reports tab lives three clicks deep, not the default tab).
+  // Deep-links straight to ?tab=reports instead.
   if (comp.status === 'completed' || comp.results_published_at) {
     return {
       hideGenericAdmin: false,
       links: [
         { to: `/scoreboard/${id}`, label: '📊 Scoreboard', primary: true },
+        { to: `/competition-admin-v2/${id}?tab=reports`, label: '📄 Download Reports' },
       ],
     }
   }

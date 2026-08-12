@@ -9,6 +9,7 @@
 // Replaces: GamefishAdmin.jsx, AllCoastalsAdmin.jsx, and all future per-competition admins.
 
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useCompetitionConfig } from './hooks/useCompetitionConfig'
 import { useCompetitionRoles  } from './hooks/useCompetitionRoles'
@@ -35,7 +36,10 @@ const TABS = [
 ]
 
 export default function CompetitionAdmin({ competitionId }) {
-  const [activeTab,     setActiveTab]     = useState('scoring')
+  const VALID_TABS = ['setup', 'participants', 'scoring', 'scoreboard', 'reports', 'roles']
+  const [searchParams] = useSearchParams()
+  const tabFromUrl = searchParams.get('tab')
+  const [activeTab,     setActiveTab]     = useState(VALID_TABS.includes(tabFromUrl) ? tabFromUrl : 'scoring')
   const [participants,  setParticipants]  = useState([])
   const [days,          setDays]          = useState([])
   const [teams,         setTeams]         = useState([])
