@@ -147,19 +147,22 @@ export function downloadPDFReport(standings, catches, competition, config, extra
   }
 
   // Team Standings (Open/Ladies split)
+  const teamHeaders = usesBoatPercentage ? ['Rank', 'Team', 'Total %', 'Anglers'] : ['Rank', 'Team', 'Total Points', 'Anglers']
+  const teamRows = ts => ts.map(t => [
+    t.rank, t.teamName,
+    usesBoatPercentage ? `${t.totalPercentage.toFixed(2)}%` : (t.totalPoints || 0).toFixed(2),
+    t.members.map(m => usesBoatPercentage
+      ? `${m.displayName} (${m.percentageSum.toFixed(2)}%)`
+      : `${m.displayName} (${(m.points || 0).toFixed(2)}pts)`
+    ).join('; '),
+  ])
   if (teamStandings.length) {
     sectionHeading('Team Standings')
-    table(['Rank', 'Team', 'Total %', 'Anglers'], teamStandings.map(t => [
-      t.rank, t.teamName, `${t.totalPercentage.toFixed(2)}%`,
-      t.members.map(m => `${m.displayName} (${m.percentageSum.toFixed(2)}%)`).join('; '),
-    ]))
+    table(teamHeaders, teamRows(teamStandings))
   }
   if (ladiesTeamStandings.length) {
     sectionHeading("Ladies' Team Standings")
-    table(['Rank', 'Team', 'Total %', 'Anglers'], ladiesTeamStandings.map(t => [
-      t.rank, t.teamName, `${t.totalPercentage.toFixed(2)}%`,
-      t.members.map(m => `${m.displayName} (${m.percentageSum.toFixed(2)}%)`).join('; '),
-    ]))
+    table(teamHeaders, teamRows(ladiesTeamStandings))
   }
 
   // Skipper Standings
@@ -240,8 +243,8 @@ function buildSingleSheetHTML(standings, catches, competition, config, participa
 <h2>${competition.name || 'Results'}</h2>
 <p>${competition.venue || ''} · ${competition.start_date || ''}</p>
 ${standingsSection}
-${teamStandings.length ? `<div class="section"><h3>Team Standings</h3>${teamStandingsTable(teamStandings)}</div>` : ''}
-${ladiesTeamStandings.length ? `<div class="section"><h3>Ladies' Team Standings</h3>${teamStandingsTable(ladiesTeamStandings)}</div>` : ''}
+${teamStandings.length ? `<div class="section"><h3>Team Standings</h3>${teamStandingsTable(teamStandings, usesBoatPercentage)}</div>` : ''}
+${ladiesTeamStandings.length ? `<div class="section"><h3>Ladies' Team Standings</h3>${teamStandingsTable(ladiesTeamStandings, usesBoatPercentage)}</div>` : ''}
 ${skipperRanking.length ? `<div class="section"><h3>Skipper Standings</h3>${skipperStandingsTable(skipperRanking)}</div>` : ''}
 ${dailyRecords.length ? `<div class="section"><h3>Daily Results</h3>${dailyResultsTable(dailyRecords, cpueData)}</div>` : ''}
 <div class="section"><h3>Species Summary</h3>${speciesSummaryTable(catches)}</div>
@@ -261,8 +264,8 @@ function buildMultiSheetHTML(standings, catches, competition, config, participan
           { name: 'Ladies Standings', content: standingsTable(ladiesStandings, showWeight) },
         ]
       : [{ name: 'Standings', content: standingsTable(standings, showWeight) }]),
-    ...(teamStandings.length ? [{ name: 'Team Standings', content: teamStandingsTable(teamStandings) }] : []),
-    ...(ladiesTeamStandings.length ? [{ name: 'Ladies Team Standings', content: teamStandingsTable(ladiesTeamStandings) }] : []),
+    ...(teamStandings.length ? [{ name: 'Team Standings', content: teamStandingsTable(teamStandings, usesBoatPercentage) }] : []),
+    ...(ladiesTeamStandings.length ? [{ name: 'Ladies Team Standings', content: teamStandingsTable(ladiesTeamStandings, usesBoatPercentage) }] : []),
     ...(skipperRanking.length ? [{ name: 'Skipper Standings', content: skipperStandingsTable(skipperRanking) }] : []),
     ...(dailyRecords.length  ? [{ name: 'Daily Results',  content: dailyResultsTable(dailyRecords, cpueData) }] : []),
     { name: 'Species Summary', content: speciesSummaryTable(catches) },
@@ -391,11 +394,17 @@ function dailyResultsTable(dailyRecords, cpueData) {
   return htmlTable(headers, rows)
 }
 
-function teamStandingsTable(teamStandings) {
-  const headers = ['Rank', 'Team', 'Total (Sum of Boat %)', 'Anglers']
+function teamStandingsTable(teamStandings, usesBoatPercentage = true) {
+  const headers = usesBoatPercentage
+    ? ['Rank', 'Team', 'Total (Sum of Boat %)', 'Anglers']
+    : ['Rank', 'Team', 'Total Points', 'Anglers']
   const rows = teamStandings.map(t => [
-    t.rank, t.teamName, `${t.totalPercentage.toFixed(2)}%`,
-    t.members.map(m => `${m.displayName} (${m.percentageSum.toFixed(2)}%)`).join('; '),
+    t.rank, t.teamName,
+    usesBoatPercentage ? `${t.totalPercentage.toFixed(2)}%` : (t.totalPoints || 0).toFixed(2),
+    t.members.map(m => usesBoatPercentage
+      ? `${m.displayName} (${m.percentageSum.toFixed(2)}%)`
+      : `${m.displayName} (${(m.points || 0).toFixed(2)}pts)`
+    ).join('; '),
   ])
   return htmlTable(headers, rows)
 }

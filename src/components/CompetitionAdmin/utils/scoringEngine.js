@@ -202,26 +202,26 @@ export function aggregateTeamScores(catches, participants, teamConfig, scoringCo
 // above (a plain raw-points sum) and from individual standings (which
 // stay raw-points-based — this percentage conversion is specifically a
 // team-scoring mechanism, not how individual prizes are decided).
-export function buildBoatPercentageTeamStandings(catches, participants, teams, days, boats) {
+//
+// For competitions NOT scored on boat-relative percentage (confirmed via
+// scoring_config.boat_percentage_scoring), totalPercentage has no meaning
+// and is always 0 for every team — ranking primarily on it silently
+// degraded to a fish-count tiebreak, same underlying bug already fixed in
+// buildIndividualStandings. Confirmed via SADSAA Gamefish Nationals 2026:
+// every team showed 0.00% and was ordered by fish count instead of points.
+// Per-participant points here now come from buildIndividualStandings
+// (species-multiplier-aware) rather than a separate raw-points sum, so
+// team and individual totals can't disagree the way they did before.
+export function buildBoatPercentageTeamStandings(catches, participants, teams, days, boats, scoringConfig = null) {
   const daily = buildDailyAnglerPercentages(catches, participants, days, boats)
+  const usesBoatPercentage = scoringConfig?.boat_percentage_scoring === true
 
-  // Total fish count + points per participant, for the competition — needed
-  // for the confirmed team tiebreak (fish count, then points), same
-  // participant_id/angler_id resolution used throughout.
-  const activeCatches = catches.filter(c => c.data_quality !== 'rejected')
-  const byUserId = {}, byPartId = {}
-  for (const p of participants) {
-    if (p.user_id) byUserId[p.user_id] = p.id
-    byPartId[p.id] = p.id
-  }
-  const fishAndPointsByParticipant = {}
-  for (const c of activeCatches) {
-    const pid = (c.angler_id && byUserId[c.angler_id]) || byPartId[c.participant_id]
-    if (!pid) continue
-    if (!fishAndPointsByParticipant[pid]) fishAndPointsByParticipant[pid] = { fishCount: 0, points: 0 }
-    fishAndPointsByParticipant[pid].fishCount += 1
-    fishAndPointsByParticipant[pid].points += c.data_quality === 'disqualified' ? 0 : parseFloat(c.points || 0)
-  }
+  // Multiplier-aware per-participant totals (same figures individual
+  // standings uses) — avoids a second, inconsistent points calculation.
+  const individual = buildIndividualStandings(catches, participants, days, boats, scoringConfig)
+  const fishAndPointsByParticipant = Object.fromEntries(
+    individual.map(p => [p.participantId, { fishCount: p.catchCount, points: p.totalPoints }])
+  )
 
   const byTeam = {}
   for (const p of participants) {
@@ -247,15 +247,19 @@ export function buildBoatPercentageTeamStandings(catches, participants, teams, d
       participantId: p.id,
       displayName:   p.full_name,
       percentageSum,
+      points:        fp.points,
       daysCounted:   entries.length,
     })
   }
 
-  // Ranking rule (confirmed): total % first, tie broken by total fish count
-  // for the competition, tie broken again by total points scored for the
-  // competition.
+  // Ranking rule: for boat-percentage competitions (confirmed), total %
+  // first, tie broken by total fish count, tie broken again by total
+  // points. For every other scoring method, rank directly by total points —
+  // percentage is meaningless (always 0) there.
   return Object.values(byTeam)
-    .sort((a, b) => b.totalPercentage - a.totalPercentage || b.totalFishCount - a.totalFishCount || b.totalPoints - a.totalPoints)
+    .sort((a, b) => usesBoatPercentage
+      ? (b.totalPercentage - a.totalPercentage || b.totalFishCount - a.totalFishCount || b.totalPoints - a.totalPoints)
+      : (b.totalPoints - a.totalPoints || b.totalFishCount - a.totalFishCount))
     .map((t, i) => ({ ...t, rank: i + 1 }))
 }
 

@@ -63,8 +63,8 @@ export default function CompetitionAdminScoreboard({
   // rules for this format (top scorer on each boat/day = 100%, others scored
   // relative to them, regardless of which team they're from).
   const teamStandings = useMemo(() =>
-    buildBoatPercentageTeamStandings(activeCatches, participants, teams, days, boats),
-    [activeCatches, participants, teams, days, boats]
+    buildBoatPercentageTeamStandings(activeCatches, participants, teams, days, boats, config?.scoring),
+    [activeCatches, participants, teams, days, boats, config?.scoring]
   )
 
   // SADSAA runs two separate team competitions from the same field —
@@ -347,11 +347,11 @@ export default function CompetitionAdminScoreboard({
                     {t.rank <= 3 ? ['🥇','🥈','🥉'][t.rank - 1] + ' ' : `${t.rank}. `}
                     {t.teamName}
                   </div>
-                  <div style={{ fontSize: '0.8rem', color: GREY }}>{t.members.length} anglers · sum of daily boat %</div>
+                  <div style={{ fontSize: '0.8rem', color: GREY }}>{t.members.length} anglers{usesBoatPercentage ? ' · sum of daily boat %' : ''}</div>
                 </div>
-                <div style={{ fontWeight: 800, fontSize: '1.3rem', color: NAVY }}>{t.totalPercentage.toFixed(2)}%</div>
+                <div style={{ fontWeight: 800, fontSize: '1.3rem', color: NAVY }}>{usesBoatPercentage ? `${t.totalPercentage.toFixed(2)}%` : (t.totalPoints || 0).toFixed(2)}</div>
               </div>
-              {t.members.sort((a, b) => b.percentageSum - a.percentageSum).map(m => (
+              {t.members.sort((a, b) => usesBoatPercentage ? (b.percentageSum - a.percentageSum) : ((b.points || 0) - (a.points || 0))).map(m => (
                 <div key={m.participantId} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.3rem 0.5rem', background: '#f8fafc', borderRadius: 5, marginBottom: '0.25rem' }}>
                   <div style={{ flex: 1, fontSize: '0.85rem' }}>
                     <button
@@ -362,7 +362,7 @@ export default function CompetitionAdminScoreboard({
                     </button>
                   </div>
                   <div style={{ fontSize: '0.78rem', color: GREY }}>{m.daysCounted} day{m.daysCounted === 1 ? '' : 's'} fished</div>
-                  <div style={{ fontWeight: 700, color: NAVY, minWidth: 60, textAlign: 'right' }}>{m.percentageSum.toFixed(2)}%</div>
+                  <div style={{ fontWeight: 700, color: NAVY, minWidth: 60, textAlign: 'right' }}>{usesBoatPercentage ? `${m.percentageSum.toFixed(2)}%` : `${(m.points || 0).toFixed(2)}pts`}</div>
                 </div>
               ))}
             </div>
@@ -382,11 +382,11 @@ export default function CompetitionAdminScoreboard({
                         {t.rank <= 3 ? ['🥇','🥈','🥉'][t.rank - 1] + ' ' : `${t.rank}. `}
                         {t.teamName}
                       </div>
-                      <div style={{ fontSize: '0.8rem', color: GREY }}>{t.members.length} anglers · sum of daily boat %</div>
+                      <div style={{ fontSize: '0.8rem', color: GREY }}>{t.members.length} anglers{usesBoatPercentage ? ' · sum of daily boat %' : ''}</div>
                     </div>
-                    <div style={{ fontWeight: 800, fontSize: '1.3rem', color: NAVY }}>{t.totalPercentage.toFixed(2)}%</div>
+                    <div style={{ fontWeight: 800, fontSize: '1.3rem', color: NAVY }}>{usesBoatPercentage ? `${t.totalPercentage.toFixed(2)}%` : (t.totalPoints || 0).toFixed(2)}</div>
                   </div>
-                  {t.members.sort((a, b) => b.percentageSum - a.percentageSum).map(m => (
+                  {t.members.sort((a, b) => usesBoatPercentage ? (b.percentageSum - a.percentageSum) : ((b.points || 0) - (a.points || 0))).map(m => (
                     <div key={m.participantId} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.3rem 0.5rem', background: '#f8fafc', borderRadius: 5, marginBottom: '0.25rem' }}>
                       <div style={{ flex: 1, fontSize: '0.85rem' }}>
                         <button
@@ -397,7 +397,7 @@ export default function CompetitionAdminScoreboard({
                         </button>
                       </div>
                       <div style={{ fontSize: '0.78rem', color: GREY }}>{m.daysCounted} day{m.daysCounted === 1 ? '' : 's'} fished</div>
-                      <div style={{ fontWeight: 700, color: NAVY, minWidth: 60, textAlign: 'right' }}>{m.percentageSum.toFixed(2)}%</div>
+                      <div style={{ fontWeight: 700, color: NAVY, minWidth: 60, textAlign: 'right' }}>{usesBoatPercentage ? `${m.percentageSum.toFixed(2)}%` : `${(m.points || 0).toFixed(2)}pts`}</div>
                     </div>
                   ))}
                 </div>

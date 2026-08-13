@@ -27,6 +27,7 @@ import assert from 'node:assert/strict'
 import {
   calcPointsScoring,
   buildIndividualStandings,
+  buildBoatPercentageTeamStandings,
   buildSkipperRanking,
 } from '../src/components/CompetitionAdmin/utils/scoringEngine.js'
 import { calculateWeight } from '../src/utils/weightCalculations.js'
@@ -186,6 +187,30 @@ test('a 4-angler boat must not beat a 3-angler boat purely by having an extra ro
   const boat4 = result.find(r => r.boatName === 'Four Anglers')
   assert.equal(boat3.rank, 1, 'Boat3 has the higher AVERAGE (20 vs 18) and must rank 1st, despite Boat4 scoring more total points (72 vs 60)')
   assert.equal(boat4.rank, 2)
+})
+
+console.log('\n── Team Standings must also use points, not a meaningless 0% (found while checking Gamefish Nationals) ──')
+
+test('team totals use multiplier-aware individual points, not a separate raw-points sum', () => {
+  const participants = [
+    { id: 'p1', full_name: 'Francois Rossouw', user_id: 'u1', team_id: 't1', competition_teams: { team_name: 'SADSAA U21' } },
+    { id: 'p2', full_name: 'Dirk Rosslee', user_id: 'u2', team_id: 't2', competition_teams: { team_name: 'Southern Gauteng Blue' } },
+  ]
+  const teams = [{ id: 't1', team_name: 'SADSAA U21' }, { id: 't2', team_name: 'Southern Gauteng Blue' }]
+  const catches = [
+    { angler_id: 'u1', competition_day_id: 'dayA', species_name: 'King Mackerel (Cuta)', points: 200, data_quality: 'self_reported' },
+    { angler_id: 'u1', competition_day_id: 'dayA', species_name: 'Other Tuna', points: 8.9888, data_quality: 'self_reported' },
+    { angler_id: 'u1', competition_day_id: 'dayA', species_name: 'Other Kingfish', points: 5, data_quality: 'self_reported' },
+    { angler_id: 'u1', competition_day_id: 'dayB', species_name: 'King Mackerel (Cuta)', points: 32, data_quality: 'historical_import' },
+    { angler_id: 'u1', competition_day_id: 'dayC', species_name: 'Dorado', points: 6.1952, data_quality: 'historical_import' },
+    { angler_id: 'u2', competition_day_id: 'dayA', species_name: 'King Mackerel (Cuta)', points: 42.32, data_quality: 'historical_import' },
+    { angler_id: 'u2', competition_day_id: 'dayA', species_name: 'Queen Mackerel', points: 6.48, data_quality: 'historical_import' },
+  ]
+  const scoringConfig = { method: 'percentage', species_multiplier: true }
+  const result = buildBoatPercentageTeamStandings(catches, participants, teams, null, null, scoringConfig)
+  const u21 = result.find(r => r.teamName === 'SADSAA U21')
+  assert.ok(Math.abs(u21.totalPoints - 466.17) < 0.01, `team total should match the individual's multiplier-aware total (466.17), got ${u21.totalPoints}`)
+  assert.equal(u21.rank, 1, 'higher team total must rank 1st, not fall back to a meaningless 0% or fish count')
 })
 
 // ── Summary ─────────────────────────────────────────────────────────────

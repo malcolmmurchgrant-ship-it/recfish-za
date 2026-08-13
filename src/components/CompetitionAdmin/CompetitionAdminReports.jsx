@@ -88,8 +88,8 @@ export default function CompetitionAdminReports({
     [catches, participants, days, boats]
   )
   const teamStandings = useMemo(() =>
-    buildBoatPercentageTeamStandings(catches.filter(c => c.data_quality !== 'rejected'), participants, teams, days, boats),
-    [catches, participants, teams, days, boats]
+    buildBoatPercentageTeamStandings(catches.filter(c => c.data_quality !== 'rejected'), participants, teams, days, boats, config?.scoring),
+    [catches, participants, teams, days, boats, config?.scoring]
   )
   // Same ladies'-division split as the Scoreboard tab — this is a
   // genuinely separate code path (its own buildBoatPercentageTeamStandings
