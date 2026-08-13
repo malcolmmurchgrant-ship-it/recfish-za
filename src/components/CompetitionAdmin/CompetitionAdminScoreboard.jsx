@@ -46,8 +46,8 @@ export default function CompetitionAdminScoreboard({
   )
 
   const individualStandings = useMemo(() =>
-    buildIndividualStandings(activeCatches, participants, days, boats),
-    [activeCatches, participants, days, boats]
+    buildIndividualStandings(activeCatches, participants, days, boats, config?.scoring),
+    [activeCatches, participants, days, boats, config?.scoring]
   )
 
   const filteredStandings = useMemo(() => {

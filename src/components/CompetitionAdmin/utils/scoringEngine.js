@@ -267,7 +267,7 @@ export function buildBoatPercentageTeamStandings(catches, participants, teams, d
 // own percentage. A higher raw-points total can still rank below someone
 // with fewer points but a better percentage — that's intentional, per the
 // confirmed ranking rule, not a bug.
-export function buildIndividualStandings(catches, participants, days, boats) {
+export function buildIndividualStandings(catches, participants, days, boats, scoringConfig = null) {
   const byParticipant = {}
   const byUserId = {}   // user_id -> participant.id, for registered anglers
   const byPartId = {}   // participant.id -> participant.id (self-map, for clarity below)
@@ -297,6 +297,10 @@ export function buildIndividualStandings(catches, participants, days, boats) {
     byPartId[p.id] = key
   }
 
+  // Tracks each participant's catches grouped by day — only used below for
+  // species-multiplier scoring, but harmless to always build.
+  const byParticipantDay = {}
+
   for (const c of catches) {
     if (c.data_quality === 'rejected') continue
     // Registered anglers are matched via angler_id (== user_id). Unregistered
@@ -310,7 +314,7 @@ export function buildIndividualStandings(catches, participants, days, boats) {
     const p = byParticipant[key]
     if (!p) continue
     const pts = c.data_quality === 'disqualified' ? 0 : parseFloat(c.points || 0)
-    p.totalPoints   += pts
+    p.totalPoints   += pts   // raw sum — overwritten below for species-multiplier competitions
     p.totalWeightKg += parseFloat(c.weight_kg || 0)
     p.catchCount    += 1
     p.catches.push(c)
@@ -325,6 +329,38 @@ export function buildIndividualStandings(catches, participants, days, boats) {
     if (!p.bestFish || pts > (p.bestFish.data_quality === 'disqualified' ? 0 : parseFloat(p.bestFish.points || 0))) {
       p.bestFish = c
     }
+
+    const dayKey = c.competition_day_id || c.fishing_date || 'unknown'
+    if (!byParticipantDay[key]) byParticipantDay[key] = {}
+    if (!byParticipantDay[key][dayKey]) byParticipantDay[key][dayKey] = []
+    byParticipantDay[key][dayKey].push(c)
+  }
+
+  // Species-multiplier scoring (SADSAA Gamefish format): each day's raw
+  // points are multiplied by max(1, distinct species that day - 1), then
+  // days are summed — overrides the flat sum above. Matches the formula
+  // documented in scoring_config.species_multiplier_logic, and the one
+  // already proven correct in the public /scoreboard page
+  // (UniversalScoreboard.jsx's calcMultipliedPoints); brings this function —
+  // and everything downstream of it (the Admin Scoreboard tab, CSV, XLSX,
+  // PDF) — in line with that, instead of silently under-counting any angler
+  // who caught more than 2 distinct species on a single day. Confirmed via
+  // SADSAA Gamefish Nationals 2026: Francois Rossouw's true total is 466.17
+  // (3 species on one day → ×2 multiplier that day), not the flat 252.18
+  // every report was previously showing.
+  if (scoringConfig?.species_multiplier) {
+    for (const [key, byDay] of Object.entries(byParticipantDay)) {
+      const p = byParticipant[key]
+      if (!p) continue
+      let total = 0
+      for (const dayCatches of Object.values(byDay)) {
+        const raw = dayCatches.reduce((s, c) => s + (c.data_quality === 'disqualified' ? 0 : parseFloat(c.points || 0)), 0)
+        const speciesThatDay = new Set(dayCatches.map(c => c.species_name).filter(Boolean)).size
+        const mult = Math.max(1, speciesThatDay - 1)
+        total += raw * mult
+      }
+      p.totalPoints = total
+    }
   }
 
   // Count unique species per angler
@@ -332,10 +368,17 @@ export function buildIndividualStandings(catches, participants, days, boats) {
     p.speciesCount = new Set(p.catches.map(c => c.species_name)).size
   }
 
-  // Angler % — same daily boat-percentage sum used for Team standings,
-  // computed here too so ranking (and every consumer of this function) is
-  // consistent without each caller separately re-deriving it.
-  if (days && boats) {
+  // Angler % is only meaningful for competitions actually scored on a
+  // boat-relative daily percentage (confirmed via
+  // scoring_config.boat_percentage_scoring) — computing it unconditionally
+  // for every competition made it silently come out as 0 for every angler
+  // in formats never meant to use it (e.g. Gamefish's species-multiplier
+  // scoring), which then became the PRIMARY sort key below, quietly
+  // reordering standings by fish count instead of by points. Confirmed via
+  // SADSAA Gamefish Nationals 2026: Dirk Rosslee (9 low-value catches) was
+  // outranking Francois Rossouw (5 catches worth far more) in every report.
+  const usesBoatPercentage = scoringConfig?.boat_percentage_scoring === true
+  if (usesBoatPercentage && days && boats) {
     const daily = buildDailyAnglerPercentages(catches, participants, days, boats)
     for (const d of daily) {
       if (byParticipant[d.participantId]) {
@@ -344,12 +387,16 @@ export function buildIndividualStandings(catches, participants, days, boats) {
     }
   }
 
-  // Ranking rule (confirmed): Angler % first, tie broken by total fish
-  // count, tie broken again by total points scored. catchCount already
-  // counts one per fish (including multi-fish "padding" rows, one row per
-  // fish caught), so it's already the right figure for "total fish count."
+  // Ranking rule: for boat-percentage competitions (confirmed), Angler %
+  // first, tie broken by total fish count, tie broken again by total points
+  // scored. For every other scoring method, rank directly by total points —
+  // anglerPercentage is meaningless (always 0) there, so it's excluded from
+  // the sort entirely rather than left in as a no-op primary key that
+  // silently falls through to fish count.
   return Object.values(byParticipant)
-    .sort((a, b) => b.anglerPercentage - a.anglerPercentage || b.catchCount - a.catchCount || b.totalPoints - a.totalPoints)
+    .sort((a, b) => usesBoatPercentage
+      ? (b.anglerPercentage - a.anglerPercentage || b.catchCount - a.catchCount || b.totalPoints - a.totalPoints)
+      : (b.totalPoints - a.totalPoints || b.catchCount - a.catchCount))
     .map((p, i) => ({ ...p, rank: i + 1 }))
 }
 

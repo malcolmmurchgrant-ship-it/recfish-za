@@ -279,7 +279,7 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
   // points tiebreak).
   const anglerPercentageMap = isSplitBoat
     ? Object.fromEntries(
-        buildIndividualStandings(filteredCatches, participants, days, boats)
+        buildIndividualStandings(filteredCatches, participants, days, boats, scoringConfig)
           .map(p => [p.participantId, p.anglerPercentage])
       )
     : {}

@@ -56,7 +56,7 @@ export default function CompetitionAdminReports({
   const [published,     setPublished]     = useState(false)
 
   const isLocked   = !!competition?.results_published_at || published
-  const standings  = useMemo(() => buildIndividualStandings(catches, participants, days, boats), [catches, participants, days, boats])
+  const standings  = useMemo(() => buildIndividualStandings(catches, participants, days, boats, config?.scoring), [catches, participants, days, boats, config?.scoring])
 
   // Boat draws, needed for crew-size-aware skipper averaging (same as the
   // Scoreboard tab) — this tab never fetched them, which is why Skipper
