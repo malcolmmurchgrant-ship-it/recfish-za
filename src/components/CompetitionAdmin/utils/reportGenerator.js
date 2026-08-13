@@ -105,6 +105,11 @@ export function downloadPDFReport(standings, catches, competition, config, extra
   const { teamStandings = [], ladiesTeamStandings = [], openStandings = [], ladiesStandings = [], skipperRanking = [] } = extra
   const name = sanitiseName(competition.name)
   const showWeight = config?.scoring?.method !== 'points'
+  // Angler % only means anything for competitions actually scored on a
+  // boat-relative daily percentage — showing "0.00%" for every angler in
+  // a different scoring format (e.g. Gamefish's species-multiplier scoring)
+  // reads as broken even once the underlying totals/ranking are correct.
+  const usesBoatPercentage = config?.scoring?.boat_percentage_scoring === true
   const hasLadies = ladiesStandings.length > 0
 
   const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' })
@@ -134,10 +139,17 @@ export function downloadPDFReport(standings, catches, competition, config, extra
   }
 
   // Standings (Open/Ladies split, same as XLSX)
-  const standingsHeaders = ['Rank', 'Name', 'Team', 'Angler %', 'Points', 'Species', 'Catches', 'Best Fish']
+  const standingsHeaders = [
+    'Rank', 'Name', 'Team',
+    ...(usesBoatPercentage ? ['Angler %'] : []),
+    'Points', 'Species', 'Catches', 'Best Fish',
+    ...(showWeight ? ['Best Fish (kg)'] : []),
+  ]
   const standingsRows = s => s.map(x => [
-    x.rank, x.displayName, x.teamName || '', `${(x.anglerPercentage || 0).toFixed(2)}%`,
+    x.rank, x.displayName, x.teamName || '',
+    ...(usesBoatPercentage ? [`${(x.anglerPercentage || 0).toFixed(2)}%`] : []),
     (x.totalPoints || 0).toFixed(2), x.speciesCount || 0, x.catchCount || 0, x.bestFish?.species_name || '',
+    ...(showWeight ? [x.bestFish?.weight_kg ?? ''] : []),
   ])
   sectionHeading('Standings')
   table(standingsHeaders, standingsRows(hasLadies ? openStandings : standings))
@@ -217,15 +229,16 @@ export function downloadPDFReport(standings, catches, competition, config, extra
 function buildSingleSheetHTML(standings, catches, competition, config, participants = [], dailyRecords = [], teamStandings = [], cpueData = null, ladiesTeamStandings = [], openStandings = [], ladiesStandings = [], skipperRanking = []) {
   const prizeRows = buildPrizeRows(standings, catches, config)
   const showWeight = config?.scoring?.method !== 'points'
+  const usesBoatPercentage = config?.scoring?.boat_percentage_scoring === true
   // If a ladies division exists (ladiesStandings non-empty), replace the
   // single combined Standings table with two independently-ranked ones —
   // same underlying scores, just grouped and renumbered by division. Falls
   // back to the original single table for every competition without a
   // ladies division, so this never changes existing behaviour elsewhere.
   const standingsSection = ladiesStandings.length
-    ? `<div class="section"><h3>Standings</h3>${standingsTable(openStandings, showWeight)}</div>
-<div class="section"><h3>Ladies' Standings</h3>${standingsTable(ladiesStandings, showWeight)}</div>`
-    : `<div class="section"><h3>Standings</h3>${standingsTable(standings, showWeight)}</div>`
+    ? `<div class="section"><h3>Standings</h3>${standingsTable(openStandings, showWeight, usesBoatPercentage)}</div>
+<div class="section"><h3>Ladies' Standings</h3>${standingsTable(ladiesStandings, showWeight, usesBoatPercentage)}</div>`
+    : `<div class="section"><h3>Standings</h3>${standingsTable(standings, showWeight, usesBoatPercentage)}</div>`
   return `<html xmlns:o="urn:schemas-microsoft-com:office:office"
     xmlns:x="urn:schemas-microsoft-com:office:excel"
     xmlns="http://www.w3.org/TR/REC-html40">
@@ -257,13 +270,14 @@ ${prizeRows.length ? `<div class="section"><h3>Prize Categories</h3>${prizeTable
 function buildMultiSheetHTML(standings, catches, competition, config, participants = [], dailyRecords = [], teamStandings = [], cpueData = null, ladiesTeamStandings = [], openStandings = [], ladiesStandings = [], skipperRanking = []) {
   const prizeRows = buildPrizeRows(standings, catches, config)
   const showWeight = config?.scoring?.method !== 'points'
+  const usesBoatPercentage = config?.scoring?.boat_percentage_scoring === true
   const sheets = [
     ...(ladiesStandings.length
       ? [
-          { name: 'Standings', content: standingsTable(openStandings, showWeight) },
-          { name: 'Ladies Standings', content: standingsTable(ladiesStandings, showWeight) },
+          { name: 'Standings', content: standingsTable(openStandings, showWeight, usesBoatPercentage) },
+          { name: 'Ladies Standings', content: standingsTable(ladiesStandings, showWeight, usesBoatPercentage) },
         ]
-      : [{ name: 'Standings', content: standingsTable(standings, showWeight) }]),
+      : [{ name: 'Standings', content: standingsTable(standings, showWeight, usesBoatPercentage) }]),
     ...(teamStandings.length ? [{ name: 'Team Standings', content: teamStandingsTable(teamStandings, usesBoatPercentage) }] : []),
     ...(ladiesTeamStandings.length ? [{ name: 'Ladies Team Standings', content: teamStandingsTable(ladiesTeamStandings, usesBoatPercentage) }] : []),
     ...(skipperRanking.length ? [{ name: 'Skipper Standings', content: skipperStandingsTable(skipperRanking) }] : []),
