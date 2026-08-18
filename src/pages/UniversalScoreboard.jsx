@@ -100,7 +100,6 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
   const [lastRefresh,  setLastRefresh]  = useState(null)
   const [activeTab,    setActiveTab]    = useState('team')
   const [dayFilter,    setDayFilter]    = useState('all')
-  const [showPending,  setShowPending]  = useState(false)
 
   const load = useCallback(async () => {
     if (!competitionId) return
@@ -196,7 +195,6 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
   const scoringCatches = catches.filter(c => {
     if (c.data_quality === 'rejected') return false
     if (c.scoring === false) return false
-    if (!showPending && c.data_quality === 'unverified' && !isAdmin) return false
     if (c.species_name === 'No Catch') return false
     // For points-method competitions, zero-point rows are legitimate catch
     // records under the species-subtotal encoding (only the last fish of each
@@ -491,12 +489,7 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
             ))}
           </select>
         )}
-        {isAdmin && (
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.82rem', cursor: 'pointer' }}>
-            <input type="checkbox" checked={showPending} onChange={e => setShowPending(e.target.checked)} />
-            Show unverified
-          </label>
-        )}
+
         <button onClick={load} style={{ marginLeft: 'auto', background: 'none', border: '1px solid #d1d5db', borderRadius: 6, padding: '0.35rem 0.75rem', cursor: 'pointer', fontSize: '0.78rem', color: GREY }}>
           🔄 {lastRefresh ? lastRefresh.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' }) : 'Refresh'}
         </button>
