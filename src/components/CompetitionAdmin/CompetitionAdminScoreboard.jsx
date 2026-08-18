@@ -39,9 +39,26 @@ export default function CompetitionAdminScoreboard({
   const [showPending,     setShowPending]      = useState(true)
   const [categoryFilter,  setCategoryFilter]   = useState('all')
 
+  // Angler % is only meaningful for competitions actually scored on a
+  // boat-relative daily percentage (confirmed via
+  // scoring_config.boat_percentage_scoring) — showing 0.00% for every
+  // angler/team in a different scoring format reads as broken even once
+  // totals/ranking are correct. Used throughout this file for both
+  // Individual and Team sections.
+  const usesBoatPercentage = config?.scoring?.boat_percentage_scoring === true
+
   // ── Build standings ──────────────────────────────────────────────────────
+  // "Include unverified catches" is meant to gate genuinely unconfirmed
+  // personal/social catches (data_quality === 'unverified', pending a
+  // witness) — not anything that simply isn't the live in-app 'verified'
+  // tag. The previous version required an exact match to 'verified' when
+  // unticked, which silently hid every properly-imported historical
+  // competition record (data_quality === 'historical_import') the moment
+  // anyone unchecked it — confirmed via SADSAA Light Tackle Billfish
+  // Nationals 2026, where unticking made every angler's real, official
+  // results disappear.
   const activeCatches = useMemo(() =>
-    catches.filter(c => showPending ? c.data_quality !== 'rejected' : c.data_quality === 'verified'),
+    catches.filter(c => showPending ? c.data_quality !== 'rejected' : (c.data_quality !== 'rejected' && c.data_quality !== 'unverified')),
     [catches, showPending]
   )
 
@@ -210,7 +227,7 @@ export default function CompetitionAdminScoreboard({
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
               <thead>
                 <tr style={{ background: NAVY, color: 'white' }}>
-                  {['Rank','Angler','Team','LC','Angler %','Points', ...(showWeight ? ['Weight'] : []), 'Species','Catches','CPUE'].map(h => (
+                  {['Rank','Angler','Team','LC', ...(usesBoatPercentage ? ['Angler %'] : []), 'Points', ...(showWeight ? ['Weight'] : []), 'Species','Catches','CPUE'].map(h => (
                     <th key={h} style={{ padding: '0.5rem 0.75rem', textAlign: h === 'Rank' ? 'center' : 'left', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -239,9 +256,11 @@ export default function CompetitionAdminScoreboard({
                     <td style={{ padding: '0.5rem 0.75rem', color: GREY, fontSize: '0.82rem', textAlign: 'center' }}>
                       {lineClassKg ? `${lineClassKg}kg` : '—'}
                     </td>
-                    <td style={{ padding: '0.5rem 0.75rem', fontWeight: 700, color: NAVY, textAlign: 'right' }}>
-                      {(s.anglerPercentage || 0).toFixed(2)}%
-                    </td>
+                    {usesBoatPercentage && (
+                      <td style={{ padding: '0.5rem 0.75rem', fontWeight: 700, color: NAVY, textAlign: 'right' }}>
+                        {(s.anglerPercentage || 0).toFixed(2)}%
+                      </td>
+                    )}
                     <td style={{ padding: '0.5rem 0.75rem', color: GREY, textAlign: 'right' }}>
                       {s.totalPoints.toFixed(2)}
                     </td>
