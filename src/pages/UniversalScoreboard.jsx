@@ -233,15 +233,40 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
   // are untouched by this and keep their existing behavior below.
   const teamPercentageMap = isSplitBoat
     ? Object.fromEntries(
-        buildBoatPercentageTeamStandings(filteredCatches, participants, teams, days, boats)
+        buildBoatPercentageTeamStandings(filteredCatches, participants, teams, days, boats, scoringConfig)
           .map(t => [t.teamId, t.totalPercentage])
       )
     : {}
 
+  // team_id -> Set(participant_id) — built once, used below instead of a
+  // never-populated catch-level team_id (see the note in teamStandings).
+  const teamParticipantIds = {}
+  for (const p of participants) {
+    if (!p.team_id) continue
+    if (!teamParticipantIds[p.team_id]) teamParticipantIds[p.team_id] = new Set()
+    teamParticipantIds[p.team_id].add(p.id)
+  }
+  const userIdToParticipantId = Object.fromEntries(
+    participants.filter(p => p.user_id).map(p => [p.user_id, p.id])
+  )
+
   const teamStandings = teams
     .filter(t => !t.is_disqualified)
     .map(t => {
-      const tc     = filteredCatches.filter(c => c.team_id === t.id)
+      // Catches never carry their own team_id — every catch links to a team
+      // indirectly, through participant_id (or angler_id for registered
+      // anglers) → that participant's own team_id, same resolution used
+      // throughout scoringEngine.js. Filtering by a catch-level c.team_id
+      // silently matched nothing for every team on this page (confirmed via
+      // SADSAA Light Tackle Billfish Nationals 2026: individual standings
+      // showed Etienne de Jager's and Renier van Jaarsveld's real catches
+      // correctly, but Team Standings showed everyone, including their own
+      // teams, at zero) — not specific to that competition; any competition
+      // using this non-split-boat path was affected.
+      const tc = filteredCatches.filter(c => {
+        const participantId = (c.angler_id && userIdToParticipantId[c.angler_id]) || c.participant_id
+        return participantId && teamParticipantIds[t.id]?.has(participantId)
+      })
       const pts    = useMultiplier
         ? calcMultipliedPoints(tc, scoringConfig, dateToDay)
         : tc.reduce((s, c) => s + calcPoints(c, scoringConfig), 0)
