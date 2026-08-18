@@ -414,6 +414,11 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
   const hasBoats    = teamConfig?.has_boats || boats.length > 0
   const hasSkipper  = scoringConfig?.skipper_competition || hasBoats
   const hasCpue     = totalHours > 0
+  // Catch-release competitions (both Billfish formats) never weigh a fish —
+  // it's released, not brought to the scale — so kg/hr is always 0 and
+  // meaningless there; fish/hr is the metric that actually reflects effort.
+  // Confirmed via SADSAA Light Tackle Billfish Nationals 2026.
+  const catchReleaseFormat = !!competition?.catch_release_enabled
 
   const TABS = [
     hasTeams          && { id: 'team',    label: '🏆 Teams'     },
@@ -533,7 +538,11 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
                     <StatPill label="Points" val={t.points.toLocaleString('en-ZA', { minimumFractionDigits: 2 })} col={isSplitBoat ? GREY : NAVY} />
                     <StatPill label="Fish"   val={t.fish}   col={GREEN} />
                     <StatPill label="Kg"     val={t.kg.toFixed(2)} col={GOLD} />
-                    {hasCpue && <StatPill label="kg/hr" val={t.kghr.toFixed(2)} col="#7c3aed" />}
+                    {hasCpue && (
+                      catchReleaseFormat
+                        ? <StatPill label="fish/hr" val={t.fhr.toFixed(2)} col={GREEN} />
+                        : <StatPill label="kg/hr" val={t.kghr.toFixed(2)} col="#7c3aed" />
+                    )}
                   </div>
                 </div>
                 {/* Angler breakdown */}
@@ -635,7 +644,7 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
                   </div>
                   <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                     <StatPill label="Points"  val={s.points.toLocaleString('en-ZA', { minimumFractionDigits: 2 })} col={NAVY}  />
-                    <StatPill label="kg/hr"   val={s.kghr.toFixed(2)} col={GOLD}  />
+                    {catchReleaseFormat ? null : <StatPill label="kg/hr" val={s.kghr.toFixed(2)} col={GOLD} />}
                     <StatPill label="fish/hr" val={s.fhr.toFixed(2)}  col={GREEN} />
                   </div>
                 </div>
@@ -733,13 +742,13 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                 <thead>
                   <tr style={{ background: NAVY, color: 'white' }}>
-                    {['#', 'Angler', 'Team', 'Fish', 'Kg', 'Points', 'kg/hr', 'fish/hr'].map(h => (
+                    {['#', 'Angler', 'Team', 'Fish', 'Kg', 'Points', ...(catchReleaseFormat ? [] : ['kg/hr']), 'fish/hr'].map(h => (
                       <th key={h} style={{ padding: '0.45rem 0.6rem', textAlign: 'left', fontWeight: 600, fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {[...anglerStandings].sort((a, b) => b.kghr - a.kghr).map((a, i) => (
+                  {[...anglerStandings].sort((a, b) => catchReleaseFormat ? (b.fhr - a.fhr) : (b.kghr - a.kghr)).map((a, i) => (
                     <tr key={a.id} style={{ background: i % 2 === 0 ? 'white' : '#f9fafb' }}>
                       <td style={{ padding: '0.4rem 0.6rem', color: GREY }}>{i + 1}</td>
                       <td style={{ padding: '0.4rem 0.6rem', fontWeight: 600 }}>{a.name}</td>
@@ -747,7 +756,7 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
                       <td style={{ padding: '0.4rem 0.6rem' }}>{a.fish}</td>
                       <td style={{ padding: '0.4rem 0.6rem' }}>{a.kg.toFixed(2)}</td>
                       <td style={{ padding: '0.4rem 0.6rem' }}>{a.points.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}</td>
-                      <td style={{ padding: '0.4rem 0.6rem', fontWeight: 700, color: GOLD }}>{a.kghr.toFixed(2)}</td>
+                      {!catchReleaseFormat && <td style={{ padding: '0.4rem 0.6rem', fontWeight: 700, color: GOLD }}>{a.kghr.toFixed(2)}</td>}
                       <td style={{ padding: '0.4rem 0.6rem', fontWeight: 700, color: GREEN }}>{a.fhr.toFixed(2)}</td>
                     </tr>
                   ))}
