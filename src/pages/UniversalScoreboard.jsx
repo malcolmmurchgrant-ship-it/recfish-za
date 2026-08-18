@@ -389,11 +389,39 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
   // this entire competition type until this fix.
   // (isSplitBoat itself is now defined earlier, in Derived config, so Team
   // and Angler standings above can use it too — not redeclared here.)
+  // Resolves a catch's boat the same defensive way as everything else in
+  // this codebase: use the catch's own boat_id where it's actually set
+  // (true for live-scored, split-boat catches — the catch logger writes
+  // it directly). Full-boat historical imports (Gamefish, both Billfish
+  // competitions) never got a per-catch boat_id written at all — for
+  // those, fall back to the participant's team's fixed boat_id
+  // (competition_teams.boat_id), which is what this format actually
+  // guarantees. Confirmed via SADSAA Gamefish Nationals 2026: 0 of 60
+  // catches had boat_id set, while every team correctly had its own
+  // fixed boat_id.
+  const boatIdByTeamId = Object.fromEntries(teams.filter(t => t.boat_id).map(t => [t.id, t.boat_id]))
+  const teamIdByBoatId = Object.fromEntries(teams.filter(t => t.boat_id).map(t => [t.boat_id, t.id]))
+  const teamIdByParticipantId = Object.fromEntries(participants.map(p => [p.id, p.team_id]))
+  function resolveBoatId(c) {
+    if (c.boat_id) return c.boat_id
+    const participantId = (c.angler_id && userIdToParticipantId[c.angler_id]) || c.participant_id
+    const teamId = participantId && teamIdByParticipantId[participantId]
+    return teamId ? boatIdByTeamId[teamId] : null
+  }
+
   const skipperStandings = boats.map(b => {
-    const tc = filteredCatches.filter(c => c.boat_id === b.id)
-    const pts  = useMultiplier
-      ? calcMultipliedPoints(tc, scoringConfig, dateToDay)
-      : tc.reduce((s, c) => s + calcPoints(c, scoringConfig), 0)
+    const tc = filteredCatches.filter(c => resolveBoatId(c) === b.id)
+    // Same fix as Team Standings: for full-boat format, a boat's crew is
+    // exactly one fixed team, so summing each member's own already-correct
+    // points (pointsByParticipantId, computed above) avoids re-running the
+    // per-day species multiplier across multiple anglers' catches pooled
+    // together — the same inflation bug Team Standings had. Split-boat
+    // format keeps the original pooled calculation (a boat's crew changes
+    // day to day there, so there's no single "this boat's total points"
+    // to look up per participant the way full-boat's fixed team allows).
+    const pts = (!isSplitBoat && teamIdByBoatId[b.id])
+      ? Array.from(teamParticipantIds[teamIdByBoatId[b.id]] || []).reduce((s, pid) => s + (pointsByParticipantId[pid] || 0), 0)
+      : (useMultiplier ? calcMultipliedPoints(tc, scoringConfig, dateToDay) : tc.reduce((s, c) => s + calcPoints(c, scoringConfig), 0))
     const kg   = tc.reduce((s, c) => s + parseFloat(c.weight_kg || 0), 0)
     return {
       id: b.id,
