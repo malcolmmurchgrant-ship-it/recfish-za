@@ -248,6 +248,28 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
     participants.filter(p => p.user_id).map(p => [p.user_id, p.id])
   )
 
+  // Each participant's own correctly-computed points — calcMultipliedPoints
+  // applies a per-day species-count multiplier, and that multiplier is
+  // meant to reward ONE angler's own catch diversity that day, not a
+  // team's combined diversity. Computing this once per participant here
+  // (same filter/formula anglerStandings below uses) and having
+  // teamStandings SUM these values, rather than re-running
+  // calcMultipliedPoints on every member's catches pooled together, is
+  // what keeps a team's total from silently exceeding the sum of its own
+  // anglers — confirmed via SADSAA Gamefish Nationals 2026: SADSAA U21
+  // showed 713.09 as a team total when its three anglers' own points
+  // (466.17 + 120.06 + 18.32) only add up to 604.55 — the pooled
+  // recalculation was crediting the team with a multiplier based on
+  // every member's combined species list per day, not each angler's own.
+  const pointsByParticipantId = {}
+  for (const p of participants) {
+    const uid = p.user_id || p.id
+    const ac  = filteredCatches.filter(c => c.angler_id === uid || c.participant_id === p.id)
+    pointsByParticipantId[p.id] = useMultiplier
+      ? calcMultipliedPoints(ac, scoringConfig, dateToDay)
+      : ac.reduce((s, c) => s + calcPoints(c, scoringConfig), 0)
+  }
+
   const teamStandings = teams
     .filter(t => !t.is_disqualified)
     .map(t => {
@@ -265,9 +287,12 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
         const participantId = (c.angler_id && userIdToParticipantId[c.angler_id]) || c.participant_id
         return participantId && teamParticipantIds[t.id]?.has(participantId)
       })
-      const pts    = useMultiplier
-        ? calcMultipliedPoints(tc, scoringConfig, dateToDay)
-        : tc.reduce((s, c) => s + calcPoints(c, scoringConfig), 0)
+      // Points: sum of each member's own points (see pointsByParticipantId
+      // above) — NOT calcMultipliedPoints(tc, ...) on the pooled catch list.
+      // Weight and fish count are plain sums either way, so pooling tc for
+      // those is fine — it's specifically the per-day species multiplier
+      // that isn't safe to apply across multiple anglers' catches at once.
+      const pts = Array.from(teamParticipantIds[t.id] || []).reduce((s, pid) => s + (pointsByParticipantId[pid] || 0), 0)
       const kg     = tc.reduce((s, c) => s + parseFloat(c.weight_kg || 0), 0)
       const boat   = boatMap[t.boat_id] || {}
       return {
