@@ -248,28 +248,6 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
     participants.filter(p => p.user_id).map(p => [p.user_id, p.id])
   )
 
-  // Each participant's own correctly-computed points — calcMultipliedPoints
-  // applies a per-day species-count multiplier, and that multiplier is
-  // meant to reward ONE angler's own catch diversity that day, not a
-  // team's combined diversity. Computing this once per participant here
-  // (same filter/formula anglerStandings below uses) and having
-  // teamStandings SUM these values, rather than re-running
-  // calcMultipliedPoints on every member's catches pooled together, is
-  // what keeps a team's total from silently exceeding the sum of its own
-  // anglers — confirmed via SADSAA Gamefish Nationals 2026: SADSAA U21
-  // showed 713.09 as a team total when its three anglers' own points
-  // (466.17 + 120.06 + 18.32) only add up to 604.55 — the pooled
-  // recalculation was crediting the team with a multiplier based on
-  // every member's combined species list per day, not each angler's own.
-  const pointsByParticipantId = {}
-  for (const p of participants) {
-    const uid = p.user_id || p.id
-    const ac  = filteredCatches.filter(c => c.angler_id === uid || c.participant_id === p.id)
-    pointsByParticipantId[p.id] = useMultiplier
-      ? calcMultipliedPoints(ac, scoringConfig, dateToDay)
-      : ac.reduce((s, c) => s + calcPoints(c, scoringConfig), 0)
-  }
-
   const teamStandings = teams
     .filter(t => !t.is_disqualified)
     .map(t => {
@@ -282,17 +260,26 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
       // showed Etienne de Jager's and Renier van Jaarsveld's real catches
       // correctly, but Team Standings showed everyone, including their own
       // teams, at zero) — not specific to that competition; any competition
-      // using this non-split-boat path was affected.
+      // using this non-split-boat path was affected. This part of the fix
+      // is correct and stays.
       const tc = filteredCatches.filter(c => {
         const participantId = (c.angler_id && userIdToParticipantId[c.angler_id]) || c.participant_id
         return participantId && teamParticipantIds[t.id]?.has(participantId)
       })
-      // Points: sum of each member's own points (see pointsByParticipantId
-      // above) — NOT calcMultipliedPoints(tc, ...) on the pooled catch list.
-      // Weight and fish count are plain sums either way, so pooling tc for
-      // those is fine — it's specifically the per-day species multiplier
-      // that isn't safe to apply across multiple anglers' catches at once.
-      const pts = Array.from(teamParticipantIds[t.id] || []).reduce((s, pid) => s + (pointsByParticipantId[pid] || 0), 0)
+      // Points: calcMultipliedPoints(tc, ...) on the POOLED team catch list
+      // — confirmed correct against SADSAA Gamefish Nationals 2026's
+      // official scoring spreadsheet (WEIGHSHEET tab): "TOTAL TEAM POINTS"
+      // = (sum of every member's raw points that day) × a TEAM-wide
+      // species-diversity multiplier, computed from the whole crew's
+      // combined catch that day — not each angler's own multiplier. A
+      // previous version of this file summed each member's own
+      // individually-multiplied total instead, on the mistaken assumption
+      // that the pooled figure was a bug — it wasn't; verified by hand
+      // against SADSAA U21's Day 4 (645.0592) and the full tournament
+      // total (713.0944), both matching the official spreadsheet exactly.
+      const pts = useMultiplier
+        ? calcMultipliedPoints(tc, scoringConfig, dateToDay)
+        : tc.reduce((s, c) => s + calcPoints(c, scoringConfig), 0)
       const kg     = tc.reduce((s, c) => s + parseFloat(c.weight_kg || 0), 0)
       const boat   = boatMap[t.boat_id] || {}
       return {
@@ -400,7 +387,6 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
   // catches had boat_id set, while every team correctly had its own
   // fixed boat_id.
   const boatIdByTeamId = Object.fromEntries(teams.filter(t => t.boat_id).map(t => [t.id, t.boat_id]))
-  const teamIdByBoatId = Object.fromEntries(teams.filter(t => t.boat_id).map(t => [t.boat_id, t.id]))
   const teamIdByParticipantId = Object.fromEntries(participants.map(p => [p.id, p.team_id]))
   function resolveBoatId(c) {
     if (c.boat_id) return c.boat_id
@@ -411,17 +397,21 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
 
   const skipperStandings = boats.map(b => {
     const tc = filteredCatches.filter(c => resolveBoatId(c) === b.id)
-    // Same fix as Team Standings: for full-boat format, a boat's crew is
-    // exactly one fixed team, so summing each member's own already-correct
-    // points (pointsByParticipantId, computed above) avoids re-running the
-    // per-day species multiplier across multiple anglers' catches pooled
-    // together — the same inflation bug Team Standings had. Split-boat
-    // format keeps the original pooled calculation (a boat's crew changes
-    // day to day there, so there's no single "this boat's total points"
-    // to look up per participant the way full-boat's fixed team allows).
-    const pts = (!isSplitBoat && teamIdByBoatId[b.id])
-      ? Array.from(teamParticipantIds[teamIdByBoatId[b.id]] || []).reduce((s, pid) => s + (pointsByParticipantId[pid] || 0), 0)
-      : (useMultiplier ? calcMultipliedPoints(tc, scoringConfig, dateToDay) : tc.reduce((s, c) => s + calcPoints(c, scoringConfig), 0))
+    // Points: calcMultipliedPoints(tc, ...) on this boat's pooled catches
+    // for the day — same official formula as Team Standings (see the note
+    // there), applied per boat instead of per team. resolveBoatId() above
+    // already handles a mid-tournament boat/skipper swap correctly (catch's
+    // own boat_id first, falling back to the team's usual boat only when
+    // it's genuinely not set) — confirmed via SADSAA Gamefish Nationals
+    // 2026: Northern Gauteng's boat changed from WALAALAHA (Riaan Odendaal)
+    // to Captain Fine (Michael Fourie) for Day 4 only; once that day's
+    // catches carry Captain Fine's boat_id directly, this pooled
+    // calculation correctly splits credit exactly the way the official
+    // Skippers Ranking sheet does — no special-casing needed for
+    // full-boat vs split-boat, the resolution chain already covers both.
+    const pts = useMultiplier
+      ? calcMultipliedPoints(tc, scoringConfig, dateToDay)
+      : tc.reduce((s, c) => s + calcPoints(c, scoringConfig), 0)
     const kg   = tc.reduce((s, c) => s + parseFloat(c.weight_kg || 0), 0)
     return {
       id: b.id,
