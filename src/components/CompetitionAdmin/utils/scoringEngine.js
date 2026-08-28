@@ -612,7 +612,21 @@ export function buildSkipperRanking(catches, boats, days, boatDraws = []) {
         return { boatId, avg }
       })
       .sort((a, b) => b.avg - a.avg)
-      .forEach((e, i) => { positionByBoatDay[`${dayNum}|${e.boatId}`] = i + 1 })
+      // Standard competition ranking: boats tied on average share the same
+      // position, and the next distinct position skips ahead by the number
+      // of boats tied at it (1,2,2,4 — not 1,2,3,4). Previously this assigned
+      // strictly sequential positions with no tie-sharing at all, which
+      // silently bumped one boat in every tied pair to the wrong position —
+      // confirmed against the SADSAA East London 2026 official Skippers
+      // sheet, e.g. Hooligan/Fish Trax tied 201-201 on Day 2 (official: both
+      // rank 4) came out as ranks 4/5 in the app, shifting Hooligan's total
+      // position from the correct 5 to 6.
+      .forEach((e, i, arr) => {
+        const position = i > 0 && arr[i - 1].avg === e.avg
+          ? positionByBoatDay[`${dayNum}|${arr[i - 1].boatId}`]
+          : i + 1
+        positionByBoatDay[`${dayNum}|${e.boatId}`] = position
+      })
 
     for (const boatId of boatIds) {
       if (!participatingBoatIds.includes(boatId)) {
