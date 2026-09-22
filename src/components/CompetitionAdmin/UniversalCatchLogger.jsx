@@ -44,6 +44,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import { useCompetitionConfig } from './hooks/useCompetitionConfig'
 import { useCatchLoggerData } from './hooks/useCatchLoggerData'
+import VideoUpload from '../VideoUpload'
 import {
   buildSpeciesPicker,
   findSpeciesConfig,
@@ -99,6 +100,15 @@ function rowToMeasuredDraft(row) {
     // unconfirmed. Only a genuinely fresh row (no points yet) needs the
     // angler to actively tick the box.
     measured_min_size: !!row.measured_min_size || (parseFloat(row.points) > 0),
+    // video_url/video_status/_originalPoints: loaded so a re-save of this
+    // card (e.g. fixing a different fish's weight) doesn't blindly reset
+    // an already-verified or already-rejected release back to pending —
+    // see the require_video_evidence branch in handleSave's payload
+    // construction. A row with no video review involved at all
+    // (video_status null, every existing competition) is unaffected.
+    video_url: row.video_url || null,
+    video_status: row.video_status || null,
+    _originalPoints: row.points,
     weightSource: 'saved',
     notes: row.notes || '',
   }
@@ -493,6 +503,17 @@ export default function UniversalCatchLogger({ competitionId }) {
   // ── Save: diff both drafts against originalRows ─────────────────────────────
   const handleSave = async () => {
     if (!participant || !selectedDay) return
+
+    // Block saving a release-video-required species with no video attached
+    // yet — otherwise it would silently save with points forced to 0 and
+    // no way to ever verify it, since there'd be nothing for the reviewer
+    // to watch.
+    const missingVideo = scoredMeasured.find(f => f.species && !f._warning && f._cfg?.require_video_evidence && !f.video_url)
+    if (missingVideo) {
+      setError(`${missingVideo.species}: attach the release video before saving`)
+      return
+    }
+
     setSaving(true); setError('')
 
     try {
@@ -528,6 +549,14 @@ export default function UniversalCatchLogger({ competitionId }) {
         // both duplicate it and destroy any per-row notes already present.
         const noteForThisRow = !recordNoteAttached && recordNote ? recordNote : (fish.notes || null)
         if (!recordNoteAttached && recordNote) recordNoteAttached = true
+        // A release already decided by the verifier (video_status
+        // 'verified' or 'not_verified') keeps its locked points and
+        // status untouched by this save, no matter what else on the card
+        // changed — only a genuinely still-pending or brand-new release
+        // gets zeroed out awaiting review. Prevents a scale-side resave
+        // (e.g. fixing a different fish's weight on the same card) from
+        // silently undoing the verifier's decision.
+        const videoAlreadyDecided = fish.video_status === 'verified' || fish.video_status === 'not_verified'
         const payload = {
           ...baseFields,
           species_name: fish.species,
@@ -536,7 +565,21 @@ export default function UniversalCatchLogger({ competitionId }) {
           line_class_kg: fish.line_class_kg ? parseInt(fish.line_class_kg, 10) : (config?.scoring?.default_line_class_kg ?? config?.scoring?.line_class_kg ?? 0),
           retained: !fish._cfg?.kingfish_release,
           measured_min_size: !!fish.measured_min_size,
-          points: fish._scored.points,
+          // Points are withheld (0) until a verifier reviews the video and
+          // approves it — see catchLoggerScoring.js's release-scoring path
+          // and the Video Review queue. The real points (already correctly
+          // computed above via fish._scored.points, using this species'
+          // release_points if set) get applied at verification time, not
+          // here. Species without require_video_evidence — every existing
+          // competition, including Gamefish Nationals' Kingfish rule —
+          // score immediately as before, completely unaffected.
+          points: fish._cfg?.require_video_evidence
+            ? (videoAlreadyDecided ? fish._originalPoints : 0)
+            : fish._scored.points,
+          video_url: fish._cfg?.require_video_evidence ? (fish.video_url || null) : null,
+          video_status: fish._cfg?.require_video_evidence
+            ? (videoAlreadyDecided ? fish.video_status : 'pending')
+            : null,
           notes: noteForThisRow,
         }
         if (fish._id) {
@@ -919,12 +962,30 @@ function MeasuredFishRow({ fish, index, speciesPicker, autoWeight, calculating, 
             <span style={S.badge(GOLD)}>Multiplier</span>
           ) : fish._cfg?.kingfish_release ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-              <span style={S.badge(fish.measured_min_size ? PURPLE : '#9ca3af')}>{pts} pts 📸</span>
+              <span style={S.badge(fish.measured_min_size ? PURPLE : '#9ca3af')}>
+                {pts} pts {fish._cfg?.require_video_evidence ? '⏳ pending review' : '📸'}
+              </span>
               <label style={{ fontSize: '0.68rem', color: fish.measured_min_size ? PURPLE : RED, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 2 }}>
                 <input type='checkbox' checked={!!fish.measured_min_size}
                   onChange={e => onChange(index, { ...fish, measured_min_size: e.target.checked })} />
                 Min size
               </label>
+              {/* Video evidence: only rendered for species that set
+                  require_video_evidence in their config (e.g. CBSC Tuna
+                  Invitational's Open+Release species). The existing
+                  Gamefish Nationals Kingfish rule doesn't set this flag,
+                  so it never renders here and behaves exactly as before —
+                  self-attested by the scorer, scored immediately. */}
+              {fish._cfg?.require_video_evidence && (
+                <VideoUpload
+                  existingVideoUrl={fish.video_url}
+                  onVideoUploaded={result => onChange(index, {
+                    ...fish,
+                    video_url: result?.videoUrl || null,
+                    video_metadata: result?.metadata || null,
+                  })}
+                />
+              )}
             </div>
           ) : (
             <div>
