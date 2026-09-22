@@ -17,6 +17,13 @@
 //     group:              'Tuna (min 5kg)',          // for UI <optgroup>
 //     billfish:           false,                      // counts as species, no weight score
 //     kingfish_release:   false,                       // fixed release points, no weight
+//     release_points:      null,     // kingfish_release only — this species' flat
+//                                     // release points, overriding the competition-
+//                                     // wide scoring_config.photo_release_fixed_points.
+//                                     // Lets one competition give different species
+//                                     // different flat rates (e.g. 20pts for Yellowfin/
+//                                     // Bigeye/Southern Bluefin Tuna, 5pts for Longfin
+//                                     // Tuna) instead of one rate for everything.
 //     min_weight_kg:       5,
 //     bag_limit:           10,
 //     points_per_fish:     3,        // 'points' method only
@@ -142,7 +149,7 @@ export function scoreDraftFish(fish, speciesCfg, scoringConfig, multiplier = 1) 
 
   // Kingfish-style photo/measure/release: fixed points, no weight needed
   if (speciesCfg.kingfish_release) {
-    const pts = calcKingfishRelease(scoringConfig)
+    const pts = calcKingfishRelease(scoringConfig, speciesCfg)
     return { points: pts, method: 'release', detail: `Photo + measure release — ${pts}pts flat` }
   }
 

@@ -48,8 +48,15 @@ export function calcPointsScoring({
 }
 
 // ── Kingfish photo-measure-release ────────────────────────────────────────────
-export function calcKingfishRelease(scoringConfig) {
-  return scoringConfig?.photo_release_fixed_points ?? 5
+// speciesCfg is optional — a per-species `release_points` value takes
+// priority (needed when a competition flags several species as
+// kingfish_release-style flat-point releases but wants different rates
+// for each, e.g. 20pts for Yellowfin/Bigeye/Southern Bluefin Tuna vs
+// 5pts for Longfin Tuna, all within the same competition). Falls back to
+// the single competition-wide value, then a hard default of 5, exactly
+// as before for any existing competition that doesn't set either.
+export function calcKingfishRelease(scoringConfig, speciesCfg) {
+  return speciesCfg?.release_points ?? scoringConfig?.photo_release_fixed_points ?? 5
 }
 
 // ── Billfish on-board points (multiplier, no weight score) ────────────────────
@@ -91,7 +98,7 @@ export function calculateCatchPoints({
   // Kingfish photo-measure-release
   if (isKingfishRelease) {
     if (!isMeasured400mm) return { points: 0, method: 'kingfish_release_invalid', detail: 'Under 400mm — no points' }
-    const pts = calcKingfishRelease(scoringConfig)
+    const pts = calcKingfishRelease(scoringConfig, speciesRule)
     return { points: pts, method: 'kingfish_release', detail: `📸 ${pts}pts` }
   }
 
