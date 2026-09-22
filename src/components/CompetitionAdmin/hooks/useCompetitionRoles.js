@@ -102,6 +102,14 @@ export function useCompetitionRoles(competitionId) {
                           ['tournament_director','scorer'].includes(platformRole)
   const canView         = isScorer || competitionRole === 'read_only'
 
+  // Video Verifier: a distinct role from Scorer, for reviewing and
+  // deciding on release videos (CBSC Tuna Invitational and any future
+  // dual Open+Release competition). Per the approved proposal, this is
+  // NOT folded into isScorer and the Tournament Director does not get
+  // it automatically — only platform admins and whoever is explicitly
+  // granted 'video_verifier' at the competition level.
+  const isVideoVerifier  = isPlatformAdmin || competitionRole === 'video_verifier'
+
   // Grant a role for this competition
   async function grantRole(email, role) {
     // Look up user by email via a SECURITY DEFINER function rather than
@@ -140,6 +148,7 @@ export function useCompetitionRoles(competitionId) {
     isPlatformAdmin,
     isAdmin,
     isScorer,
+    isVideoVerifier,
     canView,
     loading,
     grantRole,

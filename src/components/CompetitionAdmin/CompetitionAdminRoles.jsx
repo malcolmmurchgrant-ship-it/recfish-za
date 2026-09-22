@@ -20,10 +20,11 @@ const S = {
   section:{ fontWeight: 700, color: NAVY, fontSize: '0.95rem', marginBottom: '0.75rem', paddingBottom: '0.4rem', borderBottom: '2px solid #e5e7eb' },
 }
 
-const ROLE_COLORS = { admin: NAVY, scorer: GREEN, read_only: GREY, tournament_director: '#7c3aed' }
+const ROLE_COLORS = { admin: NAVY, scorer: GREEN, read_only: GREY, tournament_director: '#7c3aed', video_verifier: '#c2410c' }
 const ROLE_DESCS  = {
   tournament_director: 'Full control: rules, draws, participants, prize categories',
   scorer:              'Log and edit all catches, view boat draw',
+  video_verifier:      'Review release videos and decide Verified / Not Verified — separate from Scorer',
   read_only:           'Scoreboard view only — no edit access',
 }
 
@@ -110,6 +111,7 @@ export default function CompetitionAdminRoles({
               onChange={e => setNewRole(r => ({ ...r, role: e.target.value }))}>
               <option value="tournament_director">Tournament Director</option>
               <option value="scorer">Scorer</option>
+              <option value="video_verifier">Video Verifier</option>
               <option value="read_only">Read Only</option>
             </select>
           </div>
