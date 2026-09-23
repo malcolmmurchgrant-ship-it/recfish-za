@@ -559,7 +559,7 @@ export default function UniversalCatchLogger({ competitionId }) {
         const videoAlreadyDecided = fish.video_status === 'verified' || fish.video_status === 'not_verified'
         const payload = {
           ...baseFields,
-          species_name: fish.species,
+          species_name: fish._cfg?.species_name || fish.species,
           weight_kg: fish.weight_kg ? parseFloat(fish.weight_kg) : null,
           length_cm: fish.length_cm ? parseFloat(fish.length_cm) : null,
           line_class_kg: fish.line_class_kg ? parseInt(fish.line_class_kg, 10) : (config?.scoring?.default_line_class_kg ?? config?.scoring?.line_class_kg ?? 0),
