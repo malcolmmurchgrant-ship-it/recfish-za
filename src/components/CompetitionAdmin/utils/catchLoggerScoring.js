@@ -166,6 +166,19 @@ export function scoreDraftFish(fish, speciesCfg, scoringConfig, multiplier = 1) 
     return { points: pts, method, detail: 'Raw weight — CPUE applied at team aggregation' }
   }
 
+  // Plain 1-point-per-kg scoring, no line class or team-level effort
+  // normalization involved (unlike 'cpue', which implies further
+  // processing at team-standings time). Deliberately its own branch
+  // rather than reusing calcCpuePoints under the 'cpue' label, even
+  // though the per-catch arithmetic is identical today — this keeps it
+  // safe from ever picking up CPUE-specific team aggregation behavior
+  // by accident. Length, if entered, is not part of this calculation at
+  // all and never blocks it - purely optional, exactly as intended.
+  if (method === 'weight') {
+    const weightKg = parseFloat(fish.weight_kg) || 0
+    return { points: weightKg * multiplier, method, detail: `${weightKg}kg × 1pt/kg${multiplier > 1 ? ` × ${multiplier}` : ''}` }
+  }
+
   if (method === 'points') {
     const fishCount     = parseInt(fish.fishCount, 10) || 0
     const overLineCount = parseInt(fish.overLineCount, 10) || 0
