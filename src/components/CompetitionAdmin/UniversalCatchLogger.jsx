@@ -792,7 +792,9 @@ export default function UniversalCatchLogger({ competitionId }) {
                 <div style={S.card}>
                   <div style={{ fontWeight: 700, color: NAVY, marginBottom: '0.5rem' }}>Record Catches</div>
                   <div style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '0.75rem' }}>
-                    Maximum {measuredBagLimit} qualifying fish per angler per day.
+                    {config?.scoring?.bag_limit_note
+                      ? `Maximum ${measuredBagLimit} qualifying fish per angler per day (South Africa's recreational daily bag limit). ${config.scoring.bag_limit_note}`
+                      : `Maximum ${measuredBagLimit} qualifying fish per angler per day.`}
                   </div>
 
                   {scoredMeasured.length === 0 && (
