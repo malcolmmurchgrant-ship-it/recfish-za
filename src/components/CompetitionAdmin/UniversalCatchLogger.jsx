@@ -576,6 +576,15 @@ export default function UniversalCatchLogger({ competitionId }) {
           points: fish._cfg?.require_video_evidence
             ? (videoAlreadyDecided ? fish._originalPoints : 0)
             : fish._scored.points,
+          // pending_points: the real, correctly-computed value (20 or 5,
+          // per this species' release_points), preserved so the Video
+          // Review queue can apply it directly on verification without
+          // re-deriving it from species_config - which would be
+          // ambiguous, since a species now has both an Open and a
+          // Release config entry sharing the same underlying name.
+          pending_points: fish._cfg?.require_video_evidence && !videoAlreadyDecided
+            ? fish._scored.points
+            : null,
           video_url: fish._cfg?.require_video_evidence ? (fish.video_url || null) : null,
           video_status: fish._cfg?.require_video_evidence
             ? (videoAlreadyDecided ? fish.video_status : 'pending')

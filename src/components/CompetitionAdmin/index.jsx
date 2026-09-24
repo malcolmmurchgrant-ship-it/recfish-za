@@ -21,6 +21,7 @@ import CompetitionAdminScoring      from './CompetitionAdminScoring'
 import CompetitionAdminScoreboard   from './CompetitionAdminScoreboard'
 import CompetitionAdminReports      from './CompetitionAdminReports'
 import RolesTab                     from './CompetitionAdminRoles'
+import CompetitionAdminVideoReview  from './CompetitionAdminVideoReview'
 
 const NAVY = '#1e3a8a'
 const GREY = '#6b7280'
@@ -31,12 +32,13 @@ const TABS = [
   { id: 'participants', label: '👥 Participants',  minRole: 'scorer' },
   { id: 'scoring',      label: '📋 Scoring',       minRole: 'scorer' },
   { id: 'scoreboard',   label: '🏆 Scoreboard',   minRole: 'viewer' },
+  { id: 'video-review', label: '🎥 Video Review', minRole: 'video_verifier' },
   { id: 'reports',      label: '📊 Reports',       minRole: 'admin'  },
   { id: 'roles',        label: '🔐 Roles',         minRole: 'admin'  },
 ]
 
 export default function CompetitionAdmin({ competitionId }) {
-  const VALID_TABS = ['setup', 'participants', 'scoring', 'scoreboard', 'reports', 'roles']
+  const VALID_TABS = ['setup', 'participants', 'scoring', 'scoreboard', 'video-review', 'reports', 'roles']
   const [searchParams] = useSearchParams()
   const tabFromUrl = searchParams.get('tab')
   const [activeTab,     setActiveTab]     = useState(VALID_TABS.includes(tabFromUrl) ? tabFromUrl : 'scoring')
@@ -52,7 +54,7 @@ export default function CompetitionAdmin({ competitionId }) {
   } = useCompetitionConfig(competitionId)
 
   const {
-    isPlatformAdmin, isAdmin, isScorer, canView, loading: rolesLoading,
+    isPlatformAdmin, isAdmin, isScorer, isVideoVerifier, canView, loading: rolesLoading,
     grantRole, revokeRole, recheckRoles,
   } = useCompetitionRoles(competitionId)
 
@@ -133,6 +135,10 @@ export default function CompetitionAdmin({ competitionId }) {
     if (t.minRole === 'viewer') return canView || isScorer || isAdmin
     if (t.minRole === 'scorer') return isScorer || isAdmin
     if (t.minRole === 'admin')  return isAdmin
+    // Deliberately NOT combined with isAdmin - Tournament Director must
+    // not get video review authority automatically, per the approved
+    // proposal. isVideoVerifier already covers platform admins on its own.
+    if (t.minRole === 'video_verifier') return isVideoVerifier
     return true
   })
 
@@ -230,6 +236,14 @@ export default function CompetitionAdmin({ competitionId }) {
           days={days}
           boats={boats}
           isAdmin={isAdmin}
+        />
+      )}
+
+      {activeTab === 'video-review' && (
+        <CompetitionAdminVideoReview
+          competitionId={competitionId}
+          isVideoVerifier={isVideoVerifier}
+          onReload={reloadCatches}
         />
       )}
 
