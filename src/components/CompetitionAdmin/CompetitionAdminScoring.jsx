@@ -452,6 +452,19 @@ export default function CompetitionAdminScoring({
                   {c.data_quality === 'disqualified' && <span style={S.badge(RED)}>🚫 DQ</span>}
                   {c.data_quality === 'rejected'     && <span style={S.badge('#9ca3af')}>Rejected</span>}
                   {c.data_quality === 'verified'     && <span style={S.badge(GREEN)}>✓ Verified</span>}
+                  {/* video_status badges: a release's video-review outcome,
+                      deliberately worded "Release: ..." rather than a bare
+                      "Verified"/"Not Verified" - data_quality already uses
+                      those exact words for a completely different concept
+                      (whether the catch entry itself is properly logged),
+                      and the two showing side by side with identical
+                      wording is exactly what made this confusing to begin
+                      with. Only ever set on rows using require_video_evidence
+                      species — every other competition's catches have
+                      video_status null and show none of these. */}
+                  {c.video_status === 'pending'      && <span style={S.badge('#c2410c')}>🎥 Release: Pending Review</span>}
+                  {c.video_status === 'verified'     && <span style={S.badge(GREEN)}>🎥 Release: Verified</span>}
+                  {c.video_status === 'not_verified' && <span style={S.badge(RED)}>🎥 Release: Not Verified</span>}
                   {c.notes && c.data_quality !== 'rejected' && c.data_quality !== 'disqualified' && (
                     <span style={S.badge(GOLD)} title={c.notes}>🏆 Claim</span>
                   )}
