@@ -84,10 +84,28 @@ const S = {
 //                 applicable; the UI aggregates these into a per-species
 //                 count (see aggregateUnitCountRows below) but the database
 //                 always stores one row per fish, consistent across modes.
-function rowToMeasuredDraft(row) {
+function rowToMeasuredDraft(row, speciesConfig) {
+  // Resolve the correct dropdown key (fish.species) for this row. Most
+  // rows: the plain species_name is unambiguous. But a row that went
+  // through the video-evidence release path (video_status is set) needs
+  // to reopen against its OWN config entry - e.g. "Longfin Tuna (Release)"
+  // - not the plain "Longfin Tuna" Open entry that species_name alone
+  // would ambiguously match (since findSpeciesConfig's .find() just
+  // returns whichever eligible_species entry comes first with that name).
+  // Without this, editing an existing release silently reopens it as a
+  // plain weighed entry - wrong UI, and a real risk of overwriting the
+  // correct pending/verified state if resaved in that state.
+  let species = row.species_name || ''
+  if (row.video_status && speciesConfig?.eligible_species) {
+    const releaseEntry = speciesConfig.eligible_species.find(
+      s => s.species_name === row.species_name && s.require_video_evidence
+    )
+    if (releaseEntry) species = releaseEntry.name
+  }
+
   return {
     _id: row.id,
-    species: row.species_name || '',
+    species,
     weight_kg: row.weight_kg != null ? String(row.weight_kg) : '',
     length_cm: row.length_cm != null ? String(row.length_cm) : '',
     line_class_kg: row.line_class_kg || '',
@@ -301,7 +319,7 @@ export default function UniversalCatchLogger({ competitionId }) {
         const cfg = findSpeciesConfig(config?.species, r.species_name)
         return !cfg || (cfg.entry_mode || 'measured') !== 'unit_count'
       })
-      setMeasuredDraft(measuredRows.map(rowToMeasuredDraft))
+      setMeasuredDraft(measuredRows.map(r => rowToMeasuredDraft(r, config?.species)))
 
       // Unit-count rows: always rebuild the FULL eligible species list so
       // every species shows a stepper. Each species' count is the number
@@ -668,7 +686,7 @@ export default function UniversalCatchLogger({ competitionId }) {
         const cfg = findSpeciesConfig(config?.species, r.species_name)
         return !cfg || (cfg.entry_mode || 'measured') !== 'unit_count'
       })
-      setMeasuredDraft(freshMeasured.map(rowToMeasuredDraft))
+      setMeasuredDraft(freshMeasured.map(r => rowToMeasuredDraft(r, config?.species)))
       setUnitCountDraft(unitCountSpecies.map(sp => aggregateUnitCountRows(fresh, sp.name)))
 
       setSaving(false); setSaved(true)
