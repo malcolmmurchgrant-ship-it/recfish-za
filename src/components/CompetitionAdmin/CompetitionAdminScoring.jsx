@@ -475,13 +475,13 @@ export default function CompetitionAdminScoring({
                     <span style={S.badge(GOLD)} title={c.notes}>🏆 Claim</span>
                   )}
                   {c.species_name}
-                  {c.weight_kg && <span style={{ fontWeight: 400, color: GREY }}>{parseFloat(c.weight_kg).toFixed(2)} kg</span>}
+                  {!!c.weight_kg && <span style={{ fontWeight: 400, color: GREY }}>{parseFloat(c.weight_kg).toFixed(2)} kg</span>}
                 </div>
                 <div style={{ fontSize: '0.8rem', color: GREY, marginTop: 2 }}>
                   {participant?.full_name}
                   {team && ` · ${team.team_name || team.province}`}
                   {` · Day ${c.competition_days?.day_number || '?'}`}
-                  {c.line_class_kg && ` · ${c.line_class_kg}kg LC`}
+                  {!!c.line_class_kg && ` · ${c.line_class_kg}kg LC`}
                 </div>
                 {c.notes && (
                   <div style={{ fontSize: '0.78rem', color: GOLD, marginTop: 2, fontStyle: 'italic' }}>
