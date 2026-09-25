@@ -180,8 +180,14 @@ export default function CompetitionAdminScoring({
     if (dayFilter !== 'all') {
       const dayCatches = activeCatches.filter(c => c.competition_days?.day_number === parseInt(dayFilter))
       const byBoat = {}
+      // Falls back to the team's own fixed boat (competition_teams.boat_id)
+      // when the catch itself has no boat_id - the normal case for a
+      // traditional/fixed-boat-per-team competition, where boat_id is
+      // only ever set on individual catches for split-boat-draw formats.
+      // Without this fallback every such competition's Boat Summary shows
+      // "Unknown Boat" for everything, regardless of team.
       for (const c of dayCatches) {
-        const boatName = boats?.find(b => b.id === c.boat_id)?.boat_name || 'Unknown Boat'
+        const boatName = boats?.find(b => b.id === (c.boat_id || c.competition_teams?.boat_id))?.boat_name || 'Unknown Boat'
         if (!byBoat[boatName]) byBoat[boatName] = []
         byBoat[boatName].push(c)
       }
@@ -193,7 +199,7 @@ export default function CompetitionAdminScoring({
     // All Days — group by boat, then by day within each boat
     const byBoatDay = {}
     for (const c of activeCatches) {
-      const boatName = boats?.find(b => b.id === c.boat_id)?.boat_name || 'Unknown Boat'
+      const boatName = boats?.find(b => b.id === (c.boat_id || c.competition_teams?.boat_id))?.boat_name || 'Unknown Boat'
       const dayNum   = c.competition_days?.day_number ?? '?'
       if (!byBoatDay[boatName]) byBoatDay[boatName] = {}
       if (!byBoatDay[boatName][dayNum]) byBoatDay[boatName][dayNum] = []

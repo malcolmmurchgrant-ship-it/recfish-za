@@ -22,7 +22,7 @@ export function useCompetitionCatches(competitionId) {
         .from('competition_catches')
         .select(`
           *,
-          competition_teams ( id, team_name, province, team_type, team_suffix ),
+          competition_teams ( id, team_name, province, team_type, team_suffix, boat_id ),
           competition_days ( id, day_number, date, session_status )
         `)
         .eq('competition_id', competitionId)
