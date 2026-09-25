@@ -55,6 +55,15 @@ export default function CompetitionAdminReports({
   const [error,         setError]         = useState('')
   const [published,     setPublished]     = useState(false)
 
+  // De-duplicated species names for the prize-category species picker -
+  // some competitions (like this one) have two config entries per species
+  // (Open + Release), sharing the same species_name; the picker should
+  // only ever show each real species once.
+  const speciesOptions = useMemo(() => {
+    const names = (config?.species?.eligible_species || []).map(s => s.species_name || s.name)
+    return [...new Set(names)].filter(Boolean).sort()
+  }, [config?.species])
+
   const isLocked   = !!competition?.results_published_at || published
   const standings  = useMemo(() => buildIndividualStandings(catches, participants, days, boats, config?.scoring), [catches, participants, days, boats, config?.scoring])
 
@@ -471,42 +480,101 @@ export default function CompetitionAdminReports({
           <div style={{ fontSize: '0.8rem', color: GREY, marginBottom: '0.75rem' }}>
             These categories appear in the Prize Giving PDF. Editable until results are published.
           </div>
-          {prizeCategories.map((cat, i) => (
-            <div key={cat.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: '0.5rem', marginBottom: '0.5rem', alignItems: 'end' }}>
-              <div>
-                {i === 0 && <label style={S.label}>Category Label</label>}
-                <input style={S.input} placeholder="e.g. Heaviest Kob"
-                  value={cat.label}
-                  onChange={e => updatePrizeCat(i, { label: e.target.value })} />
+          {prizeCategories.map((cat, i) => {
+            // Fields only relevant to some criteria - shown conditionally
+            // below the main row rather than crowding every category with
+            // inputs that don't apply to it.
+            const needsSpecies = cat.criteria === 'max_species_weight' || cat.criteria === 'closest_to_target'
+            const needsTarget  = cat.criteria === 'closest_to_target'
+            const needsManual  = cat.criteria === 'manual'
+            const needsRank    = !needsManual
+            // Day-scoping (for "Daily Biggest Tuna" style categories) is
+            // available on any criteria that reads individual catches
+            // directly, not on standings-based or team-based ones, which
+            // have no per-catch day to scope by.
+            const canScopeDay  = ['max_species_weight', 'max_weight_any_species', 'closest_to_target', 'max_release_points'].includes(cat.criteria)
+
+            return (
+            <div key={cat.id} style={{ marginBottom: '0.75rem', paddingBottom: '0.75rem', borderBottom: i < prizeCategories.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr auto', gap: '0.5rem', alignItems: 'end' }}>
+                <div>
+                  {i === 0 && <label style={S.label}>Category Label</label>}
+                  <input style={S.input} placeholder="e.g. Heaviest Kob"
+                    value={cat.label}
+                    onChange={e => updatePrizeCat(i, { label: e.target.value })} />
+                </div>
+                <div>
+                  {i === 0 && <label style={S.label}>Criteria</label>}
+                  <select style={S.select} value={cat.criteria}
+                    onChange={e => updatePrizeCat(i, { criteria: e.target.value })}>
+                    <option value="max_total_points">Most Points</option>
+                    <option value="max_total_weight">Heaviest Bag</option>
+                    <option value="max_release_points">Most Release Points</option>
+                    <option value="max_species_weight">Heaviest Named Species</option>
+                    <option value="max_weight_any_species">Heaviest Fish (Any Species)</option>
+                    <option value="max_species_count">Most Species</option>
+                    <option value="closest_to_target">Closest to Target Weight</option>
+                    <option value="max_team_points">Top Team/Boat — Points</option>
+                    <option value="max_team_weight">Top Team/Boat — Weight</option>
+                    <option value="manual">Manual (TD Decides)</option>
+                  </select>
+                </div>
+                <button onClick={() => removePrizeCat(i)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: RED, fontSize: '1.1rem', padding: '0.3rem', marginTop: i === 0 ? '1.2rem' : 0 }}>
+                  ✕
+                </button>
               </div>
-              <div>
-                {i === 0 && <label style={S.label}>Criteria</label>}
-                <select style={S.select} value={cat.criteria}
-                  onChange={e => updatePrizeCat(i, { criteria: e.target.value })}>
-                  <option value="max_total_points">Most Points</option>
-                  <option value="max_total_weight">Heaviest Bag</option>
-                  <option value="max_species_weight">Heaviest Species</option>
-                  <option value="max_species_count">Most Species</option>
-                  <option value="max_team_points">Top Team — Points</option>
-                  <option value="max_team_weight">Top Team — Weight</option>
-                </select>
-              </div>
-              <div>
-                {i === 0 && <label style={S.label}>Eligible</label>}
-                <select style={S.select} value={cat.eligible}
-                  onChange={e => updatePrizeCat(i, { eligible: e.target.value })}>
-                  <option value="individual">Individual</option>
-                  <option value="team">Team</option>
-                  <option value="boat">Boat</option>
-                  <option value="skipper">Skipper</option>
-                </select>
-              </div>
-              <button onClick={() => removePrizeCat(i)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: RED, fontSize: '1.1rem', padding: '0.3rem', marginTop: i === 0 ? '1.2rem' : 0 }}>
-                ✕
-              </button>
+
+              {(needsSpecies || needsTarget || needsManual || needsRank || canScopeDay) && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.5rem', marginTop: '0.5rem' }}>
+                  {needsSpecies && (
+                    <div>
+                      <label style={S.label}>Species{needsTarget ? ' (optional)' : ''}</label>
+                      <select style={S.select} value={cat.species_name || ''}
+                        onChange={e => updatePrizeCat(i, { species_name: e.target.value || null })}>
+                        <option value="">{needsTarget ? 'Any species' : 'Select species…'}</option>
+                        {speciesOptions.map(name => <option key={name} value={name}>{name}</option>)}
+                      </select>
+                    </div>
+                  )}
+                  {needsTarget && (
+                    <div>
+                      <label style={S.label}>Target Weight (kg)</label>
+                      <input type="number" step="0.01" style={S.input} placeholder="e.g. 43"
+                        value={cat.target_weight_kg || ''}
+                        onChange={e => updatePrizeCat(i, { target_weight_kg: e.target.value })} />
+                    </div>
+                  )}
+                  {canScopeDay && (
+                    <div>
+                      <label style={S.label}>Day (optional)</label>
+                      <select style={S.select} value={cat.day_number ?? ''}
+                        onChange={e => updatePrizeCat(i, { day_number: e.target.value === '' ? null : Number(e.target.value) })}>
+                        <option value="">All days</option>
+                        {(days || []).map(d => <option key={d.id} value={d.day_number}>Day {d.day_number}</option>)}
+                      </select>
+                    </div>
+                  )}
+                  {needsRank && (
+                    <div>
+                      <label style={S.label}>Place</label>
+                      <input type="number" min="1" style={S.input}
+                        value={cat.rank || 1}
+                        onChange={e => updatePrizeCat(i, { rank: Math.max(1, parseInt(e.target.value, 10) || 1) })} />
+                    </div>
+                  )}
+                  {needsManual && (
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <label style={S.label}>Winner (typed in by TD)</label>
+                      <input style={S.input} placeholder="e.g. Bryan Fitchat"
+                        value={cat.manual_winner || ''}
+                        onChange={e => updatePrizeCat(i, { manual_winner: e.target.value })} />
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-          ))}
+          )})}
           <div style={{ marginTop: '0.75rem' }}>
             <button onClick={saveReportingConfig} disabled={savingConfig} style={S.btn(GREEN, 'white', savingConfig)}>
               {savingConfig ? 'Saving…' : '✓ Save Prize Categories'}

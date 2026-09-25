@@ -184,6 +184,16 @@ export function downloadPDFReport(standings, catches, competition, config, extra
       skipperRanking.map(s => [s.rank, s.boatName, s.skipperName, s.daysFished, s.totalFishCount, s.totalPoints.toFixed(2), s.totalPosition]))
   }
 
+  // Prize Categories — this function's own comment already promised
+  // "Prize Winners if configured", but never actually called
+  // buildPrizeRows or drew a table for it. Fixed here, using the same
+  // teamStandings this function already receives via extra.
+  const prizeRows = buildPrizeRows(standings, catches, config, teamStandings)
+  if (prizeRows.length) {
+    sectionHeading('Prize Categories')
+    table(['Category', 'Winner', 'Team', 'Value'], prizeRows)
+  }
+
   // Species Summary — a horizontal bar chart (species most-caught first),
   // matching the on-screen Competition Summary's look, rather than a table.
   // Sorted by fish count, not groupCatchesBySpecies' default points-sort —
@@ -227,7 +237,7 @@ export function downloadPDFReport(standings, catches, competition, config, extra
 }
 
 function buildSingleSheetHTML(standings, catches, competition, config, participants = [], dailyRecords = [], teamStandings = [], cpueData = null, ladiesTeamStandings = [], openStandings = [], ladiesStandings = [], skipperRanking = []) {
-  const prizeRows = buildPrizeRows(standings, catches, config)
+  const prizeRows = buildPrizeRows(standings, catches, config, teamStandings)
   const showWeight = config?.scoring?.method !== 'points'
   const usesBoatPercentage = config?.scoring?.boat_percentage_scoring === true
   // If a ladies division exists (ladiesStandings non-empty), replace the
@@ -268,7 +278,7 @@ ${prizeRows.length ? `<div class="section"><h3>Prize Categories</h3>${prizeTable
 }
 
 function buildMultiSheetHTML(standings, catches, competition, config, participants = [], dailyRecords = [], teamStandings = [], cpueData = null, ladiesTeamStandings = [], openStandings = [], ladiesStandings = [], skipperRanking = []) {
-  const prizeRows = buildPrizeRows(standings, catches, config)
+  const prizeRows = buildPrizeRows(standings, catches, config, teamStandings)
   const showWeight = config?.scoring?.method !== 'points'
   const usesBoatPercentage = config?.scoring?.boat_percentage_scoring === true
   const sheets = [
@@ -439,29 +449,101 @@ function prizeTable(prizeRows) {
   return htmlTable(['Category','Winner','Team','Value'], prizeRows)
 }
 
-function buildPrizeRows(standings, catches, config) {
+// Every winner lookup below uses participant_id and species_name - not
+// angler_id/species_id, which exist as columns but are never actually
+// populated by the live catch-logging flow (confirmed: null on every real
+// catch checked). The original version of this function used those two
+// fields and had therefore never actually found a winner for
+// max_species_weight on any real competition.
+function buildPrizeRows(standings, catches, config, teamStandings = []) {
   const categories = config?.reporting?.prize_categories || []
+
+  // Scopes a category to one fishing day when cat.day_number is set (for
+  // "Daily Biggest Tuna" style categories) - otherwise every non-rejected
+  // catch is in scope. competition_days.day_number is already embedded on
+  // every catch via the existing join, so this needs no extra data at all.
+  const scopedCatches = (cat) => catches.filter(c =>
+    c.data_quality !== 'rejected' &&
+    (cat.day_number == null || cat.day_number === '' || c.competition_days?.day_number === Number(cat.day_number))
+  )
+
   return categories.map(cat => {
-    let winner = null, value = ''
-    if (cat.criteria === 'max_total_weight') {
-      winner = [...standings].sort((a, b) => b.totalWeightKg - a.totalWeightKg)[0]
+    let winner = null, value = '', teamName = ''
+    const rank = Math.max(1, parseInt(cat.rank, 10) || 1)
+
+    if (cat.criteria === 'manual') {
+      // The TD (or any admin) types the winner's name directly - for
+      // genuinely subjective awards like Spirit of the Competition, or
+      // ones deliberately left to full discretion, like the Wooden Spoon.
+      const name = cat.manual_winner || ''
+      return [cat.label || '', name || 'TBD', '', '']
+    }
+
+    if (cat.criteria === 'closest_to_target' && cat.target_weight_kg) {
+      const target = parseFloat(cat.target_weight_kg)
+      const pool = scopedCatches(cat).filter(c =>
+        c.weight_kg != null && (!cat.species_name || c.species_name === cat.species_name)
+      )
+      const top = [...pool].sort((a, b) =>
+        Math.abs(parseFloat(a.weight_kg) - target) - Math.abs(parseFloat(b.weight_kg) - target)
+      )[0]
+      if (top) {
+        winner = standings.find(s => s.participantId === top.participant_id)
+        value = `${parseFloat(top.weight_kg).toFixed(3)} kg (target ${target}kg)`
+      }
+    } else if (cat.criteria === 'max_total_weight') {
+      winner = [...standings].sort((a, b) => b.totalWeightKg - a.totalWeightKg)[rank - 1]
       if (winner) value = `${winner.totalWeightKg.toFixed(3)} kg`
     } else if (cat.criteria === 'max_total_points') {
-      winner = standings[0]
+      winner = [...standings].sort((a, b) => b.totalPoints - a.totalPoints)[rank - 1]
       if (winner) value = `${winner.totalPoints.toFixed(2)} pts`
-    } else if (cat.criteria === 'max_species_count') {
-      winner = [...standings].sort((a, b) => b.speciesCount - a.speciesCount)[0]
-      if (winner) value = `${winner.speciesCount} species`
-    } else if (cat.criteria === 'max_species_weight' && cat.species_id) {
-      const top = catches
-        .filter(c => c.species_id === cat.species_id && c.data_quality !== 'rejected')
-        .sort((a, b) => b.weight_kg - a.weight_kg)[0]
+    } else if (cat.criteria === 'max_release_points') {
+      // Release-only points per participant, summed directly from catches
+      // with retained = false. standings' totalPoints blends Open and
+      // Release together, so it can't answer "who scored most from
+      // releases specifically" on its own - a rejected or still-pending
+      // release naturally contributes 0 here, same as it does everywhere
+      // else, so nothing extra needs filtering for review status.
+      const byParticipant = {}
+      for (const c of scopedCatches(cat)) {
+        if (c.retained !== false) continue
+        byParticipant[c.participant_id] = (byParticipant[c.participant_id] || 0) + parseFloat(c.points || 0)
+      }
+      const top = Object.entries(byParticipant).sort((a, b) => b[1] - a[1])[rank - 1]
       if (top) {
-        winner = standings.find(s => s.participantId === top.angler_id)
+        winner = standings.find(s => s.participantId === top[0])
+        value = `${top[1].toFixed(2)} pts (release)`
+      }
+    } else if (cat.criteria === 'max_species_count') {
+      winner = [...standings].sort((a, b) => b.speciesCount - a.speciesCount)[rank - 1]
+      if (winner) value = `${winner.speciesCount} species`
+    } else if (cat.criteria === 'max_species_weight' && cat.species_name) {
+      const top = scopedCatches(cat)
+        .filter(c => c.species_name === cat.species_name && c.weight_kg != null)
+        .sort((a, b) => b.weight_kg - a.weight_kg)[rank - 1]
+      if (top) {
+        winner = standings.find(s => s.participantId === top.participant_id)
         value = `${parseFloat(top.weight_kg).toFixed(3)} kg`
       }
+    } else if (cat.criteria === 'max_weight_any_species') {
+      // "Overall Biggest Fish" - heaviest single catch regardless of
+      // species, unlike max_species_weight which requires naming one.
+      const top = scopedCatches(cat)
+        .filter(c => c.weight_kg != null)
+        .sort((a, b) => b.weight_kg - a.weight_kg)[rank - 1]
+      if (top) {
+        winner = standings.find(s => s.participantId === top.participant_id)
+        value = `${parseFloat(top.weight_kg).toFixed(3)} kg (${top.species_name})`
+      }
+    } else if (cat.criteria === 'max_team_points') {
+      const topTeam = [...teamStandings].sort((a, b) => b.totalPoints - a.totalPoints)[rank - 1]
+      if (topTeam) return [cat.label || '', topTeam.teamName, topTeam.teamName, `${topTeam.totalPoints.toFixed(2)} pts`]
+    } else if (cat.criteria === 'max_team_weight') {
+      const topTeam = [...teamStandings].sort((a, b) => b.totalWeight - a.totalWeight)[rank - 1]
+      if (topTeam) return [cat.label || '', topTeam.teamName, topTeam.teamName, `${topTeam.totalWeight.toFixed(3)} kg`]
     }
-    return [cat.label || '', winner?.displayName || 'TBD', winner?.teamName || '', value]
+
+    return [cat.label || '', winner?.displayName || 'TBD', teamName || winner?.teamName || '', value]
   })
 }
 
