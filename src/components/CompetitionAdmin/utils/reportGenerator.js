@@ -470,6 +470,15 @@ function buildPrizeRows(standings, catches, config, teamStandings = []) {
   return categories.map(cat => {
     let winner = null, value = '', teamName = ''
     const rank = Math.max(1, parseInt(cat.rank, 10) || 1)
+    // Optional category filter (e.g. "ladies", "junior") - applies on top
+    // of whichever criteria is chosen below, rather than being its own
+    // separate criteria type. "Top Lady" is just "Most Points" filtered
+    // to category === 'ladies'; "Top Junior" the same, filtered to
+    // 'junior'. Falls back to every angler when not set, so this changes
+    // nothing for any category that doesn't use it.
+    const pool = cat.filter_category
+      ? standings.filter(s => s.category === cat.filter_category)
+      : standings
 
     if (cat.criteria === 'manual') {
       // The TD (or any admin) types the winner's name directly - for
@@ -492,10 +501,10 @@ function buildPrizeRows(standings, catches, config, teamStandings = []) {
         value = `${parseFloat(top.weight_kg).toFixed(3)} kg (target ${target}kg)`
       }
     } else if (cat.criteria === 'max_total_weight') {
-      winner = [...standings].sort((a, b) => b.totalWeightKg - a.totalWeightKg)[rank - 1]
+      winner = [...pool].sort((a, b) => b.totalWeightKg - a.totalWeightKg)[rank - 1]
       if (winner) value = `${winner.totalWeightKg.toFixed(3)} kg`
     } else if (cat.criteria === 'max_total_points') {
-      winner = [...standings].sort((a, b) => b.totalPoints - a.totalPoints)[rank - 1]
+      winner = [...pool].sort((a, b) => b.totalPoints - a.totalPoints)[rank - 1]
       if (winner) value = `${winner.totalPoints.toFixed(2)} pts`
     } else if (cat.criteria === 'max_release_points') {
       // Release-only points per participant, summed directly from catches
@@ -515,7 +524,7 @@ function buildPrizeRows(standings, catches, config, teamStandings = []) {
         value = `${top[1].toFixed(2)} pts (release)`
       }
     } else if (cat.criteria === 'max_species_count') {
-      winner = [...standings].sort((a, b) => b.speciesCount - a.speciesCount)[rank - 1]
+      winner = [...pool].sort((a, b) => b.speciesCount - a.speciesCount)[rank - 1]
       if (winner) value = `${winner.speciesCount} species`
     } else if (cat.criteria === 'max_species_weight' && cat.species_name) {
       const top = scopedCatches(cat)

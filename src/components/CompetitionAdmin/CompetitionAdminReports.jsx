@@ -488,6 +488,7 @@ export default function CompetitionAdminReports({
             const needsTarget  = cat.criteria === 'closest_to_target'
             const needsManual  = cat.criteria === 'manual'
             const needsRank    = !needsManual
+            const needsCategory = ['max_total_points', 'max_total_weight', 'max_species_count'].includes(cat.criteria)
             // Day-scoping (for "Daily Biggest Tuna" style categories) is
             // available on any criteria that reads individual catches
             // directly, not on standings-based or team-based ones, which
@@ -525,8 +526,20 @@ export default function CompetitionAdminReports({
                 </button>
               </div>
 
-              {(needsSpecies || needsTarget || needsManual || needsRank || canScopeDay) && (
+              {(needsSpecies || needsTarget || needsManual || needsRank || canScopeDay || needsCategory) && (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.5rem', marginTop: '0.5rem' }}>
+                  {needsCategory && (
+                    <div>
+                      <label style={S.label}>Restrict To (optional)</label>
+                      <select style={S.select} value={cat.filter_category || ''}
+                        onChange={e => updatePrizeCat(i, { filter_category: e.target.value || null })}>
+                        <option value="">All anglers</option>
+                        <option value="ladies">Ladies only</option>
+                        <option value="junior">Juniors only</option>
+                        <option value="senior">Seniors only</option>
+                      </select>
+                    </div>
+                  )}
                   {needsSpecies && (
                     <div>
                       <label style={S.label}>Species{needsTarget ? ' (optional)' : ''}</label>
