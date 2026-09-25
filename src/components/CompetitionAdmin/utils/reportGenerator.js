@@ -537,10 +537,13 @@ function buildPrizeRows(standings, catches, config, teamStandings = []) {
       }
     } else if (cat.criteria === 'max_team_points') {
       const topTeam = [...teamStandings].sort((a, b) => b.totalPoints - a.totalPoints)[rank - 1]
-      if (topTeam) return [cat.label || '', topTeam.teamName, topTeam.teamName, `${topTeam.totalPoints.toFixed(2)} pts`]
+      // Winner shown is the skipper by name - this prize is awarded to a
+      // person, not the abstract team entity - falling back to the team
+      // name only if no skipper is on record for that boat yet.
+      if (topTeam) return [cat.label || '', topTeam.skipperName || topTeam.teamName, topTeam.teamName, `${topTeam.totalPoints.toFixed(2)} pts`]
     } else if (cat.criteria === 'max_team_weight') {
       const topTeam = [...teamStandings].sort((a, b) => b.totalWeight - a.totalWeight)[rank - 1]
-      if (topTeam) return [cat.label || '', topTeam.teamName, topTeam.teamName, `${topTeam.totalWeight.toFixed(3)} kg`]
+      if (topTeam) return [cat.label || '', topTeam.skipperName || topTeam.teamName, topTeam.teamName, `${topTeam.totalWeight.toFixed(3)} kg`]
     }
 
     return [cat.label || '', winner?.displayName || 'TBD', teamName || winner?.teamName || '', value]

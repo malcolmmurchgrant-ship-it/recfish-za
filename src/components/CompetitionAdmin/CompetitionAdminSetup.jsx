@@ -359,10 +359,18 @@ export default function CompetitionAdminSetup({ competition, config, days, boats
         <div style={S.section}>Competition Configuration</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0.75rem' }}>
           {[
-            { label: 'Scoring Method',  value: config?.scoring?.method || '—' },
+            // Each of these checks an optional *_display_label override
+            // first, falling back to the real functional value. Never the
+            // other way around - method and team_format are read
+            // elsewhere to decide actual scoring/team behaviour
+            // (scoreDraftFish dispatches on method === 'weight' exactly;
+            // isTeamBased checks team_format !== 'split_boat'), so the
+            // real values driving that behaviour are never touched here,
+            // only optionally relabelled for this display.
+            { label: 'Scoring Method',  value: config?.scoring?.method_display_label || config?.scoring?.method || '—' },
             { label: 'Fishing Days',    value: config?.session?.days || '—' },
-            { label: 'Team Format',     value: config?.team?.team_format || '—' },
-            { label: 'Team Size',       value: config?.team?.team_size_min || '—' },
+            { label: 'Team Format',     value: config?.team?.team_format_display_label || config?.team?.team_format || '—' },
+            { label: 'Team Size',       value: config?.team?.team_size_display_label || config?.team?.team_size_min || '—' },
             { label: 'Line Classes',    value: config?.scoring?.line_class?.enabled ? config?.scoring?.line_class?.available_classes?.join(', ') + ' kg' : 'Not used' },
             { label: 'Species Bonus',   value: config?.scoring?.species_bonus_points ? `${config.scoring.species_bonus_points} pts` : '—' },
             { label: 'Photo Release',   value: config?.scoring?.allow_photo_measure_release ? 'Enabled' : 'Disabled' },

@@ -231,9 +231,14 @@ export function buildBoatPercentageTeamStandings(catches, participants, teams, d
     const fp = fishAndPointsByParticipant[p.id] || { fishCount: 0, points: 0, weight: 0 }
     if (!byTeam[p.team_id]) {
       const team = teams?.find(t => t.id === p.team_id)
+      // skipperName: this team's fixed boat's skipper, via team.boat_id -
+      // needed because prizes like "Top Boat" are actually awarded to the
+      // skipper as a named person, not to the abstract team entity.
+      const boat = boats?.find(b => b.id === team?.boat_id)
       byTeam[p.team_id] = {
         teamId:   p.team_id,
         teamName: team?.team_name || team?.province || 'Unknown',
+        skipperName: boat?.skipper_name || null,
         totalPercentage: 0,
         totalFishCount: 0,
         totalPoints: 0,
