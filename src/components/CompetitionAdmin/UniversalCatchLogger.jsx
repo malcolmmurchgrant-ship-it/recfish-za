@@ -126,6 +126,7 @@ function rowToMeasuredDraft(row, speciesConfig) {
     // (video_status null, every existing competition) is unaffected.
     video_url: row.video_url || null,
     video_status: row.video_status || null,
+    pending_points: row.pending_points,
     _originalPoints: row.points,
     weightSource: 'saved',
     notes: row.notes || '',
@@ -595,13 +596,13 @@ export default function UniversalCatchLogger({ competitionId }) {
             ? (videoAlreadyDecided ? fish._originalPoints : 0)
             : fish._scored.points,
           // pending_points: the real, correctly-computed value (20 or 5,
-          // per this species' release_points), preserved so the Video
-          // Review queue can apply it directly on verification without
-          // re-deriving it from species_config - which would be
-          // ambiguous, since a species now has both an Open and a
-          // Release config entry sharing the same underlying name.
-          pending_points: fish._cfg?.require_video_evidence && !videoAlreadyDecided
-            ? fish._scored.points
+          // per this species' release_points). Preserved once decided
+          // (not reset to null) so a card resaved after the fact - or a
+          // release put back to pending for reconsideration - still has
+          // a real figure to apply, rather than silently zeroing on the
+          // next verify. Only computed fresh while still undecided.
+          pending_points: fish._cfg?.require_video_evidence
+            ? (videoAlreadyDecided ? fish.pending_points : fish._scored.points)
             : null,
           video_url: fish._cfg?.require_video_evidence ? (fish.video_url || null) : null,
           video_status: fish._cfg?.require_video_evidence
