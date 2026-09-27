@@ -576,6 +576,28 @@ export default function UniversalCatchLogger({ competitionId }) {
         // (e.g. fixing a different fish's weight on the same card) from
         // silently undoing the verifier's decision.
         const videoAlreadyDecided = fish.video_status === 'verified' || fish.video_status === 'not_verified'
+        // reviewFields: the actual review-outcome columns. For a
+        // brand-new row, or one still undecided, these get written
+        // normally. But for an EXISTING row that's already been decided,
+        // these keys are left out of the payload entirely rather than
+        // re-asserting a value - Supabase's .update() only touches keys
+        // present in the payload, so omitting them means the database's
+        // own stored points/pending_points/video_status simply stay
+        // exactly as they are, no matter what this browser tab happens
+        // to have loaded. This is deliberately more robust than
+        // re-sending fish._originalPoints/fish.pending_points/
+        // fish.video_status: those are a snapshot from whenever the page
+        // was loaded, and could be stale if the database was corrected
+        // directly (e.g. via SQL) after that - re-sending a stale
+        // snapshot would silently undo the correction on the next save.
+        const reviewFields = (fish._id && videoAlreadyDecided)
+          ? {}
+          : {
+              points: fish._cfg?.require_video_evidence ? 0 : fish._scored.points,
+              pending_points: fish._cfg?.require_video_evidence ? fish._scored.points : null,
+              video_url: fish._cfg?.require_video_evidence ? (fish.video_url || null) : null,
+              video_status: fish._cfg?.require_video_evidence ? 'pending' : null,
+            }
         const payload = {
           ...baseFields,
           species_name: fish._cfg?.species_name || fish.species,
@@ -584,30 +606,7 @@ export default function UniversalCatchLogger({ competitionId }) {
           line_class_kg: fish.line_class_kg ? parseInt(fish.line_class_kg, 10) : (config?.scoring?.default_line_class_kg ?? config?.scoring?.line_class_kg ?? 0),
           retained: !fish._cfg?.kingfish_release,
           measured_min_size: !!fish.measured_min_size,
-          // Points are withheld (0) until a verifier reviews the video and
-          // approves it — see catchLoggerScoring.js's release-scoring path
-          // and the Video Review queue. The real points (already correctly
-          // computed above via fish._scored.points, using this species'
-          // release_points if set) get applied at verification time, not
-          // here. Species without require_video_evidence — every existing
-          // competition, including Gamefish Nationals' Kingfish rule —
-          // score immediately as before, completely unaffected.
-          points: fish._cfg?.require_video_evidence
-            ? (videoAlreadyDecided ? fish._originalPoints : 0)
-            : fish._scored.points,
-          // pending_points: the real, correctly-computed value (20 or 5,
-          // per this species' release_points). Preserved once decided
-          // (not reset to null) so a card resaved after the fact - or a
-          // release put back to pending for reconsideration - still has
-          // a real figure to apply, rather than silently zeroing on the
-          // next verify. Only computed fresh while still undecided.
-          pending_points: fish._cfg?.require_video_evidence
-            ? (videoAlreadyDecided ? fish.pending_points : fish._scored.points)
-            : null,
-          video_url: fish._cfg?.require_video_evidence ? (fish.video_url || null) : null,
-          video_status: fish._cfg?.require_video_evidence
-            ? (videoAlreadyDecided ? fish.video_status : 'pending')
-            : null,
+          ...reviewFields,
           notes: noteForThisRow,
         }
         if (fish._id) {
