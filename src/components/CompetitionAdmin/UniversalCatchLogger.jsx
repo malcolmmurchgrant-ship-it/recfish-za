@@ -502,7 +502,19 @@ export default function UniversalCatchLogger({ competitionId }) {
     return computeSpeciesMultiplier(combined, config?.species)
   }, [measuredDraft, unitCountDraft, config])
 
-  const measuredRawPoints = scoredMeasured.reduce((sum, f) => sum + (f._warning ? 0 : f._scored.points), 0)
+  // Sums each row's actual, decided points where one exists (already-
+  // verified or rejected releases use fish._originalPoints, the real
+  // saved value) rather than always re-computing a live preview -
+  // otherwise this header disagrees with every admin-side view the
+  // moment a release has been decided, which is exactly what was
+  // confusing here: Nenya Summary read the real saved values correctly
+  // the whole time, while this header kept showing a live recalculation
+  // that ignored the decision entirely.
+  const measuredRawPoints = scoredMeasured.reduce((sum, f) => {
+    if (f._warning) return sum
+    if (f.video_status === 'verified' || f.video_status === 'not_verified') return sum + (f._originalPoints ?? 0)
+    return sum + f._scored.points
+  }, 0)
   const unitCountRawPoints = scoredUnitCount.reduce((sum, f) => sum + (f._warning ? 0 : f._scored.points), 0)
   const rawPoints = measuredRawPoints + unitCountRawPoints
   const finalPoints = usesMultiplier
