@@ -36,7 +36,7 @@ export function useCatchLoggerData(competitionId) {
       ] = await Promise.all([
         supabase
           .from('competition_participants')
-          .select('*, competition_teams(id, team_name, team_suffix, province, team_type, captain_name, is_disqualified)')
+          .select('*, competition_teams(id, team_name, team_suffix, province, team_type, captain_name, is_disqualified, boat_id)')
           .eq('competition_id', competitionId)
           .order('full_name', { ascending: true }),
         supabase
