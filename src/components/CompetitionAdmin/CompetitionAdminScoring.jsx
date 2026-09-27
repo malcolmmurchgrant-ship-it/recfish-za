@@ -75,6 +75,13 @@ export default function CompetitionAdminScoring({
       .then(({ data }) => setFishingSessions(data || []))
   }, [competition?.id])
 
+  // Moved above cpueData - it's used there for the CPUE boat_id fallback,
+  // and needs to exist before that call, not after it.
+  const teams = [...new Map(
+    participants.filter(p => p.competition_teams)
+      .map(p => [p.team_id, p.competition_teams])
+  ).values()]
+
   const cpueData = buildCpueData(catches.filter(c => c.data_quality !== 'rejected'), participants, days, boats, fishingSessions, teams)
 
   const scoringMethod = config?.scoring?.method || 'percentage'
@@ -86,11 +93,6 @@ export default function CompetitionAdminScoring({
     if (initialFilter.teamName)     setTeamFilter(initialFilter.teamName)
     if (initialFilter.participantId) setAnglerFilter(initialFilter.participantId)
   }, [initialFilter])
-
-  const teams = [...new Map(
-    participants.filter(p => p.competition_teams)
-      .map(p => [p.team_id, p.competition_teams])
-  ).values()]
 
   // Anglers scoped to the currently selected team — this is what makes the
   // dropdown actually useful instead of scrolling/typing through everyone.
