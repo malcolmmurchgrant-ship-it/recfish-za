@@ -992,9 +992,25 @@ function MeasuredFishRow({ fish, index, speciesPicker, autoWeight, calculating, 
             <span style={S.badge(GOLD)}>Multiplier</span>
           ) : fish._cfg?.kingfish_release ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-              <span style={S.badge(fish.measured_min_size ? PURPLE : '#9ca3af')}>
-                {pts} pts {fish._cfg?.require_video_evidence ? '⏳ pending review' : '📸'}
-              </span>
+              {/* Badge now reflects the actual saved video_status, not
+                  just "is this a video-evidence species" - previously it
+                  showed "pending review" unconditionally for any such
+                  species, even ones already verified or rejected, which
+                  is exactly what was confusing here. Points shown for an
+                  already-decided catch are the real awarded amount
+                  (fish._originalPoints), not the live species-config
+                  preview - a verified Longfin will always correctly show
+                  5, a verified Yellowfin 20, regardless of what species
+                  happens to be selected in a neighbouring row. */}
+              {fish.video_status === 'verified' ? (
+                <span style={S.badge(GREEN)}>{fish._originalPoints ?? pts} pts ✓ Release Verified</span>
+              ) : fish.video_status === 'not_verified' ? (
+                <span style={S.badge(RED)}>0 pts ✗ Not Verified</span>
+              ) : (
+                <span style={S.badge(fish.measured_min_size ? PURPLE : '#9ca3af')}>
+                  {pts} pts {fish._cfg?.require_video_evidence ? '⏳ pending review' : '📸'}
+                </span>
+              )}
               <label style={{ fontSize: '0.68rem', color: fish.measured_min_size ? PURPLE : RED, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 2 }}>
                 <input type='checkbox' checked={!!fish.measured_min_size}
                   onChange={e => onChange(index, { ...fish, measured_min_size: e.target.checked })} />
