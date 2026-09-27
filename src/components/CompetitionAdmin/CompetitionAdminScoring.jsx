@@ -75,7 +75,7 @@ export default function CompetitionAdminScoring({
       .then(({ data }) => setFishingSessions(data || []))
   }, [competition?.id])
 
-  const cpueData = buildCpueData(catches.filter(c => c.data_quality !== 'rejected'), participants, days, boats, fishingSessions, teams)
+  const cpueData = buildCpueData(catches.filter(c => c.data_quality !== 'rejected'), participants, days, boats, fishingSessions)
 
   const scoringMethod = config?.scoring?.method || 'percentage'
 

@@ -220,7 +220,7 @@ export function buildBoatPercentageTeamStandings(catches, participants, teams, d
   // standings uses) — avoids a second, inconsistent points calculation.
   const individual = buildIndividualStandings(catches, participants, days, boats, scoringConfig)
   const fishAndPointsByParticipant = Object.fromEntries(
-    individual.map(p => [p.participantId, { fishCount: p.catchCount, points: p.totalPoints }])
+    individual.map(p => [p.participantId, { fishCount: p.catchCount, points: p.totalPoints, weight: p.totalWeightKg }])
   )
 
   const byTeam = {}
@@ -228,21 +228,31 @@ export function buildBoatPercentageTeamStandings(catches, participants, teams, d
     if (!p.team_id) continue
     const entries = daily.filter(d => d.participantId === p.id)
     const percentageSum = entries.reduce((s, e) => s + e.percentage, 0)
-    const fp = fishAndPointsByParticipant[p.id] || { fishCount: 0, points: 0 }
+    const fp = fishAndPointsByParticipant[p.id] || { fishCount: 0, points: 0, weight: 0 }
     if (!byTeam[p.team_id]) {
       const team = teams?.find(t => t.id === p.team_id)
+      // skipperName: this team's fixed boat's skipper, via team.boat_id -
+      // needed because prizes like "Top Boat" are actually awarded to the
+      // skipper as a named person, not to the abstract team entity.
+      const boat = boats?.find(b => b.id === team?.boat_id)
       byTeam[p.team_id] = {
         teamId:   p.team_id,
         teamName: team?.team_name || team?.province || 'Unknown',
+        skipperName: boat?.skipper_name || null,
         totalPercentage: 0,
         totalFishCount: 0,
         totalPoints: 0,
+        // totalWeight: added for Top Team/Boat - Weight prize criteria,
+        // which previously had nowhere to read a team-level weight figure
+        // from at all.
+        totalWeight: 0,
         members: [],
       }
     }
     byTeam[p.team_id].totalPercentage += percentageSum
     byTeam[p.team_id].totalFishCount  += fp.fishCount
     byTeam[p.team_id].totalPoints     += fp.points
+    byTeam[p.team_id].totalWeight     += fp.weight
     byTeam[p.team_id].members.push({
       participantId: p.id,
       displayName:   p.full_name,
@@ -440,23 +450,8 @@ export function groupCatchesBySpecies(catches) {
 // byAngler sums fish and hours across every day that day's boat had hours
 // recorded, so it only reflects days where Lines In/Up were actually
 // captured, not the whole competition by default.
-export function buildCpueData(catches, participants, days, boats, fishingSessions, teams = []) {
+export function buildCpueData(catches, participants, days, boats, fishingSessions) {
   const activeCatches = catches.filter(c => c.data_quality !== 'rejected')
-
-  // Resolves a catch's boat_id even when the catch itself never had one
-  // set - true for every catch in a "traditional" fixed-boat-per-team
-  // competition (boat_id on the catch is only ever populated for
-  // split-boat-draw formats). Falls back to the angler's team's own
-  // fixed boat, via competition_teams.boat_id, exactly the same fallback
-  // already used to fix the "Unknown Boat" issue in Boat Summary -
-  // without it, CPUE silently has nothing to compute for any such
-  // competition at all.
-  const resolveBoatId = (c) => {
-    if (c.boat_id) return c.boat_id
-    const participant = participants.find(p => p.id === c.participant_id)
-    const team = teams.find(t => t.id === participant?.team_id)
-    return team?.boat_id || null
-  }
 
   // hours lookup: "dayNumber|boatName" -> fishing_hours
   const hoursLookup = {}
@@ -470,10 +465,9 @@ export function buildCpueData(catches, participants, days, boats, fishingSession
   const anglerDayFish = {} // "participantId|dayNumber" -> { fishCount, boatName, dayNumber }
 
   for (const c of activeCatches) {
-    const boatId = resolveBoatId(c)
-    if (!boatId || !c.competition_day_id) continue
+    if (!c.boat_id || !c.competition_day_id) continue
     const day  = days?.find(d => d.id === c.competition_day_id)
-    const boat = boats?.find(b => b.id === boatId)
+    const boat = boats?.find(b => b.id === c.boat_id)
     if (!day || !boat) continue
     const pid = c.participant_id || participants.find(p => p.user_id === c.angler_id)?.id
     if (!pid) continue

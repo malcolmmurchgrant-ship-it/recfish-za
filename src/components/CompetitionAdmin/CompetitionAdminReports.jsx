@@ -140,7 +140,7 @@ export default function CompetitionAdminReports({
   }, [competition?.id])
 
   const cpueData = useMemo(() =>
-    buildCpueData(catches.filter(c => c.data_quality !== 'rejected'), participants, days, boats, fishingSessions, teams),
+    buildCpueData(catches.filter(c => c.data_quality !== 'rejected'), participants, days, boats, fishingSessions),
     [catches, participants, days, boats, fishingSessions]
   )
 

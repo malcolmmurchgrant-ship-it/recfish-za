@@ -137,7 +137,7 @@ export default function CompetitionAdminScoreboard({
       .then(({ data }) => setFishingSessions(data || []))
   }, [competition?.id])
   const cpueData = useMemo(() =>
-    buildCpueData(activeCatches, participants, days, boats, fishingSessions, teams),
+    buildCpueData(activeCatches, participants, days, boats, fishingSessions),
     [activeCatches, participants, days, boats, fishingSessions]
   )
 
