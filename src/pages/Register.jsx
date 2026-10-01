@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 
 export default function Register() {
   const navigate = useNavigate()
+  const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -20,7 +21,10 @@ export default function Register() {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/dashboard`
+          emailRedirectTo: `${window.location.origin}/dashboard`,
+          data: {
+            full_name: fullName.trim(),
+          },
         }
       })
 
@@ -28,10 +32,15 @@ export default function Register() {
 
       // Check if email confirmation is disabled (instant login)
       if (data?.session) {
-        // Email confirmation disabled - user is logged in immediately
+        // Email confirmation disabled - user is logged in immediately.
+        // AuthContext's onAuthStateChange picks this up and copies
+        // full_name across to the users table automatically.
         navigate('/dashboard')
       } else {
-        // Email confirmation enabled - show success message
+        // Email confirmation enabled - show success message. The name
+        // is safely stored in the auth signup metadata either way, and
+        // gets copied to the users table the moment this person first
+        // logs in after confirming their email.
         setRegistrationComplete(true)
       }
     } catch (error) {
@@ -195,6 +204,7 @@ export default function Register() {
             <button
               onClick={() => {
                 setRegistrationComplete(false)
+                setFullName('')
                 setEmail('')
                 setPassword('')
               }}
@@ -244,6 +254,29 @@ export default function Register() {
         </p>
 
         <form onSubmit={handleRegister}>
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', fontSize: '0.875rem' }}>
+              Full Name
+            </label>
+            <input
+              type="text"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              required
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '6px',
+                fontSize: '1rem'
+              }}
+              placeholder="Your full name"
+            />
+            <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
+              This is how you'll appear to Tournament Directors and scorers
+            </p>
+          </div>
+
           <div style={{ marginBottom: '1rem' }}>
             <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', fontSize: '0.875rem' }}>
               Email Address
