@@ -79,8 +79,8 @@ export default function CompetitionAdminReports({
       .then(({ data }) => setBoatDraws(data || []))
   }, [competition?.id])
   const skipperRanking = useMemo(() =>
-    buildSkipperRanking(catches.filter(c => c.data_quality !== 'rejected'), boats, days, boatDraws),
-    [catches, boats, days, boatDraws]
+    buildSkipperRanking(catches.filter(c => c.data_quality !== 'rejected'), boats, days, boatDraws, teams),
+    [catches, boats, days, boatDraws, teams]
   )
   // Weight isn't tracked at all for 'points'-method (unit-count) competitions
   // like this one — species are tallied, not weighed — so a "Total Weight"

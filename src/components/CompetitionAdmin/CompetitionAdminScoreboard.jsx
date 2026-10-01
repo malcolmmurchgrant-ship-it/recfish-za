@@ -155,8 +155,8 @@ export default function CompetitionAdminScoreboard({
   }, [competition?.id])
 
   const skipperRanking = useMemo(() =>
-    buildSkipperRanking(activeCatches, boats, days, boatDraws),
-    [activeCatches, boats, days, boatDraws]
+    buildSkipperRanking(activeCatches, boats, days, boatDraws, teams),
+    [activeCatches, boats, days, boatDraws, teams]
   )
   const dayNumbersForSkipper = [...new Set((days || []).map(d => d.day_number))].sort((a, b) => a - b)
 

@@ -578,7 +578,7 @@ export function buildCpueData(catches, participants, days, boats, fishingSession
 // indistinguishable from a true no-show with catch data alone. Worth
 // flagging to Malcolm/John if a specific day's ranking looks wrong for this
 // reason.
-export function buildSkipperRanking(catches, boats, days, boatDraws = []) {
+export function buildSkipperRanking(catches, boats, days, boatDraws = [], teams = []) {
   // 'rejected' catches never count anywhere — they represent a data-entry
   // mistake, not a real catch. 'disqualified' is different: the fish was
   // genuinely caught, the angler incurred a rules penalty for something
@@ -594,14 +594,27 @@ export function buildSkipperRanking(catches, boats, days, boatDraws = []) {
   const byBoatDay = {}       // "dayNumber|boatId" -> summed points, all anglers on the boat
   const fishCountByBoat = {} // boatId -> total fish count, whole competition
   const catchAnglersByBoatDay = {} // "dayNumber|boatId" -> Set(participant_id) — fallback crew source
+
+  // Same boat_id resolution gap as buildCpueData/buildDailyAnglerPercentages:
+  // fixed-boat-per-team competitions (e.g. CBSC Tuna Invitational) never
+  // populate boat_id on the catch itself. Every catch does carry its own
+  // team_id directly, so the team's fixed boat is resolved from there —
+  // no participants lookup needed.
+  const resolveBoatId = (c) => {
+    if (c.boat_id) return c.boat_id
+    const team = teams.find(t => t.id === c.team_id)
+    return team?.boat_id || null
+  }
+
   for (const c of activeCatches) {
-    if (!c.boat_id || !c.competition_day_id) continue
+    const boatId = resolveBoatId(c)
+    if (!boatId || !c.competition_day_id) continue
     const day = days?.find(d => d.id === c.competition_day_id)
     if (!day) continue
     const pts = parseFloat(c.points || 0)
-    const key = `${day.day_number}|${c.boat_id}`
+    const key = `${day.day_number}|${boatId}`
     byBoatDay[key] = (byBoatDay[key] || 0) + pts
-    fishCountByBoat[c.boat_id] = (fishCountByBoat[c.boat_id] || 0) + 1
+    fishCountByBoat[boatId] = (fishCountByBoat[boatId] || 0) + 1
     if (!catchAnglersByBoatDay[key]) catchAnglersByBoatDay[key] = new Set()
     if (c.participant_id) catchAnglersByBoatDay[key].add(c.participant_id)
   }
