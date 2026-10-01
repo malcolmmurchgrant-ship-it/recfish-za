@@ -63,8 +63,8 @@ export default function CompetitionAdminScoreboard({
   )
 
   const individualStandings = useMemo(() =>
-    buildIndividualStandings(activeCatches, participants, days, boats, config?.scoring),
-    [activeCatches, participants, days, boats, config?.scoring]
+    buildIndividualStandings(activeCatches, participants, days, boats, config?.scoring, teams),
+    [activeCatches, participants, days, boats, config?.scoring, teams]
   )
 
   const filteredStandings = useMemo(() => {
@@ -115,8 +115,8 @@ export default function CompetitionAdminScoreboard({
   // team totals — both matter, shown side by side rather than collapsed
   // into a single figure).
   const dailyRecords = useMemo(() =>
-    buildDailyAnglerPercentages(activeCatches, participants, days, boats),
-    [activeCatches, participants, days, boats]
+    buildDailyAnglerPercentages(activeCatches, participants, days, boats, teams),
+    [activeCatches, participants, days, boats, teams]
   )
   const [dailyDayFilter, setDailyDayFilter] = useState('all')
   const filteredDaily = useMemo(() => {

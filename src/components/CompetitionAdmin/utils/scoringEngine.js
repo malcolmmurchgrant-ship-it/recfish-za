@@ -131,14 +131,29 @@ export function calculateCatchPoints({
 // daily top-angler award, percentage is what feeds into team totals. Returns
 // one record per angler per day they fished, so callers can show both
 // figures side by side without re-deriving anything.
-export function buildDailyAnglerPercentages(catches, participants, days, boats) {
+export function buildDailyAnglerPercentages(catches, participants, days, boats, teams = []) {
   const activeCatches = catches.filter(c => c.data_quality !== 'rejected')
+
+  // Resolves a catch's boat_id even when the catch itself never had one
+  // set — true for every catch in a fixed-boat-per-team competition like
+  // the CBSC Tuna Invitational ("Same Crew - All Days"), where boat_id on
+  // the catch is only ever populated for split-boat-draw formats. Same
+  // fallback already applied in buildCpueData for the identical reason —
+  // without it, this function silently has nothing to show for any such
+  // competition's Daily view, no matter how many catches get logged.
+  const resolveBoatId = (c) => {
+    if (c.boat_id) return c.boat_id
+    const participant = participants.find(p => p.id === c.participant_id)
+    const team = teams.find(t => t.id === participant?.team_id)
+    return team?.boat_id || null
+  }
 
   // Total points per participant, per boat, per day
   const byBoatDay = {}
   for (const c of activeCatches) {
-    if (!c.boat_id || !c.competition_day_id) continue
-    const key = `${c.boat_id}|${c.competition_day_id}`
+    const boatId = resolveBoatId(c)
+    if (!boatId || !c.competition_day_id) continue
+    const key = `${boatId}|${c.competition_day_id}`
     const pid = c.participant_id || participants.find(p => p.user_id === c.angler_id)?.id
     if (!pid) continue
     if (!byBoatDay[key]) byBoatDay[key] = {}
@@ -213,7 +228,7 @@ export function aggregateTeamScores(catches, participants, teamConfig, scoringCo
 // (species-multiplier-aware) rather than a separate raw-points sum, so
 // team and individual totals can't disagree the way they did before.
 export function buildBoatPercentageTeamStandings(catches, participants, teams, days, boats, scoringConfig = null) {
-  const daily = buildDailyAnglerPercentages(catches, participants, days, boats)
+  const daily = buildDailyAnglerPercentages(catches, participants, days, boats, teams)
   const usesBoatPercentage = scoringConfig?.boat_percentage_scoring === true
 
   // Multiplier-aware per-participant totals (same figures individual
@@ -271,7 +286,7 @@ export function buildBoatPercentageTeamStandings(catches, participants, teams, d
 // own percentage. A higher raw-points total can still rank below someone
 // with fewer points but a better percentage — that's intentional, per the
 // confirmed ranking rule, not a bug.
-export function buildIndividualStandings(catches, participants, days, boats, scoringConfig = null) {
+export function buildIndividualStandings(catches, participants, days, boats, scoringConfig = null, teams = []) {
   const byParticipant = {}
   const byUserId = {}   // user_id -> participant.id, for registered anglers
   const byPartId = {}   // participant.id -> participant.id (self-map, for clarity below)
@@ -383,7 +398,7 @@ export function buildIndividualStandings(catches, participants, days, boats, sco
   // outranking Francois Rossouw (5 catches worth far more) in every report.
   const usesBoatPercentage = scoringConfig?.boat_percentage_scoring === true
   if (usesBoatPercentage && days && boats) {
-    const daily = buildDailyAnglerPercentages(catches, participants, days, boats)
+    const daily = buildDailyAnglerPercentages(catches, participants, days, boats, teams)
     for (const d of daily) {
       if (byParticipant[d.participantId]) {
         byParticipant[d.participantId].anglerPercentage += d.percentage

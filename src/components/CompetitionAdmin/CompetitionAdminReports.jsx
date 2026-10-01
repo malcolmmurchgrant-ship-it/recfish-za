@@ -65,7 +65,7 @@ export default function CompetitionAdminReports({
   }, [config?.species])
 
   const isLocked   = !!competition?.results_published_at || published
-  const standings  = useMemo(() => buildIndividualStandings(catches, participants, days, boats, config?.scoring), [catches, participants, days, boats, config?.scoring])
+  const standings  = useMemo(() => buildIndividualStandings(catches, participants, days, boats, config?.scoring, teams), [catches, participants, days, boats, config?.scoring, teams])
 
   // Boat draws, needed for crew-size-aware skipper averaging (same as the
   // Scoreboard tab) — this tab never fetched them, which is why Skipper
@@ -93,8 +93,8 @@ export default function CompetitionAdminReports({
   // totals. Both matter independently, so both are shown here rather than
   // collapsing into a single figure.
   const dailyRecords = useMemo(() =>
-    buildDailyAnglerPercentages(catches.filter(c => c.data_quality !== 'rejected'), participants, days, boats),
-    [catches, participants, days, boats]
+    buildDailyAnglerPercentages(catches.filter(c => c.data_quality !== 'rejected'), participants, days, boats, teams),
+    [catches, participants, days, boats, teams]
   )
   const teamStandings = useMemo(() =>
     buildBoatPercentageTeamStandings(catches.filter(c => c.data_quality !== 'rejected'), participants, teams, days, boats, config?.scoring),
