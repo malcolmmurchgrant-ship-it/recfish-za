@@ -268,15 +268,39 @@ function CompetitionStep({ competition, onSaved, recentComps, onPickExisting }) 
       .then(({ data }) => setTemplates(data || []))
   }, [form.federation_id])
 
+  // Copies a template's settings into the form. Shared by the Template
+  // dropdown and the "use a past competition as a starting point" picker.
+  // Also adopts the template's federation, so the Template dropdown below
+  // has its list loaded and shows the chosen template as selected.
+  const applyTemplate = (tpl) => {
+    setForm(f => ({
+      ...f,
+      federation_id: f.federation_id || tpl.federation_id || '',
+      template_id: tpl.id,
+      discipline: tpl.discipline || f.discipline,
+      level: tpl.level || f.level,
+      category: tpl.category || f.category,
+      team_format: tpl.team_format || f.team_format,
+      team_size: tpl.team_size || f.team_size,
+      default_line_class_kg: tpl.default_line_class_kg || f.default_line_class_kg,
+      catch_release_enabled: tpl.catch_release_enabled ?? f.catch_release_enabled,
+    }))
+  }
+
+  // Every template, regardless of federation or whether it is still active —
+  // used only by the "past competition as a starting point" picker, which is
+  // shown before a federation is chosen (so `templates` above is still empty)
+  // and which must still be able to describe a retired template.
+  const [allTemplates, setAllTemplates] = useState([])
+  useEffect(() => {
+    supabase.from('competition_templates').select('*')
+      .then(({ data }) => setAllTemplates(data || []))
+  }, [])
+
   const handleTemplateChange = (templateId) => {
     const tpl = templates.find(t => t.id === templateId)
     if (!tpl) { setForm(f => ({ ...f, template_id: templateId })); return }
-    setForm(f => ({
-      ...f, template_id: tpl.id, discipline: tpl.discipline, level: tpl.level || f.level,
-      category: tpl.category, team_format: tpl.team_format, team_size: tpl.team_size,
-      default_line_class_kg: tpl.default_line_class_kg || f.default_line_class_kg,
-      catch_release_enabled: tpl.catch_release_enabled,
-    }))
+    applyTemplate(tpl)
   }
 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }))
@@ -299,7 +323,11 @@ function CompetitionStep({ competition, onSaved, recentComps, onPickExisting }) 
       results_visible: form.results_visible, catch_release_enabled: form.catch_release_enabled,
       description: form.description || null, td_name: form.td_name || null,
       scoring_method: competition?.scoring_method || 'bottomfish_percentage',
-      status: 'active', updated_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      // NOTE: status is deliberately NOT part of this shared payload. It used
+      // to be hard-coded to 'active' here, which ran on every re-save too —
+      // so saving Step 1 of a finished competition quietly reset it to
+      // "Live". It is now set once, on creation only (below).
     }
     if (form.num_fishing_days) payload.num_fishing_days = parseInt(form.num_fishing_days)
 
@@ -308,7 +336,10 @@ function CompetitionStep({ competition, onSaved, recentComps, onPickExisting }) 
       const { data, error } = await supabase.from('competitions').update(payload).eq('id', competition.id).select()
       saveError = error; savedData = data?.[0] || null
     } else {
-      const { data, error } = await supabase.from('competitions').insert(payload).select()
+      // 'active' here means "set up and usable", not "running today" — the
+      // Competition Hub works out Upcoming / Live / Ended from the dates
+      // (src/utils/competitionStatus.js), so a future event is not mislabelled.
+      const { data, error } = await supabase.from('competitions').insert({ ...payload, status: 'active' }).select()
       saveError = error; savedData = data?.[0] || null
 
       // A brand-new competition has no rows in competition_user_roles yet —
@@ -361,9 +392,27 @@ function CompetitionStep({ competition, onSaved, recentComps, onPickExisting }) 
   const drafts = recentComps.filter(c => c.status !== 'completed' && !c.results_published_at)
   const pastComps = recentComps.filter(c => c.status === 'completed' || c.results_published_at)
 
-  const handleUseAsTemplate = (templateId) => {
-    if (templateId) handleTemplateChange(templateId)
+  // The picker is shown BEFORE a federation has been chosen, and the
+  // `templates` list only loads once one is — so at this point it is still
+  // empty and a lookup in it finds nothing. That used to carry across only
+  // the template's id and silently drop its discipline, level, team format
+  // and so on (which is why a competition created this way showed up as
+  // "Unknown" in the Competition Hub). Fetch the template directly instead.
+  const handleUseAsTemplate = async (templateId) => {
     setShowPicker(false)
+    if (!templateId) return
+    let tpl = allTemplates.find(t => t.id === templateId) || templates.find(t => t.id === templateId)
+    if (!tpl) {
+      const { data, error: tplError } = await supabase
+        .from('competition_templates').select('*').eq('id', templateId).maybeSingle()
+      if (tplError || !data) {
+        setForm(f => ({ ...f, template_id: templateId }))
+        setError("Couldn't load that scoring protocol's settings automatically — pick the template from the dropdown below to fill them in.")
+        return
+      }
+      tpl = data
+    }
+    applyTemplate(tpl)
   }
 
   return (
@@ -402,7 +451,7 @@ function CompetitionStep({ competition, onSaved, recentComps, onPickExisting }) 
                 see exactly what that protocol is before deciding.
               </div>
               {pastComps.map(c => {
-                const tpl = templates.find(t => t.id === c.template_id)
+                const tpl = allTemplates.find(t => t.id === c.template_id) || templates.find(t => t.id === c.template_id)
                 const isExpanded = expandedCompId === c.id
                 return (
                   <div key={c.id} style={{ borderRadius: 6, marginBottom: '0.4rem', background: '#f9fafb', overflow: 'hidden' }}>

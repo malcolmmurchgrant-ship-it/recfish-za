@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { effectiveStatus } from '../utils/competitionStatus'
 
 const NAVY  = '#1e3a8a'
 const GOLD  = '#d97706'
@@ -207,12 +208,16 @@ const DISCIPLINE_STYLE = {
   spearfishing:   { bg: '#ecfeff', col: '#0e7490', label: '🤿 Spearfishing'},
 }
 
+// Keyed by the DISPLAYED status from effectiveStatus() (src/utils/competitionStatus.js),
+// not by the raw stored value — see that file for why.
 const STATUS_STYLE = {
-  active:            { bg: '#dcfce7', col: GREEN,     label: '🟢 Live',      border: GREEN      },
-  upcoming:          { bg: '#eff6ff', col: NAVY,      label: '🔵 Upcoming',  border: NAVY       },
-  registration_open: { bg: '#fef3c7', col: GOLD,      label: '🟡 Open',      border: GOLD       },
-  completed:         { bg: '#f3f4f6', col: '#6b7280', label: '⚪ Completed', border: '#d1d5db'  },
-  cancelled:         { bg: '#fef2f2', col: '#dc2626', label: '🔴 Cancelled', border: '#fca5a5'  },
+  active:            { bg: '#dcfce7', col: GREEN,     label: '🟢 Live',                    border: GREEN      },
+  upcoming:          { bg: '#eff6ff', col: NAVY,      label: '🔵 Upcoming',                border: NAVY       },
+  registration_open: { bg: '#fef3c7', col: GOLD,      label: '🟡 Open',                    border: GOLD       },
+  draft:             { bg: '#f3f4f6', col: '#6b7280', label: '📝 Draft',                   border: '#d1d5db'  },
+  ended:             { bg: '#fff7ed', col: '#c2410c', label: '🏁 Ended — results pending', border: '#fdba74'  },
+  completed:         { bg: '#f3f4f6', col: '#6b7280', label: '⚪ Completed',               border: '#d1d5db'  },
+  cancelled:         { bg: '#fef2f2', col: '#dc2626', label: '🔴 Cancelled',               border: '#fca5a5'  },
 }
 
 const LEVEL_LABELS = {
@@ -271,21 +276,29 @@ export default function Competitions() {
   const canEnter = (compId) =>
     catchAccess === 'all' || (catchAccess instanceof Set && catchAccess.has(compId))
 
-  const filtered = competitions.filter(c => {
+  // Work out each competition's displayed status once, from its stored
+  // status plus its dates (see src/utils/competitionStatus.js).
+  const shown = competitions.map(c => ({ ...c, _shown: effectiveStatus(c) }))
+
+  const UPCOMING_STATES = ['upcoming', 'registration_open', 'draft']
+
+  const filtered = shown.filter(c => {
     if (filter === 'all')       return true
-    if (filter === 'active')    return c.status === 'active'
-    if (filter === 'upcoming')  return ['upcoming', 'registration_open'].includes(c.status)
-    if (filter === 'completed') return c.status === 'completed'
-    if (filter === 'cancelled') return c.status === 'cancelled'
+    if (filter === 'active')    return c._shown === 'active'
+    if (filter === 'upcoming')  return UPCOMING_STATES.includes(c._shown)
+    if (filter === 'ended')     return c._shown === 'ended'
+    if (filter === 'completed') return c._shown === 'completed'
+    if (filter === 'cancelled') return c._shown === 'cancelled'
     return true
   })
 
   const filterCounts = {
-    all:       competitions.length,
-    active:    competitions.filter(c => c.status === 'active').length,
-    upcoming:  competitions.filter(c => ['upcoming', 'registration_open'].includes(c.status)).length,
-    completed: competitions.filter(c => c.status === 'completed').length,
-    cancelled: competitions.filter(c => c.status === 'cancelled').length,
+    all:       shown.length,
+    active:    shown.filter(c => c._shown === 'active').length,
+    upcoming:  shown.filter(c => UPCOMING_STATES.includes(c._shown)).length,
+    ended:     shown.filter(c => c._shown === 'ended').length,
+    completed: shown.filter(c => c._shown === 'completed').length,
+    cancelled: shown.filter(c => c._shown === 'cancelled').length,
   }
 
   return (
@@ -305,9 +318,10 @@ export default function Competitions() {
           { key: 'all',       label: 'All'          },
           { key: 'active',    label: '🟢 Live'      },
           { key: 'upcoming',  label: '🔵 Upcoming'  },
+          { key: 'ended',     label: '🏁 Ended'     },
           { key: 'completed', label: '⚪ Completed' },
           { key: 'cancelled', label: '🔴 Cancelled' },
-        ].map(f => (
+        ].filter(f => f.key !== 'ended' || filterCounts.ended > 0).map(f => (
           <button key={f.key} onClick={() => setFilter(f.key)}
             style={{
               padding: '0.4rem 0.9rem',
@@ -335,7 +349,7 @@ export default function Competitions() {
       ) : (
         filtered.map(comp => {
           const disc      = DISCIPLINE_STYLE[comp.discipline] || { bg: '#f3f4f6', col: '#6b7280', label: comp.discipline || 'Unknown' }
-          const statStyle = STATUS_STYLE[comp.status]         || STATUS_STYLE.completed
+          const statStyle = STATUS_STYLE[comp._shown]        || STATUS_STYLE.upcoming
           const { links, hideGenericAdmin } = getCompConfig(comp, canEnter(comp.id))
           const dateStr   = comp.start_date && comp.end_date
             ? `${comp.start_date} → ${comp.end_date}`
