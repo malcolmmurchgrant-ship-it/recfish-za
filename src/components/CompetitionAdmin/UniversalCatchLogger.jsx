@@ -53,6 +53,8 @@ import {
   scoreDraftFish,
   validateDraftFish,
   computeSpeciesMultiplier,
+  isPredatorCatch,
+  PREDATOR_NOTE,
 } from './utils/catchLoggerScoring'
 
 // ─── STYLES ───────────────────────────────────────────────────────────────────
@@ -103,8 +105,22 @@ function rowToMeasuredDraft(row, speciesConfig) {
     if (releaseEntry) species = releaseEntry.name
   }
 
+  // A saved predator-damaged fish (rule 8.2.6) reopens against its own
+  // "(predator-damaged)" entry, not the plain species entry, for the same
+  // reason as the release case above - otherwise editing it would silently
+  // turn it into a normal, point-scoring fish.
+  const isPredator = isPredatorCatch(row)
+  if (isPredator && speciesConfig?.eligible_species) {
+    const predatorEntry = speciesConfig.eligible_species.find(
+      s => s.predator_damaged && s.species_name === row.species_name
+    )
+    if (predatorEntry) species = predatorEntry.name
+  }
+
   return {
     _id: row.id,
+    _predatorOnly: isPredator,
+    _wasPredator: isPredator,
     species,
     weight_kg: row.weight_kg != null ? String(row.weight_kg) : '',
     length_cm: row.length_cm != null ? String(row.length_cm) : '',
@@ -356,8 +372,23 @@ export default function UniversalCatchLogger({ competitionId }) {
   // ── Measured draft mutators ──────────────────────────────────────────────────
   const measuredBagLimit = config?.scoring?.bag_limit || 10
 
+  // Predator-damaged fish (SADSAA rule 8.2.6): recorded when brought to the
+  // scales, no points, and NOT counted towards the daily bag limit. They get
+  // their own add button and species list, so a card already holding the
+  // maximum ordinary fish can still record one. Competitions whose species
+  // list has no predator_damaged entries never see any of this.
+  const isPredatorRow = (f) => !!f._predatorOnly || !!findSpeciesConfig(config?.species, f.species)?.predator_damaged
+  const hasPredatorEntries = measuredSpecies.some(s => s.predator_damaged)
+  const normalFishCount = measuredDraft.filter(f => !isPredatorRow(f)).length
+  const addPredatorFish = () => {
+    setMeasuredDraft(prev => [...prev, {
+      species: '', weight_kg: '', length_cm: '', line_class_kg: participant?.line_class_kg || '',
+      measured_min_size: false, weightSource: 'manual', notes: '', _predatorOnly: true,
+    }])
+  }
+
   const addMeasuredFish = () => {
-    if (measuredDraft.length >= measuredBagLimit) return
+    if (normalFishCount >= measuredBagLimit) return
     setMeasuredDraft(prev => [...prev, {
       species: '', weight_kg: '', length_cm: '', line_class_kg: participant?.line_class_kg || '',
       measured_min_size: false, weightSource: 'manual', notes: '',
@@ -496,7 +527,7 @@ export default function UniversalCatchLogger({ competitionId }) {
 
   const { speciesCount, multiplier } = useMemo(() => {
     const combined = [
-      ...measuredDraft,
+      ...measuredDraft.filter(f => !isPredatorRow(f)),
       ...unitCountDraft.filter(r => r.fishCount > 0),
     ]
     return computeSpeciesMultiplier(combined, config?.species)
@@ -521,7 +552,10 @@ export default function UniversalCatchLogger({ competitionId }) {
     ? parseFloat((rawPoints * multiplier).toFixed(2))
     : parseFloat(rawPoints.toFixed(2))
 
-  const validMeasuredCount = scoredMeasured.filter(f => f.species && !f._warning).length
+  const validMeasuredCount = scoredMeasured.filter(f => f.species && !f._warning && !f._cfg?.predator_damaged).length
+  // Predator-damaged fish are valid records (so Save works for an angler whose
+  // only fish was mutilated) but are never counted as catches.
+  const validPredatorCount = scoredMeasured.filter(f => f.species && !f._warning && f._cfg?.predator_damaged).length
   const validUnitCountTotal = scoredUnitCount.reduce((sum, r) => sum + (r._warning ? 0 : (r.fishCount || 0)), 0)
   const totalValidFish = validMeasuredCount + validUnitCountTotal
 
@@ -578,8 +612,15 @@ export default function UniversalCatchLogger({ competitionId }) {
         // claim for the day) — attach it to just the first fish rather than
         // overwriting every row's own notes with the same text, which would
         // both duplicate it and destroy any per-row notes already present.
-        const noteForThisRow = !recordNoteAttached && recordNote ? recordNote : (fish.notes || null)
-        if (!recordNoteAttached && recordNote) recordNoteAttached = true
+        // A predator-damaged fish always carries its own marker note and never
+        // takes the card-level record note (which goes to the next ordinary
+        // fish). A fish corrected FROM predator-damaged to a normal species
+        // drops the old marker note.
+        const isPredator = !!fish._cfg?.predator_damaged
+        const noteForThisRow = isPredator
+          ? PREDATOR_NOTE
+          : (!recordNoteAttached && recordNote ? recordNote : (fish._wasPredator ? null : (fish.notes || null)))
+        if (!isPredator && !recordNoteAttached && recordNote) recordNoteAttached = true
         // A release already decided by the verifier (video_status
         // 'verified' or 'not_verified') keeps its locked points and
         // status untouched by this save, no matter what else on the card
@@ -617,6 +658,10 @@ export default function UniversalCatchLogger({ competitionId }) {
           length_cm: fish.length_cm ? parseFloat(fish.length_cm) : null,
           line_class_kg: fish.line_class_kg ? parseInt(fish.line_class_kg, 10) : (config?.scoring?.default_line_class_kg ?? config?.scoring?.line_class_kg ?? 0),
           retained: !fish._cfg?.kingfish_release,
+          // scoring is only written for a predator row (false) or a row being
+          // corrected away from predator (true). Every other save leaves the
+          // column exactly as it was, so disqualified rows are never disturbed.
+          ...(isPredator ? { scoring: false } : (fish._wasPredator ? { scoring: true } : {})),
           measured_min_size: !!fish.measured_min_size,
           ...reviewFields,
           notes: noteForThisRow,
@@ -717,6 +762,13 @@ export default function UniversalCatchLogger({ competitionId }) {
   if (configError || metaError) {
     return <div style={S.page}><div style={{ ...S.card, color: RED }}>Error loading competition: {configError || metaError}</div></div>
   }
+
+  // Species lists for the fish rows: ordinary fish never see the predator-
+  // damaged entries, and a predator-damaged row sees only those. With no
+  // predator entries configured, normalPicker is exactly the list used before.
+  const measuredPickerGroups = speciesPicker.groups.filter(g => g.species.some(s => (s.entry_mode || 'measured') !== 'unit_count'))
+  const normalPicker = { groups: measuredPickerGroups.map(g => ({ ...g, species: g.species.filter(s => !s.predator_damaged) })).filter(g => g.species.length > 0) }
+  const predatorPicker = { groups: measuredPickerGroups.map(g => ({ ...g, species: g.species.filter(s => s.predator_damaged) })).filter(g => g.species.length > 0) }
 
   const TABS = [
     { id: 'entry', label: `📝 ${participant ? participant.full_name.split(' ')[0] + "'s Card" : 'Catch Entry'}` },
@@ -847,7 +899,7 @@ export default function UniversalCatchLogger({ competitionId }) {
                       key={i}
                       fish={fish}
                       index={i}
-                      speciesPicker={{ groups: speciesPicker.groups.filter(g => g.species.some(s => (s.entry_mode || 'measured') !== 'unit_count')) }}
+                      speciesPicker={(fish._predatorOnly || fish._cfg?.predator_damaged) ? predatorPicker : normalPicker}
                       autoWeight={autoWeights[i]}
                       calculating={calculatingIndex === i}
                       onSpeciesChange={onMeasuredSpeciesChange}
@@ -857,12 +909,20 @@ export default function UniversalCatchLogger({ competitionId }) {
                     />
                   ))}
 
-                  {measuredDraft.length < measuredBagLimit && (
+                  {normalFishCount < measuredBagLimit && (
                     <button onClick={addMeasuredFish} style={{ ...S.btn(GREEN), marginTop: '0.5rem' }}>+ Add Fish</button>
                   )}
-                  {measuredDraft.length >= measuredBagLimit && (
+                  {normalFishCount >= measuredBagLimit && (
                     <div style={{ fontSize: '0.82rem', color: GOLD, fontWeight: 600, marginTop: '0.5rem' }}>
                       ⚠ Maximum {measuredBagLimit} fish reached for this angler today.
+                    </div>
+                  )}
+                  {hasPredatorEntries && (
+                    <div style={{ marginTop: '0.5rem' }}>
+                      <button onClick={addPredatorFish} style={{ ...S.btn('#6b7280') }}>🦈 Add predator-damaged fish</button>
+                      <div style={{ fontSize: '0.74rem', color: '#6b7280', marginTop: '0.3rem' }}>
+                        For a fish taken or mutilated by a predator and brought to the scales. It is recorded for adjudication, scores no points, and does not count towards the {measuredBagLimit}-fish limit.
+                      </div>
                     </div>
                   )}
                 </div>
@@ -913,7 +973,8 @@ export default function UniversalCatchLogger({ competitionId }) {
                   longer represented, so blocking the button here was the
                   only thing actually preventing that from working. */}
               {(() => {
-                const isBlankNew = totalValidFish === 0 && originalRows.length === 0
+                const totalRecordable = totalValidFish + validPredatorCount
+                const isBlankNew = totalRecordable === 0 && originalRows.length === 0
                 return (
                   <>
                     <button onClick={handleSave} disabled={saving || isBlankNew || overLineBonusPending}
@@ -923,7 +984,7 @@ export default function UniversalCatchLogger({ competitionId }) {
                     {isBlankNew && (
                       <span style={{ fontSize: '0.82rem', color: '#9ca3af', marginLeft: '0.75rem' }}>Add at least 1 valid catch to save</span>
                     )}
-                    {!isBlankNew && totalValidFish === 0 && originalRows.length > 0 && (
+                    {!isBlankNew && totalRecordable === 0 && originalRows.length > 0 && (
                       <span style={{ fontSize: '0.82rem', color: RED, marginLeft: '0.75rem' }}>⚠ Saving will remove all logged catches for this angler on this day</span>
                     )}
                     {overLineBonusPending && (
@@ -942,7 +1003,7 @@ export default function UniversalCatchLogger({ competitionId }) {
               boat={boat}
               selectedDay={selectedDay}
               anglers={availableAnglers}
-              summaryRows={summaryRows}
+              summaryRows={summaryRows.filter(r => !isPredatorCatch(r))}
               usesMultiplier={usesMultiplier}
             />
           )}
@@ -999,7 +1060,9 @@ function MeasuredFishRow({ fish, index, speciesPicker, autoWeight, calculating, 
         />
 
         <div style={{ textAlign: 'center' }}>
-          {fish._cfg?.billfish ? (
+          {fish._cfg?.predator_damaged ? (
+            <span style={S.badge('#6b7280')}>🦈 No points</span>
+          ) : fish._cfg?.billfish ? (
             <span style={S.badge(GOLD)}>Multiplier</span>
           ) : fish._cfg?.kingfish_release ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>

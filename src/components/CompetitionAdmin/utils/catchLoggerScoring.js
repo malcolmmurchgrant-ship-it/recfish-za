@@ -41,6 +41,31 @@ import {
 } from './scoringEngine'
 import { calculateWeight, getBestFormula } from '../../../utils/weightCalculations'
 
+// ── Predator-damaged fish ───────────────────────────────────────────────────
+// SADSAA rule 8.2.6: fish taken or mutilated by predators attract NO points,
+// but are recorded when brought to the scales so they can be adjudicated.
+//
+// A species_config entry flagged  predator_damaged: true  is a "this fish was
+// damaged by a predator" choice for a species (e.g. "Yellowfin Tuna
+// (predator-damaged)", with species_name: "Yellowfin Tuna" so the real
+// species is what gets stored). It scores 0, ignores the minimum weight, does
+// not count towards the daily bag limit, and is saved as scoring = false
+// (the app's existing "recorded but not counted" state) with the note below.
+//
+// Saved rows are recognised by isPredatorCatch(). It deliberately excludes
+// disqualified and rejected rows, which are also stored with scoring = false,
+// so a disqualification can never be mistaken for a predator fish or vice versa.
+export const PREDATOR_NOTE = 'Predator-damaged - recorded for adjudication, no points'
+
+export function isPredatorCatch(row) {
+  return !!row
+    && row.scoring === false
+    && row.data_quality !== 'disqualified'
+    && row.data_quality !== 'rejected'
+    && typeof row.notes === 'string'
+    && row.notes.startsWith('Predator-damaged')
+}
+
 // ── Auto-calculate weight from length for a measured-mode species ───────────
 // Mirrors LogCatch.jsx's flow exactly: look up the species' best available
 // length-weight formula (Visboekie jsonb first, FishBase table fallback),
@@ -139,6 +164,11 @@ export function buildSpeciesPicker(speciesConfig) {
 export function scoreDraftFish(fish, speciesCfg, scoringConfig, multiplier = 1) {
   if (!fish || !speciesCfg) return { points: 0, method: 'unknown', detail: '' }
 
+  // Rule 8.2.6 — predator-damaged fish never attract points.
+  if (speciesCfg.predator_damaged) {
+    return { points: 0, method: 'predator', detail: 'Predator-damaged — recorded for adjudication, no points' }
+  }
+
   const method = scoringConfig?.method || 'percentage'
   const lineClassKg = parseFloat(fish.line_class_kg) || scoringConfig?.default_line_class_kg || null
 
@@ -229,6 +259,12 @@ export function validateDraftFish(fish, speciesCfg) {
   }
 
   // entry_mode === 'measured' (default)
+  // A predator-damaged fish was brought to the scales, so it must have a
+  // weighed weight on record. It is exempt from the minimum weight: a
+  // mutilated fish is by definition lighter than it was when caught.
+  if (speciesCfg.predator_damaged) {
+    return (parseFloat(fish.weight_kg) || 0) > 0 ? null : 'Enter the weight recorded at the scales'
+  }
   if (speciesCfg.billfish) return null
   if (speciesCfg.kingfish_release) {
     return fish.measured_min_size
