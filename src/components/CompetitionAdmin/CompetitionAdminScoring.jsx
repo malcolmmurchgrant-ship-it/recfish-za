@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { calculateCatchPoints, groupCatchesBySpecies, buildCpueData } from './utils/scoringEngine'
 import { disqualifyParticipant } from './utils/disqualificationActions'
+import { isPredatorCatch } from './utils/catchLoggerScoring'
 
 const NAVY  = '#1e3a8a'
 const GREY  = '#6b7280'
@@ -82,7 +83,8 @@ export default function CompetitionAdminScoring({
       .map(p => [p.team_id, p.competition_teams])
   ).values()]
 
-  const cpueData = buildCpueData(catches.filter(c => c.data_quality !== 'rejected'), participants, days, boats, fishingSessions, teams)
+  // Predator-damaged fish are recorded for adjudication but are not catches: left out of CPUE.
+  const cpueData = buildCpueData(catches.filter(c => c.data_quality !== 'rejected' && !isPredatorCatch(c)), participants, days, boats, fishingSessions, teams)
 
   const scoringMethod = config?.scoring?.method || 'percentage'
 
@@ -144,7 +146,7 @@ export default function CompetitionAdminScoring({
     onCatchUpdate()
   }
 
-  const totalFish   = filtered.filter(c => c.data_quality !== 'rejected').length
+  const totalFish   = filtered.filter(c => c.data_quality !== 'rejected' && !isPredatorCatch(c)).length
   const totalPoints = filtered.reduce((s, c) =>
     c.data_quality === 'disqualified' || c.data_quality === 'rejected'
       ? s : s + parseFloat(c.points || 0), 0)
@@ -159,7 +161,7 @@ export default function CompetitionAdminScoring({
   // Species tally for whatever's currently filtered (angler/day/team) —
   // this is the main clutter fix: one row per species instead of one row
   // per raw catch (including the 0-point padding rows).
-  const filteredSpeciesGroups = groupCatchesBySpecies(filtered)
+  const filteredSpeciesGroups = groupCatchesBySpecies(filtered.filter(c => !isPredatorCatch(c)))
 
   // Whole-scope DQ notice — if every catch in the current filter is
   // disqualified (the common case: an angler DQ'd for a whole day), show
@@ -177,7 +179,7 @@ export default function CompetitionAdminScoring({
   // would blur together unrelated crews — nesting by day keeps that
   // distinction visible while still not forcing a day to be picked first.
   const boatSummaryData = (() => {
-    const activeCatches = catches.filter(c => c.data_quality !== 'rejected')
+    const activeCatches = catches.filter(c => c.data_quality !== 'rejected' && !isPredatorCatch(c))
 
     if (dayFilter !== 'all') {
       const dayCatches = activeCatches.filter(c => c.competition_days?.day_number === parseInt(dayFilter))
@@ -378,7 +380,7 @@ export default function CompetitionAdminScoring({
             {filteredSpeciesGroups.map(g => {
           const groupKey = g.speciesName
           const isExpanded = !!expandedGroups[groupKey]
-          const hasClaim = g.rows.some(r => r.notes && r.data_quality !== 'rejected' && r.data_quality !== 'disqualified')
+          const hasClaim = g.rows.some(r => r.notes && !isPredatorCatch(r) && r.data_quality !== 'rejected' && r.data_quality !== 'disqualified')
           const groupIsDQd = !allFilteredDQd && g.rows.length > 0 && g.rows.every(r => r.data_quality === 'disqualified')
           return (
             <div key={groupKey} style={S.card}>
@@ -473,7 +475,8 @@ export default function CompetitionAdminScoring({
                   {c.video_status === 'pending'      && <span style={S.badge('#c2410c')}>🎥 Release: Pending Review</span>}
                   {c.video_status === 'verified'     && <span style={S.badge(GREEN)}>🎥 Release: Verified</span>}
                   {c.video_status === 'not_verified' && <span style={S.badge(RED)}>🎥 Release: Not Verified</span>}
-                  {c.notes && c.data_quality !== 'rejected' && c.data_quality !== 'disqualified' && (
+                  {isPredatorCatch(c) && <span style={S.badge('#6b7280')} title={c.notes}>🦈 Predator-damaged · no points</span>}
+                  {c.notes && !isPredatorCatch(c) && c.data_quality !== 'rejected' && c.data_quality !== 'disqualified' && (
                     <span style={S.badge(GOLD)} title={c.notes}>🏆 Claim</span>
                   )}
                   {c.species_name}

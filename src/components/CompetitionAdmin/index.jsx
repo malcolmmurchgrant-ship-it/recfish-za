@@ -8,12 +8,13 @@
 //
 // Replaces: GamefishAdmin.jsx, AllCoastalsAdmin.jsx, and all future per-competition admins.
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useCompetitionConfig } from './hooks/useCompetitionConfig'
 import { useCompetitionRoles  } from './hooks/useCompetitionRoles'
 import { useCompetitionCatches} from './hooks/useCompetitionCatches'
+import { isPredatorCatch } from './utils/catchLoggerScoring'
 
 import CompetitionAdminSetup        from './CompetitionAdminSetup'
 import CompetitionAdminParticipants from './CompetitionAdminParticipants'
@@ -62,6 +63,12 @@ export default function CompetitionAdmin({ competitionId }) {
     catches, loading: catchesLoading, stats, reload: reloadCatches,
     updateCatch, rejectCatch, verifyCatch,
   } = useCompetitionCatches(competitionId)
+
+  // Fish taken or mutilated by predators (SADSAA rule 8.2.6) are recorded for
+  // adjudication and stay visible on the Scoring tab, but they are not catches:
+  // the Scoreboard and Reports never see them, so no fish count, tie-break or
+  // report can include one. Memoised so the list keeps a stable identity.
+  const standingsCatches = useMemo(() => catches.filter(c => !isPredatorCatch(c)), [catches])
 
   // ── Load participants, days, teams ────────────────────────────────────────
   useEffect(() => {
@@ -230,7 +237,7 @@ export default function CompetitionAdmin({ competitionId }) {
         <CompetitionAdminScoreboard
           competition={competition}
           config={config}
-          catches={catches}
+          catches={standingsCatches}
           participants={participants}
           teams={teams}
           days={days}
@@ -251,7 +258,7 @@ export default function CompetitionAdmin({ competitionId }) {
         <CompetitionAdminReports
           competition={competition}
           config={config}
-          catches={catches}
+          catches={standingsCatches}
           participants={participants}
           teams={teams}
           days={days}
