@@ -199,11 +199,17 @@ export default function CompetitionAdminReports({
       description:    'Reporting config updated',
       changed_fields: { reporting_config: { ...updatedReporting, sponsor_logos: sponsorLogos.map(l => l.name) } },
     }
-    const { error: err } = await supabase
+    // .select('id') returns the rows actually changed. Supabase's row
+    // security can silently skip an update (no error, nothing written), so
+    // an empty result must be treated as a failed save, never as "Saved".
+    const { data: changed, error: err } = await supabase
       .from('competitions')
       .update({ report_settings: updatedReporting, rule_overrides: [...existing, override] })
       .eq('id', competition.id)
-    if (err) {
+      .select('id')
+    if (!err && (!changed || changed.length === 0)) {
+      setError('Not saved: the database did not allow this change to the competition (no rows were updated). Nothing was stored.')
+    } else if (err) {
       setError(/report_settings/.test(err.message)
         ? 'Could not save: the database is missing the report_settings column. Run 127_add_report_settings.sql in the Supabase SQL Editor, then save again.'
         : err.message)
