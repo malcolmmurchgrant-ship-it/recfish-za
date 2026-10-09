@@ -167,11 +167,15 @@ function resolveCompLinks(comp, canEnter) {
     }
   }
 
-  // Generic fallback
+  // Generic fallback: every live or upcoming competition not listed above
+  // gets the same pair as the hand-listed ones — a public Scoreboard link
+  // (which also opens the big-screen TV display) plus the grey ⚙️ Admin
+  // button. Previously these got only a single "Manage Competition" button
+  // and no way to reach their Scoreboard from this page.
   return {
-    hideGenericAdmin: true,
+    hideGenericAdmin: false,
     links: [
-      { to: `/competition-admin-v2/${id}`, label: '⚙️ Manage Competition', primary: true },
+      { to: `/scoreboard/${id}`, label: '📊 Scoreboard', primary: true },
     ],
   }
 }
