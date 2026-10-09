@@ -9,6 +9,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { buildIndividualStandings, buildBoatPercentageTeamStandings } from '../components/CompetitionAdmin/utils/scoringEngine'
+import ScoreboardTV from '../components/ScoreboardTV'
 
 const NAVY  = '#1e3a8a'
 const GOLD  = '#d97706'
@@ -100,6 +101,30 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
   const [lastRefresh,  setLastRefresh]  = useState(null)
   const [activeTab,    setActiveTab]    = useState('team')
   const [dayFilter,    setDayFilter]    = useState('all')
+
+  // Big-screen TV display (ScoreboardTV): every angler on one screen, no
+  // scrolling. Opened with the "📺 TV display" button or a ?tv=1 link, so a
+  // clubhouse TV can be bookmarked straight to it. Never in embedded use.
+  const urlParams = (() => { try { return new URLSearchParams(window.location.search) } catch { return new URLSearchParams() } })()
+  const [tvMode, setTvMode] = useState(!embedded && urlParams.get('tv') === '1')
+  const [tvInitialView] = useState(urlParams.get('view') || 'angler')
+  function openTv() {
+    try {
+      const url = new URL(window.location.href)
+      url.searchParams.set('tv', '1')
+      window.history.replaceState(null, '', url.toString())
+    } catch { /* address bar update is a convenience only */ }
+    setTvMode(true)
+  }
+  function exitTv() {
+    try {
+      if (document.fullscreenElement) document.exitFullscreen()
+      const url = new URL(window.location.href)
+      url.searchParams.delete('tv'); url.searchParams.delete('view')
+      window.history.replaceState(null, '', url.toString())
+    } catch { /* ignore */ }
+    setTvMode(false)
+  }
 
   const load = useCallback(async () => {
     if (!competitionId) return
@@ -341,6 +366,10 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
         name: p.full_name,
         number: p.angler_number,
         team: team?.team_name || p.competition_teams?.team_name || p.province || '',
+        // Team name WITH its suffix (e.g. "Western Province White"), for the TV
+        // display, where several teams can come from one province. `team` above
+        // stays as it was: the Teams tab matches anglers to teams by it.
+        teamDisplay: team ? team.team_name + (team.team_suffix ? ` ${team.team_suffix}` : '') : (p.competition_teams?.team_name || p.province || ''),
         lineClass: p.line_class_kg,
         category: p.category,
         fish: ac.length,
@@ -494,6 +523,28 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
 
   const name = competition?.name || 'Scoreboard'
 
+  if (tvMode) {
+    return (
+      <ScoreboardTV
+        competitionName={name}
+        venue={competition?.venue}
+        days={days}
+        dayFilter={dayFilter}
+        onDayFilter={setDayFilter}
+        lastRefresh={lastRefresh}
+        anglers={anglerStandings}
+        teams={teamStandings}
+        boats={skipperStandings}
+        hasTeams={!!hasTeams && teamStandings.length > 0}
+        hasBoats={!!hasSkipper && skipperStandings.length > 0}
+        isSplitBoat={isSplitBoat}
+        catchReleaseFormat={catchReleaseFormat}
+        initialView={tvInitialView}
+        onExit={exitTv}
+      />
+    )
+  }
+
   return (
     <div style={{ maxWidth: embedded ? '100%' : 960, margin: '0 auto', padding: embedded ? 0 : '1rem', fontFamily: 'system-ui, sans-serif' }}>
 
@@ -538,7 +589,13 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
           </select>
         )}
 
-        <button onClick={load} style={{ marginLeft: 'auto', background: 'none', border: '1px solid #d1d5db', borderRadius: 6, padding: '0.35rem 0.75rem', cursor: 'pointer', fontSize: '0.78rem', color: GREY }}>
+        {!embedded && (
+          <button onClick={openTv} title="Full-screen display for a TV: every angler on one screen"
+            style={{ marginLeft: 'auto', background: NAVY, color: 'white', border: 'none', borderRadius: 6, padding: '0.4rem 0.85rem', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>
+            📺 TV display
+          </button>
+        )}
+        <button onClick={load} style={{ marginLeft: embedded ? 'auto' : 0, background: 'none', border: '1px solid #d1d5db', borderRadius: 6, padding: '0.35rem 0.75rem', cursor: 'pointer', fontSize: '0.78rem', color: GREY }}>
           🔄 {lastRefresh ? lastRefresh.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' }) : 'Refresh'}
         </button>
       </div>
