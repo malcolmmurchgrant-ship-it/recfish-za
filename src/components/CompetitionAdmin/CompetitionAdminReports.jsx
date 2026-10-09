@@ -7,6 +7,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { downloadCSV, downloadXLSX, downloadPDFReport } from './utils/reportGenerator'
+import { readLogoFile, MAX_LOGOS } from '../../utils/sponsorLogos'
 import { buildIndividualStandings, buildDailyAnglerPercentages, buildBoatPercentageTeamStandings, buildCpueData, buildSkipperRanking } from './utils/scoringEngine'
 
 // Flip to true once generate-competition-pdf is actually built and deployed
@@ -50,6 +51,9 @@ export default function CompetitionAdminReports({
       : DEFAULT_PRIZE_CATEGORIES
   )
   const [sponsorName,   setSponsorName]   = useState(config?.reporting?.cover_page?.headline_sponsor_name || '')
+  const [sponsorLogos,  setSponsorLogos]  = useState(Array.isArray(config?.reporting?.sponsor_logos) ? config.reporting.sponsor_logos : [])
+  const [logoError,     setLogoError]     = useState('')
+  const [savedMsg,      setSavedMsg]      = useState('')
   const [savingConfig,  setSavingConfig]  = useState(false)
   const [downloading,   setDownloading]   = useState(null)
   const [error,         setError]         = useState('')
@@ -183,19 +187,61 @@ export default function CompetitionAdminReports({
         headline_sponsor_name:  sponsorName || null,
       },
     }
-    // Update via rule_overrides to preserve audit trail
+    updatedReporting.sponsor_logos = sponsorLogos
+    // Saved to the competition's own report_settings, which is what the
+    // settings loader reads back (previously this only went into the
+    // rule_overrides history and so never took effect after a reload).
+    // A history entry is still added for the audit trail — with logo
+    // names only, not the image data, to keep the history small.
     const existing = competition.rule_overrides || []
     const override = {
       timestamp:      new Date().toISOString(),
       description:    'Reporting config updated',
-      changed_fields: { reporting_config: updatedReporting },
+      changed_fields: { reporting_config: { ...updatedReporting, sponsor_logos: sponsorLogos.map(l => l.name) } },
     }
-    const { error: err } = await supabase
+    // .select('id') returns the rows actually changed. Supabase's row
+    // security can silently skip an update (no error, nothing written), so
+    // an empty result must be treated as a failed save, never as "Saved".
+    const { data: changed, error: err } = await supabase
       .from('competitions')
-      .update({ rule_overrides: [...existing, override] })
+      .update({ report_settings: updatedReporting, rule_overrides: [...existing, override] })
       .eq('id', competition.id)
-    if (err) { setError(err.message) }
+      .select('id')
+    if (!err && (!changed || changed.length === 0)) {
+      setError('Not saved: the database did not allow this change to the competition (no rows were updated). Nothing was stored.')
+    } else if (err) {
+      setError(/report_settings/.test(err.message)
+        ? 'Could not save: the database is missing the report_settings column. Run 127_add_report_settings.sql in the Supabase SQL Editor, then save again.'
+        : err.message)
+    } else {
+      competition.report_settings = updatedReporting   // keep this page's copy in step without a reload
+      setSavedMsg(`Saved ${new Date().toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' })}`)
+    }
     setSavingConfig(false)
+  }
+
+  async function addLogo(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''           // allow choosing the same file again later
+    setLogoError(''); setSavedMsg('')
+    if (!file) return
+    if (sponsorLogos.length >= MAX_LOGOS) { setLogoError(`Up to ${MAX_LOGOS} logos.`); return }
+    try {
+      const logo = await readLogoFile(file)
+      setSponsorLogos(prev => [...prev, logo])
+    } catch (err) {
+      setLogoError(err.message)
+    }
+  }
+  function removeLogo(i) { setSavedMsg(''); setSponsorLogos(prev => prev.filter((_, idx) => idx !== i)) }
+  function moveLogo(i, dir) {
+    setSavedMsg('')
+    setSponsorLogos(prev => {
+      const j = i + dir
+      if (j < 0 || j >= prev.length) return prev
+      const next = [...prev]; [next[i], next[j]] = [next[j], next[i]]
+      return next
+    })
   }
 
   // ── Publish final results ─────────────────────────────────────────────────
@@ -222,7 +268,7 @@ export default function CompetitionAdminReports({
       } else if (type === 'xlsx') {
         downloadXLSX(standingsWithCpue, catches, competition, config, xlsxMode, { participants, dailyRecords, teamStandings: generalTeamStandings, ladiesTeamStandings, cpueData, openStandings, ladiesStandings, skipperRanking })
       } else if (type === 'pdf') {
-        downloadPDFReport(standingsWithCpue, catches, competition, config, { teamStandings: generalTeamStandings, ladiesTeamStandings, openStandings, ladiesStandings, skipperRanking })
+        downloadPDFReport(standingsWithCpue, catches, competition, config, { teamStandings: generalTeamStandings, ladiesTeamStandings, openStandings, ladiesStandings, skipperRanking, sponsorLogos, sponsorName })
       } else if (type === 'pdf_prize' || type === 'pdf_scorer') {
         throw new Error('This PDF type isn\'t built yet — only Full Results PDF is available so far.')
       }
@@ -602,16 +648,46 @@ export default function CompetitionAdminReports({
           <div style={S.section}>Sponsor / Branding</div>
           <div style={{ marginBottom: '0.75rem' }}>
             <label style={S.label}>Headline Sponsor Name (optional)</label>
-            <input style={S.input} placeholder="e.g. Shimano SA — appears on PDF cover and footer"
+            <input style={S.input} placeholder="e.g. Glenwood — appears in the PDF footer as 'Sponsored by …'"
               value={sponsorName}
               onChange={e => setSponsorName(e.target.value)} />
           </div>
-          <div style={{ fontSize: '0.8rem', color: GREY, marginBottom: '0.75rem' }}>
-            Sponsor logo upload is coming in a future release. Name only for now.
+          <div style={{ marginBottom: '0.75rem' }}>
+            <label style={S.label}>Sponsor Logos</label>
+            <div style={{ fontSize: '0.8rem', color: GREY, marginBottom: '0.5rem' }}>
+              Shown, in this order, on the PDF results report, the public Scoreboard and the TV display.
+              PNG with a transparent background looks best. Remember to save.
+            </div>
+            <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'stretch' }}>
+              {sponsorLogos.map((logo, i) => (
+                <div key={i} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: '0.5rem', width: 150, display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
+                  <div style={{ height: 70, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', borderRadius: 4 }}>
+                    <img src={logo.dataUrl} alt={logo.name} style={{ maxHeight: 64, maxWidth: '100%', objectFit: 'contain' }} />
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#374151', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={logo.name}>{logo.name}</div>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <button onClick={() => moveLogo(i, -1)} disabled={i === 0} title="Move left" style={{ ...S.btn('white', NAVY, i === 0), border: '1px solid #d1d5db', padding: '0.2rem 0.5rem', fontSize: '0.8rem' }}>◀</button>
+                    <button onClick={() => moveLogo(i, 1)} disabled={i === sponsorLogos.length - 1} title="Move right" style={{ ...S.btn('white', NAVY, i === sponsorLogos.length - 1), border: '1px solid #d1d5db', padding: '0.2rem 0.5rem', fontSize: '0.8rem' }}>▶</button>
+                    <button onClick={() => removeLogo(i)} title="Remove" style={{ ...S.btn('white', RED), border: '1px solid #fca5a5', padding: '0.2rem 0.5rem', fontSize: '0.8rem' }}>✕</button>
+                  </div>
+                </div>
+              ))}
+              {sponsorLogos.length < MAX_LOGOS && (
+                <label style={{ border: '2px dashed #cbd5e1', borderRadius: 8, width: 150, minHeight: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: NAVY, fontWeight: 600, fontSize: '0.85rem', textAlign: 'center', padding: '0.5rem' }}>
+                  + Add logo
+                  <input type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" onChange={addLogo} style={{ display: 'none' }} />
+                </label>
+              )}
+            </div>
+            {logoError && <div style={{ color: RED, fontSize: '0.8rem', marginTop: '0.4rem' }}>⚠ {logoError}</div>}
           </div>
-          <button onClick={saveReportingConfig} disabled={savingConfig} style={S.btn(NAVY, 'white', savingConfig)}>
-            {savingConfig ? 'Saving…' : '✓ Save Branding'}
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <button onClick={saveReportingConfig} disabled={savingConfig} style={S.btn(NAVY, 'white', savingConfig)}>
+              {savingConfig ? 'Saving…' : '✓ Save Branding'}
+            </button>
+            {savedMsg && <span style={{ color: GREEN, fontSize: '0.85rem', fontWeight: 600 }}>✓ {savedMsg}</span>}
+            {error && <span style={{ color: RED, fontSize: '0.85rem', fontWeight: 600 }}>⚠ {error}</span>}
+          </div>
         </div>
       )}
     </div>

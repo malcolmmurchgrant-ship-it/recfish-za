@@ -10,6 +10,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { buildIndividualStandings, buildBoatPercentageTeamStandings } from '../components/CompetitionAdmin/utils/scoringEngine'
 import ScoreboardTV from '../components/ScoreboardTV'
+import { getSponsorLogos } from '../utils/sponsorLogos'
 
 const NAVY  = '#1e3a8a'
 const GOLD  = '#d97706'
@@ -363,6 +364,7 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
       })
       return {
         id: p.id, uid,
+        teamId: p.team_id,
         name: p.full_name,
         number: p.angler_number,
         team: team?.team_name || p.competition_teams?.team_name || p.province || '',
@@ -522,6 +524,7 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
   }
 
   const name = competition?.name || 'Scoreboard'
+  const sponsorLogos = getSponsorLogos(competition)
 
   if (tvMode) {
     return (
@@ -541,6 +544,7 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
         catchReleaseFormat={catchReleaseFormat}
         initialView={tvInitialView}
         onExit={exitTv}
+        sponsorLogos={sponsorLogos}
       />
     )
   }
@@ -550,7 +554,8 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
 
       {/* ── Header ───────────────────────────────────────────────────────── */}
       {!embedded && (
-        <div style={{ ...S.card, background: NAVY, color: 'white', marginBottom: '1rem' }}>
+        <div style={{ ...S.card, background: NAVY, color: 'white', marginBottom: '1rem', display: 'flex', flexWrap: 'wrap-reverse', justifyContent: 'space-between', alignItems: 'flex-end', gap: '0.75rem' }}>
+          <div style={{ flex: '1 1 280px', minWidth: 0 }}>
           <div style={{ fontWeight: 800, fontSize: '1.3rem' }}>{name}</div>
           <div style={{ fontSize: '0.85rem', opacity: 0.8, marginTop: 4 }}>
             {competition?.venue} · {competition?.start_date}
@@ -563,6 +568,19 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
             <StatPill label="Total Kg"   val={totalKg.toFixed(1)}              col={GOLD}    />
             {totalHours > 0 && <StatPill label="Hours"  val={totalHours.toFixed(1)} col="#c4b5fd" />}
           </div>
+          </div>
+          {/* Sponsor logos (Reports tab → Sponsor / Branding), on white tiles
+              so dark logos stay visible on the navy header. Beside the title
+              on wide screens; above it on a phone (wrap-reverse). */}
+          {sponsorLogos.length > 0 && (
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', flex: '0 0 auto' }}>
+              {sponsorLogos.map((l, i) => (
+                <div key={i} style={{ background: 'white', borderRadius: 6, padding: '0.3rem 0.5rem', height: 56, boxSizing: 'border-box', display: 'flex', alignItems: 'center' }}>
+                  <img src={l.dataUrl} alt={l.name || 'Sponsor'} style={{ height: '100%', maxWidth: 140, objectFit: 'contain', display: 'block' }} />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -622,7 +640,10 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
           )}
           {teamStandings.map((t, i) => {
             const pos = i + 1
-            const teamAnglers = anglerStandings.filter(a => a.team === t.name)
+            // Match anglers to THIS team by team id, not by name: provinces can
+            // field several teams with the same team_name (e.g. Border Red and
+            // Border White), and a name match listed both teams' anglers here.
+            const teamAnglers = anglerStandings.filter(a => a.teamId === t.id)
             return (
               <div key={t.id} style={{ ...S.medal(pos), borderRadius: 8, padding: '0.75rem 1rem', marginBottom: '0.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
