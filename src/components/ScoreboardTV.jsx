@@ -39,8 +39,9 @@ const fmt2 = (n) => (Number(n) || 0).toLocaleString('en-ZA', { minimumFractionDi
 // available height divided by the rows needed (plus one heading row per
 // column); text size is limited both by that row height and by how wide a
 // column is. The column count giving the LARGEST readable text wins.
-// `charsPerRow` is roughly how many characters one full row needs.
-export function chooseLayout(count, width, height, charsPerRow) {
+// `emPerRow` is how wide one full row must be, in multiples of the font
+// size, for every number to show in full and names to have fair room.
+export function chooseLayout(count, width, height, emPerRow) {
   const n = Math.max(1, count)
   let best = { cols: 1, rows: n, font: 0 }
   for (let cols = 1; cols <= 6; cols++) {
@@ -49,7 +50,7 @@ export function chooseLayout(count, width, height, charsPerRow) {
     const rowH = height / (rows + 1)                 // +1 for the heading row
     const colW = width / cols
     const fontByHeight = rowH * 0.56
-    const fontByWidth  = colW / (charsPerRow * 0.58)
+    const fontByWidth  = colW / emPerRow
     const font = Math.min(fontByHeight, fontByWidth, 44)
     if (font > best.font + 0.25) best = { cols, rows, font }
   }
@@ -72,6 +73,7 @@ export default function ScoreboardTV({
   catchReleaseFormat,
   initialView = 'angler',
   onExit,
+  sponsorLogos = [],
 }) {
   const views = [
     { id: 'angler', label: '🎣 Anglers' },
@@ -173,10 +175,10 @@ export default function ScoreboardTV({
     cols = [
       { key: 'name', label: 'Angler', flex: 3.4, get: r => r.name || '—', strong: true },
       { key: 'team', label: 'Team', flex: 2.6, get: r => r.teamDisplay || r.team || '', muted: true },
-      { key: 'fish', label: 'Fish', flex: 0.7, get: r => r.fish, align: 'right', color: GREEN },
-      showKg && { key: 'kg', label: 'Kg', flex: 1.3, get: r => fmt2(r.kg), align: 'right', color: GOLD },
-      isSplitBoat && { key: 'pct', label: '%', flex: 1.3, get: r => fmt2(r.percentage), align: 'right', color: NAVY, strong: true },
-      { key: 'pts', label: 'Points', flex: 1.6, get: r => fmt2(r.points), align: 'right', color: isSplitBoat ? GREY : NAVY, strong: !isSplitBoat },
+      { key: 'fish', label: 'Fish', flex: 0.7, get: r => r.fish, align: 'right', num: true, color: GREEN },
+      showKg && { key: 'kg', label: 'Kg', flex: 1.3, get: r => fmt2(r.kg), align: 'right', num: true, color: GOLD },
+      isSplitBoat && { key: 'pct', label: '%', flex: 1.3, get: r => fmt2(r.percentage), align: 'right', num: true, color: NAVY, strong: true },
+      { key: 'pts', label: 'Points', flex: 1.6, get: r => fmt2(r.points), align: 'right', num: true, color: isSplitBoat ? GREY : NAVY, strong: !isSplitBoat },
     ].filter(Boolean)
   } else if (view === 'team') {
     title = 'Team Standings'
@@ -184,10 +186,10 @@ export default function ScoreboardTV({
     cols = [
       { key: 'name', label: 'Team', flex: 2.6, get: r => r.displayName || r.name, strong: true },
       { key: 'boat', label: 'Boat · Skipper', flex: 3.6, get: r => [r.boat, r.skipper].filter(Boolean).join(' · '), muted: true },
-      { key: 'fish', label: 'Fish', flex: 0.7, get: r => r.fish, align: 'right', color: GREEN },
-      showKg && { key: 'kg', label: 'Kg', flex: 1.3, get: r => fmt2(r.kg), align: 'right', color: GOLD },
-      isSplitBoat && { key: 'pct', label: '%', flex: 1.3, get: r => fmt2(r.percentage), align: 'right', color: NAVY, strong: true },
-      { key: 'pts', label: 'Points', flex: 1.6, get: r => fmt2(r.points), align: 'right', color: isSplitBoat ? GREY : NAVY, strong: !isSplitBoat },
+      { key: 'fish', label: 'Fish', flex: 0.7, get: r => r.fish, align: 'right', num: true, color: GREEN },
+      showKg && { key: 'kg', label: 'Kg', flex: 1.3, get: r => fmt2(r.kg), align: 'right', num: true, color: GOLD },
+      isSplitBoat && { key: 'pct', label: '%', flex: 1.3, get: r => fmt2(r.percentage), align: 'right', num: true, color: NAVY, strong: true },
+      { key: 'pts', label: 'Points', flex: 1.6, get: r => fmt2(r.points), align: 'right', num: true, color: isSplitBoat ? GREY : NAVY, strong: !isSplitBoat },
     ].filter(Boolean)
   } else {
     title = 'Boat / Skipper Standings'
@@ -195,15 +197,28 @@ export default function ScoreboardTV({
     cols = [
       { key: 'skipper', label: 'Skipper', flex: 2.8, get: r => r.skipper || 'Unknown skipper', strong: true },
       { key: 'boat', label: 'Boat', flex: 2.4, get: r => r.boat || '', muted: true },
-      { key: 'fish', label: 'Fish', flex: 0.7, get: r => r.fish, align: 'right', color: GREEN },
-      showKg && { key: 'kg', label: 'Kg', flex: 1.3, get: r => fmt2(r.kg), align: 'right', color: GOLD },
-      { key: 'pts', label: 'Points', flex: 1.6, get: r => fmt2(r.points), align: 'right', color: NAVY, strong: true },
+      { key: 'fish', label: 'Fish', flex: 0.7, get: r => r.fish, align: 'right', num: true, color: GREEN },
+      showKg && { key: 'kg', label: 'Kg', flex: 1.3, get: r => fmt2(r.kg), align: 'right', num: true, color: GOLD },
+      { key: 'pts', label: 'Points', flex: 1.6, get: r => fmt2(r.points), align: 'right', num: true, color: NAVY, strong: true },
     ].filter(Boolean)
   }
 
-  // Approximate characters one row needs: position + each column's share
-  const charsPerRow = 4 + cols.reduce((s, c) => s + c.flex * 5, 0)
-  const layout = chooseLayout(rows.length, size.w, size.h, charsPerRow)
+  // Number columns get a FIXED width, measured from the longest value they
+  // actually hold (or their heading), so a score is never cut short. Text
+  // columns (names, teams) share whatever width is left, and are the only
+  // ones that may be shortened with "…" if a name is very long.
+  const DIGIT_EM = 0.64, HEAD_EM = 0.62, PAD_EM = 0.8, TEXT_CHAR_EM = 0.55
+  for (const c of cols) {
+    if (!c.num) continue
+    const longest = rows.reduce((m, r) => Math.max(m, String(c.get(r) ?? '').length), 1)
+    c.widthEm = Math.max(longest * DIGIT_EM, c.label.length * HEAD_EM) + PAD_EM
+  }
+  // Fair room for text: ~16 characters for a name/skipper/team, less for a
+  // second text column.
+  const textCols = cols.filter(c => !c.num)
+  const textEm = textCols.reduce((s, c, i) => s + (i === 0 ? 16 : 13) * TEXT_CHAR_EM + PAD_EM, 0)
+  const emPerRow = 2.6 + cols.reduce((s, c) => s + (c.num ? c.widthEm : 0), 0) + textEm
+  const layout = chooseLayout(rows.length, size.w, size.h, emPerRow)
   const rowH = size.h > 0 ? size.h / (layout.rows + 1) : 0
   const columns = Array.from({ length: layout.cols }, (_, ci) =>
     rows.slice(ci * layout.rows, (ci + 1) * layout.rows).map((r, i) => ({ r, pos: ci * layout.rows + i + 1 }))
@@ -214,7 +229,10 @@ export default function ScoreboardTV({
     : (() => { const d = days.find(x => String(x.day_number) === String(dayFilter)); return d ? `Day ${d.day_number}${d.date ? ` — ${d.date}` : ''}` : `Day ${dayFilter}` })()
 
   const cell = (c) => ({
-    flex: c.flex, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+    ...(c.num
+      ? { flex: '0 0 auto', width: `${c.widthEm}em`, overflow: 'visible' }
+      : { flex: c.flex, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }),
+    whiteSpace: 'nowrap', boxSizing: 'border-box',
     textAlign: c.align || 'left', padding: '0 0.35em',
     fontWeight: c.strong ? 700 : 500,
     color: c.color || (c.muted ? '#4b5563' : '#111827'),
@@ -238,6 +256,17 @@ export default function ScoreboardTV({
             {title} · {dayLabel}{venue ? ` · ${venue}` : ''}
           </div>
         </div>
+        {/* Sponsor logos (Reports tab → Sponsor / Branding), each on a white
+            tile so dark logos stay visible on the navy bar */}
+        {sponsorLogos.length > 0 && (
+          <div style={{ display: 'flex', gap: '0.8vw', alignItems: 'center', flexShrink: 0 }}>
+            {sponsorLogos.map((l, i) => (
+              <div key={i} style={{ background: 'white', borderRadius: 8, padding: '0.5vh 0.6vw', height: 'clamp(30px, 6.2vh, 76px)', boxSizing: 'border-box', display: 'flex', alignItems: 'center' }}>
+                <img src={l.dataUrl} alt={l.name || 'Sponsor'} style={{ height: '100%', maxWidth: '14vw', objectFit: 'contain', display: 'block' }} />
+              </div>
+            ))}
+          </div>
+        )}
         <div style={{ textAlign: 'right', fontSize: 'clamp(11px, 1.8vh, 22px)', opacity: 0.9, whiteSpace: 'nowrap' }}>
           {rotate && <div>🔁 {views.find(v => v.id === view)?.label}</div>}
           <div>Updated {lastRefresh ? lastRefresh.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' }) : '—'}</div>
@@ -255,7 +284,7 @@ export default function ScoreboardTV({
             <div style={{ height: rowH, boxSizing: 'border-box', display: 'flex', alignItems: 'center', background: '#e0e7ff', color: NAVY, fontWeight: 700, fontSize: '0.8em', textTransform: 'uppercase', letterSpacing: '0.03em', flexShrink: 0 }}>
               <div style={{ width: '2.6em', textAlign: 'center', flexShrink: 0 }}>#</div>
               {cols.map(c => (
-                <div key={c.key} style={{ ...cell(c), color: NAVY, fontWeight: 700 }}>{c.label}</div>
+                <div key={c.key} data-num={c.num ? '1' : undefined} style={{ ...cell(c), color: NAVY, fontWeight: 700 }}>{c.label}</div>
               ))}
             </div>
             {col.map(({ r, pos }) => (
@@ -268,7 +297,7 @@ export default function ScoreboardTV({
                   {MEDAL_ICON[pos] || pos}
                 </div>
                 {cols.map(c => (
-                  <div key={c.key} style={cell(c)}>{c.get(r)}</div>
+                  <div key={c.key} data-num={c.num ? '1' : undefined} style={cell(c)}>{c.get(r)}</div>
                 ))}
               </div>
             ))}

@@ -24,6 +24,7 @@ import { groupCatchesBySpecies } from './scoringEngine'
 // achieving anything, since supabase.js was already needed eagerly by ~30
 // other files regardless.
 import { supabase } from '../../../lib/supabase'
+import { logoWidthFor } from '../../../utils/sponsorLogos'
 
 // ── CSV download ──────────────────────────────────────────────────────────────
 export function downloadCSV(standings, competition, config) {
@@ -102,7 +103,7 @@ export function downloadXLSX(standings, catches, competition, config, mode = 'mu
 // re-importing data, so it stays to a readable length instead of matching
 // the XLSX section-for-section.
 export function downloadPDFReport(standings, catches, competition, config, extra = {}) {
-  const { teamStandings = [], ladiesTeamStandings = [], openStandings = [], ladiesStandings = [], skipperRanking = [] } = extra
+  const { teamStandings = [], ladiesTeamStandings = [], openStandings = [], ladiesStandings = [], skipperRanking = [], sponsorLogos = [], sponsorName = '' } = extra
   const name = sanitiseName(competition.name)
   const showWeight = config?.scoring?.method !== 'points'
   // Angler % only means anything for competitions actually scored on a
@@ -130,7 +131,9 @@ export function downloadPDFReport(standings, catches, competition, config, extra
 
   function table(headers, rows) {
     autoTable(doc, {
-      startY: 90, margin: { left: 40, right: 40 },
+      // top: 72 so a table that runs onto a further page starts below the
+      // sponsor logos drawn in each page's top-right corner
+      startY: 90, margin: { left: 40, right: 40, top: 72, bottom: 40 },
       head: [headers], body: rows,
       headStyles: { fillColor: NAVY, textColor: 255, fontSize: 8 },
       styles: { fontSize: 8, cellPadding: 4 },
@@ -231,6 +234,38 @@ export function downloadPDFReport(standings, catches, competition, config, extra
       doc.text(`${g.fishCount} fish`, barAreaX + barMaxWidth + 5, y + 7)
       y += rowHeight
     }
+  }
+
+  // ── Sponsor logos + footer on every page ──────────────────────────────
+  // Drawn last, over every page, so pages added anywhere above (including
+  // a long table continuing onto extra pages) all get them. Logos sit
+  // top-right, in the order set on the Reports tab, 34pt tall, keeping
+  // their shape; very wide logos are capped so the row never reaches the
+  // competition name on the left.
+  const pageCount = doc.internal.getNumberOfPages()
+  const pageHeight = doc.internal.pageSize.getHeight()
+  const LOGO_H = 34, LOGO_GAP = 12, LOGO_MAX_W = 120, LOGO_ROW_MAX = pageWidth * 0.42
+  const placed = []
+  let rowW = 0
+  for (const logo of sponsorLogos) {
+    let h = LOGO_H, w = logoWidthFor(logo, h)
+    if (w > LOGO_MAX_W) { w = LOGO_MAX_W; h = w * ((Number(logo.h) || 1) / (Number(logo.w) || 1)) }
+    if (rowW + w + (placed.length ? LOGO_GAP : 0) > LOGO_ROW_MAX) break
+    rowW += w + (placed.length ? LOGO_GAP : 0)
+    placed.push({ logo, w, h })
+  }
+  for (let p = 1; p <= pageCount; p++) {
+    doc.setPage(p)
+    let x = pageWidth - 40 - rowW
+    for (const { logo, w, h } of placed) {
+      try {
+        doc.addImage(logo.dataUrl, 'PNG', x, 22 + (LOGO_H - h) / 2, w, h)
+      } catch { /* a logo that won't draw is skipped, never breaks the report */ }
+      x += w + LOGO_GAP
+    }
+    doc.setFontSize(8); doc.setTextColor(107, 114, 128); doc.setFont(undefined, 'normal')
+    if (sponsorName) doc.text(`Sponsored by ${sponsorName}`, 40, pageHeight - 18)
+    doc.text(`Page ${p} of ${pageCount}`, pageWidth - 40, pageHeight - 18, { align: 'right' })
   }
 
   doc.save(`${name}_Results.pdf`)

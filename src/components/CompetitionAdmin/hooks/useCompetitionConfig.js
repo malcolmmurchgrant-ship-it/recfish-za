@@ -54,7 +54,15 @@ export function useCompetitionConfig(competitionId) {
         scoring:   comp.pinned_config?.scoring   || tmpl?.scoring_config     || {},
         species:   comp.pinned_config?.species   || tmpl?.species_config     || {},
         team:      comp.pinned_config?.team      || tmpl?.team_config        || {},
-        reporting: comp.pinned_config?.reporting || tmpl?.reporting_config   || {},
+        // The competition's own report settings (prize categories, sponsor
+        // name and logos — saved from the Reports tab into
+        // competitions.report_settings) sit on top of the pinned/template
+        // defaults. Before this, the Reports tab's saves only went into the
+        // rule_overrides history and were never read back.
+        reporting: {
+          ...(comp.pinned_config?.reporting || tmpl?.reporting_config || {}),
+          ...(comp.report_settings || {}),
+        },
       }
 
       setCompetition(comp)
