@@ -129,7 +129,9 @@ export default function CompetitionAdmin({ competitionId }) {
     )
   }
 
-  if (!canView && !isScorer && !isAdmin) {
+  // A Video Verifier holds none of the other roles, so they must be let in
+  // explicitly - otherwise they could never reach their own Video Review tab.
+  if (!canView && !isScorer && !isAdmin && !isVideoVerifier) {
     return (
       <div style={{ maxWidth: 960, margin: '0 auto', padding: '2rem', textAlign: 'center', color: GREY }}>
         You do not have access to this competition.
@@ -148,6 +150,13 @@ export default function CompetitionAdmin({ competitionId }) {
     if (t.minRole === 'video_verifier') return isVideoVerifier
     return true
   })
+
+  // The tab actually shown: the chosen one if this person may see it,
+  // otherwise their first permitted tab (e.g. Video Review for a Video
+  // Verifier). Content is rendered from this, never from activeTab
+  // directly, so a tab someone isn't allowed - whether the default
+  // 'scoring' or one typed into the address bar (?tab=...) - is never shown.
+  const shownTab = visibleTabs.some(t => t.id === activeTab) ? activeTab : (visibleTabs[0]?.id || null)
 
   const discipline = competition?.competition_templates?.discipline || ''
   const level      = competition?.competition_templates?.level      || ''
@@ -188,8 +197,8 @@ export default function CompetitionAdmin({ competitionId }) {
             style={{
               flex: 1, minWidth: 80, padding: '0.65rem 0.5rem', border: 'none',
               cursor: 'pointer', fontWeight: 600, fontSize: '0.82rem',
-              background: activeTab === t.id ? NAVY : 'white',
-              color: activeTab === t.id ? 'white' : '#374151',
+              background: shownTab === t.id ? NAVY : 'white',
+              color: shownTab === t.id ? 'white' : '#374151',
               borderRight: '1px solid #e5e7eb',
             }}>
             {t.label}
@@ -198,7 +207,7 @@ export default function CompetitionAdmin({ competitionId }) {
       </div>
 
       {/* ── Tab content ───────────────────────────────────────────────── */}
-      {activeTab === 'setup' && (
+      {shownTab === 'setup' && (
         <CompetitionAdminSetup
           competition={competition}
           config={config}
@@ -209,7 +218,7 @@ export default function CompetitionAdmin({ competitionId }) {
         />
       )}
 
-      {activeTab === 'participants' && (
+      {shownTab === 'participants' && (
         <CompetitionAdminParticipants
           competition={competition}
           config={config}
@@ -219,7 +228,7 @@ export default function CompetitionAdmin({ competitionId }) {
         />
       )}
 
-      {activeTab === 'scoring' && (
+      {shownTab === 'scoring' && (
         <CompetitionAdminScoring
           competition={competition}
           config={config}
@@ -233,7 +242,7 @@ export default function CompetitionAdmin({ competitionId }) {
         />
       )}
 
-      {activeTab === 'scoreboard' && (
+      {shownTab === 'scoreboard' && (
         <CompetitionAdminScoreboard
           competition={competition}
           config={config}
@@ -246,7 +255,7 @@ export default function CompetitionAdmin({ competitionId }) {
         />
       )}
 
-      {activeTab === 'video-review' && (
+      {shownTab === 'video-review' && (
         <CompetitionAdminVideoReview
           competitionId={competitionId}
           isVideoVerifier={isVideoVerifier}
@@ -254,7 +263,7 @@ export default function CompetitionAdmin({ competitionId }) {
         />
       )}
 
-      {activeTab === 'reports' && (
+      {shownTab === 'reports' && (
         <CompetitionAdminReports
           competition={competition}
           config={config}
@@ -267,7 +276,7 @@ export default function CompetitionAdmin({ competitionId }) {
         />
       )}
 
-      {activeTab === 'roles' && (
+      {shownTab === 'roles' && (
         <RolesTab
           competition={competition}
           competitionId={competitionId}
