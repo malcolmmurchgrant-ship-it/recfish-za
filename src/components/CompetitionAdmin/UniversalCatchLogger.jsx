@@ -569,15 +569,11 @@ export default function UniversalCatchLogger({ competitionId }) {
   const handleSave = async () => {
     if (!participant || !selectedDay) return
 
-    // Block saving a release-video-required species with no video attached
-    // yet — otherwise it would silently save with points forced to 0 and
-    // no way to ever verify it, since there'd be nothing for the reviewer
-    // to watch.
-    const missingVideo = scoredMeasured.find(f => f.species && !f._warning && f._cfg?.require_video_evidence && !f.video_url)
-    if (missingVideo) {
-      setError(`${missingVideo.species}: attach the release video before saving`)
-      return
-    }
+    // A release no longer needs a video to be saved: anglers may send their
+    // release videos straight to the Video Verifier (e.g. by WhatsApp), who
+    // verifies from there and can optionally attach the video in Video
+    // Review. The release is still saved as 'pending' with 0 points until
+    // the verifier decides, so nothing scores without verification.
 
     setSaving(true); setError('')
 
@@ -648,7 +644,14 @@ export default function UniversalCatchLogger({ competitionId }) {
           : {
               points: fish._cfg?.require_video_evidence ? 0 : fish._scored.points,
               pending_points: fish._cfg?.require_video_evidence ? fish._scored.points : null,
-              video_url: fish._cfg?.require_video_evidence ? (fish.video_url || null) : null,
+              // video_url is only written when this card actually has a video,
+              // for a brand-new row, or when the scorer removed the video.
+              // Otherwise it is left out, so a video the Video Verifier
+              // attached in Video Review is never wiped by a later re-save
+              // of this card from a page loaded before that attachment.
+              ...((fish.video_url || !fish._id || fish._videoCleared)
+                ? { video_url: fish._cfg?.require_video_evidence ? (fish.video_url || null) : null }
+                : {}),
               video_status: fish._cfg?.require_video_evidence ? 'pending' : null,
             }
         const payload = {
@@ -1099,10 +1102,12 @@ function MeasuredFishRow({ fish, index, speciesPicker, autoWeight, calculating, 
               {fish._cfg?.require_video_evidence && (
                 <VideoUpload
                   existingVideoUrl={fish.video_url}
+                  label='Attach release video (optional)'
                   onVideoUploaded={result => onChange(index, {
                     ...fish,
                     video_url: result?.videoUrl || null,
                     video_metadata: result?.metadata || null,
+                    _videoCleared: !result?.videoUrl,
                   })}
                 />
               )}
