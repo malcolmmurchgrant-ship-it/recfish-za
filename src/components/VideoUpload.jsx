@@ -54,7 +54,7 @@ function friendlyError(err, offline) {
   return 'Upload failed: ' + (err?.message || 'unknown error') + '. Tap Retry upload.'
 }
 
-export default function VideoUpload({ onVideoUploaded, existingVideoUrl }) {
+export default function VideoUpload({ onVideoUploaded, existingVideoUrl, label = 'Attach release video' }) {
   const { user } = useAuth()
   const [status, setStatus] = useState(existingVideoUrl ? 'done' : 'idle') // idle | uploading | failed | done
   const [uploaded, setUploaded] = useState(existingVideoUrl || null)
@@ -265,7 +265,7 @@ export default function VideoUpload({ onVideoUploaded, existingVideoUrl }) {
       ) : (
         <label style={btn('#c2410c', status === 'uploading')}>
           <span>🎥</span>
-          <span>{status === 'uploading' ? (progressNote || 'Uploading…') : 'Attach release video'}</span>
+          <span>{status === 'uploading' ? (progressNote || 'Uploading…') : label}</span>
           <input
             ref={inputRef}
             type="file"

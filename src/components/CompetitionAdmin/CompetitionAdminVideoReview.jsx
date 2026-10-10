@@ -16,6 +16,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
+import VideoUpload from '../VideoUpload'
 
 const NAVY = '#1e3a8a'
 const GREY = '#6b7280'
@@ -111,15 +112,23 @@ export default function CompetitionAdminVideoReview({ competitionId, isVideoVeri
           verification_note: note || null,
         }
 
-    const { error: updateError } = await supabase
+    // .select('id') returns the rows actually changed: the database's row
+    // security can skip an update without an error, and a decision that
+    // wasn't stored must never look as if it was.
+    const { data: changed, error: updateError } = await supabase
       .from('competition_catches')
       .update(updates)
       .eq('id', catchId)
+      .select('id')
 
     setBusyId(null)
 
     if (updateError) {
       setError('Failed to save decision: ' + updateError.message)
+      return
+    }
+    if (!changed || changed.length === 0) {
+      setError('Decision NOT saved: the database did not allow this change. The release is still pending — please tell the organiser.')
       return
     }
 
@@ -154,6 +163,29 @@ export default function CompetitionAdminVideoReview({ competitionId, isVideoVeri
     loadAll()
   }
 
+  // The Video Verifier attaches a video they received outside the app (e.g.
+  // by WhatsApp) to a pending release, so it is kept with the catch record.
+  // Optional - verifying does not require it.
+  const attachVideo = async (catchId, result) => {
+    if (!result?.videoUrl) return
+    setError('')
+    const { data: changed, error: updateError } = await supabase
+      .from('competition_catches')
+      .update({ video_url: result.videoUrl })
+      .eq('id', catchId)
+      .select('id')
+    if (updateError || !changed || changed.length === 0) {
+      setError('Video uploaded but NOT linked to the catch' + (updateError ? ': ' + updateError.message : ' (the database did not allow the change).') + ' You can still verify from WhatsApp.')
+      return
+    }
+    setPending(prev => prev.map(p => p.id === catchId ? { ...p, video_url: result.videoUrl } : p))
+  }
+
+  const loggedAt = (iso) => {
+    if (!iso) return ''
+    try { return new Date(iso).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' }) } catch { return '' }
+  }
+
   if (!isVideoVerifier) {
     return (
       <div style={{ ...S.card, textAlign: 'center', color: GREY }}>
@@ -173,7 +205,8 @@ export default function CompetitionAdminVideoReview({ competitionId, isVideoVeri
           {pending.length} pending release{pending.length === 1 ? '' : 's'}
         </div>
         <div style={{ fontSize: '0.85rem', color: GREY }}>
-          Review each video, confirm minimum size was met, then decide. Made a wrong call?
+          Review each release's video — in the app if one is attached, otherwise the one
+          sent to you (e.g. by WhatsApp) — confirm minimum size was met, then decide. Made a wrong call?
           Open "Recently decided" below and use Reset to Pending — that puts it straight
           back in this queue for another look, rather than editing the catch directly.
         </div>
@@ -192,11 +225,27 @@ export default function CompetitionAdminVideoReview({ competitionId, isVideoVeri
       {pending.map(item => (
         <div key={item.id} style={S.card}>
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-            <video
-              src={item.video_url}
-              controls
-              style={{ width: 260, maxWidth: '100%', borderRadius: 6, background: '#000' }}
-            />
+            {item.video_url ? (
+              <video
+                src={item.video_url}
+                controls
+                style={{ width: 260, maxWidth: '100%', borderRadius: 6, background: '#000' }}
+              />
+            ) : (
+              <div style={{ width: 260, maxWidth: '100%', borderRadius: 6, background: '#f8fafc', border: '2px dashed #cbd5e1', padding: '0.9rem', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ fontSize: '0.85rem', color: '#374151' }}>
+                  <div style={{ fontWeight: 700, marginBottom: 4 }}>📱 No video in the app</div>
+                  Check the video sent to you (e.g. on WhatsApp), matching it by angler, boat, day and the time logged.
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.72rem', color: GREY, marginBottom: 4 }}>Optional: keep it with this catch</div>
+                  <VideoUpload
+                    label='Attach video from phone'
+                    onVideoUploaded={result => attachVideo(item.id, result)}
+                  />
+                </div>
+              </div>
+            )}
 
             <div style={{ flex: 1, minWidth: 220 }}>
               <div style={{ fontWeight: 700, fontSize: '1.05rem', color: NAVY }}>
@@ -204,6 +253,7 @@ export default function CompetitionAdminVideoReview({ competitionId, isVideoVeri
               </div>
               <div style={{ fontSize: '0.85rem', color: GREY, marginBottom: 8 }}>
                 {item.competition_teams?.team_name} · {item.competition_boats?.boat_name} · Day {item.competition_days?.day_number}
+                {item.created_at && <> · Logged {loggedAt(item.created_at)}</>}
               </div>
 
               <span style={S.label}>Species</span>
