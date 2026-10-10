@@ -56,6 +56,7 @@ export default function CompetitionAdmin({ competitionId }) {
 
   const {
     isPlatformAdmin, isAdmin, isScorer, isVideoVerifier, canView, loading: rolesLoading,
+    isSignedIn, checkFailed,
     grantRole, revokeRole, recheckRoles,
   } = useCompetitionRoles(competitionId)
 
@@ -132,6 +133,27 @@ export default function CompetitionAdmin({ competitionId }) {
   // A Video Verifier holds none of the other roles, so they must be let in
   // explicitly - otherwise they could never reach their own Video Review tab.
   if (!canView && !isScorer && !isAdmin && !isVideoVerifier) {
+    // Not logged in: say so, rather than "no access".
+    if (!isSignedIn) {
+      return (
+        <div style={{ maxWidth: 960, margin: '0 auto', padding: '2rem', textAlign: 'center', color: GREY }}>
+          Please <a href="/login" style={{ color: NAVY, fontWeight: 600 }}>log in</a> to open this competition.
+        </div>
+      )
+    }
+    // The access check itself failed (usually a dropped connection) - offer
+    // a retry instead of wrongly telling the person they have no access.
+    if (checkFailed) {
+      return (
+        <div style={{ maxWidth: 960, margin: '0 auto', padding: '2rem', textAlign: 'center', color: GREY }}>
+          <div style={{ marginBottom: '0.75rem' }}>Couldn't confirm your access — the connection may have dropped.</div>
+          <button onClick={() => recheckRoles()}
+            style={{ background: NAVY, color: 'white', border: 'none', borderRadius: 6, padding: '0.6rem 1.2rem', fontWeight: 600, cursor: 'pointer' }}>
+            ↻ Try again
+          </button>
+        </div>
+      )
+    }
     return (
       <div style={{ maxWidth: 960, margin: '0 auto', padding: '2rem', textAlign: 'center', color: GREY }}>
         You do not have access to this competition.

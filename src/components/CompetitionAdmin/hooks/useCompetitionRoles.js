@@ -12,7 +12,14 @@ const ADMIN_EMAILS = ['malcolmmurchgrant@gmail.com', 'mpca99@telkomsa.net']
 export function useCompetitionRoles(competitionId) {
   const { user }              = useAuth()
   const [platformRole,  setPlatformRole]  = useState(null)
-  const [competitionRole, setCompetitionRole] = useState(null)
+  // ALL of this user's roles on this competition - a person may hold more
+  // than one (e.g. Video Verifier + Scorer). Previously only one was read,
+  // with .maybeSingle(), which ERRORS when there are two rows - leaving the
+  // person with no role at all and a false "You do not have access".
+  const [competitionRoles, setCompetitionRoles] = useState([])
+  // true when the role check could not complete (e.g. the connection
+  // dropped) - shown as "couldn't check, retry", never as "no access".
+  const [checkFailed,   setCheckFailed]   = useState(false)
   const [loading,       setLoading]       = useState(true)
 
   useEffect(() => {
@@ -28,6 +35,7 @@ export function useCompetitionRoles(competitionId) {
     const timeout = setTimeout(() => {
       if (!settled) {
         console.warn('useCompetitionRoles: role check timed out after 8s — clearing loading state defensively')
+        setCheckFailed(true)
         setLoading(false)
       }
     }, 8000)
@@ -69,24 +77,30 @@ export function useCompetitionRoles(competitionId) {
         }
       }
 
-      // Check competition_user_roles for this specific competition
-      const { data: compRole } = await supabase
+      // Check competition_user_roles for this specific competition (all rows)
+      const { data: compRoles, error: compErr } = await supabase
         .from('competition_user_roles')
         .select('role')
         .eq('competition_id', competitionId)
         .eq('user_id', user.id)
-        .maybeSingle()
 
-      if (compRole) setCompetitionRole(compRole.role)
+      if (compErr) throw compErr
+      setCompetitionRoles((compRoles || []).map(r => r.role))
+      setCheckFailed(false)
 
     } catch (err) {
       console.error('Role check error:', err)
+      setCheckFailed(true)
     } finally {
       setLoading(false)
     }
   }
 
   // Derived permission flags
+  const hasRole = (...roles) => roles.some(r => competitionRoles.includes(r))
+  // The single most senior role, kept for anything that wants one value.
+  const competitionRole = ['admin', 'tournament_director', 'scorer', 'video_verifier', 'read_only']
+    .find(r => competitionRoles.includes(r)) || competitionRoles[0] || null
   const isPlatformAdmin = platformRole === 'platform_admin' ||
                           ADMIN_EMAILS.includes(user?.email)
   const isAdmin         = isPlatformAdmin ||
@@ -97,10 +111,10 @@ export function useCompetitionRoles(competitionId) {
                           // participants, prize categories" — someone granted that
                           // role got LESS access than Scorer (isAdmin/isScorer/canView
                           // all false), the opposite of what the UI describes.
-                          ['admin', 'tournament_director'].includes(competitionRole)
-  const isScorer        = isAdmin || competitionRole === 'scorer' ||
+                          hasRole('admin', 'tournament_director')
+  const isScorer        = isAdmin || hasRole('scorer') ||
                           ['tournament_director','scorer'].includes(platformRole)
-  const canView         = isScorer || competitionRole === 'read_only'
+  const canView         = isScorer || hasRole('read_only')
 
   // Video Verifier: a distinct role from Scorer, for reviewing and
   // deciding on release videos (CBSC Tuna Invitational and any future
@@ -108,7 +122,7 @@ export function useCompetitionRoles(competitionId) {
   // NOT folded into isScorer and the Tournament Director does not get
   // it automatically — only platform admins and whoever is explicitly
   // granted 'video_verifier' at the competition level.
-  const isVideoVerifier  = isPlatformAdmin || competitionRole === 'video_verifier'
+  const isVideoVerifier  = isPlatformAdmin || hasRole('video_verifier')
 
   // Grant a role for this competition
   async function grantRole(email, role) {
@@ -145,6 +159,9 @@ export function useCompetitionRoles(competitionId) {
     user,
     platformRole,
     competitionRole,
+    competitionRoles,
+    isSignedIn: !!user,
+    checkFailed,
     isPlatformAdmin,
     isAdmin,
     isScorer,
