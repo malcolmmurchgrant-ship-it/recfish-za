@@ -10,7 +10,10 @@ import { useAuth } from '../../../contexts/AuthContext'
 const ADMIN_EMAILS = ['malcolmmurchgrant@gmail.com', 'mpca99@telkomsa.net']
 
 export function useCompetitionRoles(competitionId) {
-  const { user }              = useAuth()
+  // authLoading: true while the saved login is still being restored after a
+  // page load (slower on weak Wi-Fi). The role check must wait for it -
+  // otherwise it runs with no user yet and wrongly reports "no access".
+  const { user, loading: authLoading } = useAuth()
   const [platformRole,  setPlatformRole]  = useState(null)
   // ALL of this user's roles on this competition - a person may hold more
   // than one (e.g. Video Verifier + Scorer). Previously only one was read,
@@ -24,6 +27,7 @@ export function useCompetitionRoles(competitionId) {
 
   useEffect(() => {
     if (!competitionId) return
+    if (authLoading) { setLoading(true); return }   // wait for the login to be restored
 
     let settled = false
 
@@ -54,7 +58,7 @@ export function useCompetitionRoles(competitionId) {
     })
 
     return () => clearTimeout(timeout)
-  }, [user, competitionId])
+  }, [user, competitionId, authLoading])
 
   async function checkRoles() {
     setLoading(true)
