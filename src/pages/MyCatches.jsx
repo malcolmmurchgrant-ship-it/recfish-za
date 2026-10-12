@@ -135,7 +135,7 @@ export default function MyCatches() {
   const claimRecord = async (participant) => {
     if (!confirm(
       `Claim ${participant.catch_count} catches from ${participant.competition.name} as ${participant.full_name}?\n\n` +
-      `This links your account to this competition record permanently.`
+      `This links your account to these catches permanently.`
     )) return
 
     setClaiming(true)
@@ -149,10 +149,40 @@ export default function MyCatches() {
       // Reload everything so Competition History tab populates immediately
       await loadAll()
     } catch (err) {
-      setClaimMessage('❌ ' + (err.message || 'Could not claim this record'))
+      setClaimMessage('❌ ' + (err.message || 'Could not claim these catches'))
     } finally {
       setClaiming(false)
     }
+  }
+
+  // Claim every listed competition in one go. Each competition is claimed
+  // separately, so one refusal (e.g. already linked to another account)
+  // doesn't stop the rest; the message reports both.
+  const claimAll = async () => {
+    const list = claimableRecords
+    if (list.length === 0) return
+    const total = list.reduce((n, r) => n + r.catch_count, 0)
+    if (!confirm(
+      `Claim all ${total} catches from ${list.length} competition${list.length === 1 ? '' : 's'}?\n\n` +
+      `This links your account to these catches permanently.`
+    )) return
+
+    setClaiming(true)
+    setClaimMessage('')
+    let claimed = 0, comps = 0
+    const failed = []
+    for (const r of list) {
+      const { data, error } = await supabase.rpc('claim_competition_record', { p_participant_id: r.id })
+      if (error) failed.push(`${r.competition.name}: ${error.message}`)
+      else { claimed += Number(data) || 0; comps++ }
+    }
+    let msg = comps > 0
+      ? `✅ Claimed ${claimed} catch${claimed === 1 ? '' : 'es'} from ${comps} competition${comps === 1 ? '' : 's'}. They are now in your Competition History.`
+      : '❌ No catches could be claimed.'
+    if (failed.length) msg += `\nNot claimed: ${failed.join(' · ')}`
+    setClaimMessage(msg)
+    await loadAll()
+    setClaiming(false)
   }
 
   // ── Delete social catch ────────────────────────────────────────────────────
@@ -569,7 +599,7 @@ export default function MyCatches() {
           {claimMessage && (
             <div style={{
               padding: '0.85rem 1.1rem', borderRadius: '8px', marginBottom: '1.25rem',
-              fontSize: '0.875rem', fontWeight: '600',
+              fontSize: '0.875rem', fontWeight: '600', whiteSpace: 'pre-line',
               background: claimMessage.startsWith('✅') ? '#dcfce7' : '#fee2e2',
               color: claimMessage.startsWith('✅') ? '#166534' : '#991b1b',
               border: `1px solid ${claimMessage.startsWith('✅') ? '#86efac' : '#fecaca'}`
@@ -581,8 +611,23 @@ export default function MyCatches() {
           {/* Claimable records — shown when name matches exist */}
           {claimableRecords.length > 0 && (
             <div style={{ marginBottom: '1.5rem' }}>
-              <div style={{ fontWeight: '700', fontSize: '0.9rem', color: '#1e3a8a', marginBottom: '0.6rem' }}>
-                🔗 Competition records found matching your name
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem', marginBottom: '0.6rem' }}>
+                <div style={{ fontWeight: '700', fontSize: '0.9rem', color: '#1e3a8a' }}>
+                  🔗 Competition catches found under your name
+                </div>
+                {claimableRecords.length > 1 && (
+                  <button
+                    onClick={claimAll}
+                    disabled={claiming}
+                    style={{
+                      padding: '0.6rem 1.25rem', background: claiming ? '#9ca3af' : '#16a34a',
+                      color: 'white', border: 'none', borderRadius: '6px',
+                      fontWeight: '700', fontSize: '0.875rem',
+                      cursor: claiming ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap'
+                    }}>
+                    {claiming ? 'Claiming...' : `Claim All (${claimableRecords.reduce((n, r) => n + r.catch_count, 0)} catches)`}
+                  </button>
+                )}
               </div>
               {claimableRecords.map(record => (
                 <div key={record.id} style={{
@@ -613,7 +658,7 @@ export default function MyCatches() {
                       fontWeight: '700', fontSize: '0.875rem',
                       cursor: claiming ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap'
                     }}>
-                    {claiming ? 'Claiming...' : 'Claim My Record'}
+                    {claiming ? 'Claiming...' : 'Claim My Catches'}
                   </button>
                 </div>
               ))}
