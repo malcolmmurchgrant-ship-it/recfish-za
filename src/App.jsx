@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation, useParams } from 'react-router-dom'
 import { useState, useEffect } from 'react'
-import { AuthProvider } from './contexts/AuthContext'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { SessionProvider, useSession } from './contexts/SessionContext'
 import { supabase } from './lib/supabase'
 import { isOwner } from './utils/owners'
@@ -67,6 +67,20 @@ function Navigation() {
   const path = location.pathname
   const [openGroup,   setOpenGroup]   = useState(null)
   const [canEnterGamefish, setCanEnterGamefish] = useState(false)
+  const { user } = useAuth()
+
+  // Log out. If the server can't end the login (e.g. the account was deleted
+  // in Supabase), still forget it on this device. A full page load then
+  // clears everything held in memory for the previous person.
+  const handleLogout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut()
+      if (error) throw error
+    } catch {
+      await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
+    }
+    window.location.href = '/login'
+  }
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -155,6 +169,9 @@ function Navigation() {
         />
 
         <Link to='/profile' style={pill(path === '/profile')}>👤 Profile</Link>
+        {user
+          ? <button type='button' onClick={handleLogout} style={pill(false)}>🚪 Log out</button>
+          : <Link to='/login' style={pill(path === '/login')}>🔑 Log in</Link>}
 
         <a href='https://safishid.netlify.app' target='_blank' rel='noopener noreferrer'
           style={pill(false)}>🔍 Fish ID ↗</a>
