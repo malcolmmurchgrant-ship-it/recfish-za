@@ -87,8 +87,24 @@ export default function CompetitionAdminSetup({ competition, config, days, boats
     setLoadingSessions(false)
   }
 
+  // One row per boat for a day, in A-Z order by boat name. Built from the
+  // competition's CURRENT boats, merged with any saved session rows - not
+  // from the saved rows alone. Saved rows are only created when boats are
+  // first set up, so a boat added later (e.g. Motley Crew) used to be missing
+  // here entirely. A boat with no saved row yet gets a placeholder that is
+  // inserted on its first Save. Saved rows for a boat no longer in the list
+  // are still shown, so no recorded times are hidden.
   function sessionsForDay(dayNumber) {
-    return fishingSessions.filter(s => s.day_number === dayNumber)
+    const saved = fishingSessions.filter(s => s.day_number === dayNumber)
+    const key = n => (n || '').trim().toLowerCase()
+    const savedByName = new Map(saved.map(s => [key(s.boat_name), s]))
+    const rows = (boats || []).map(b => savedByName.get(key(b.boat_name)) || {
+      id: `new-${dayNumber}-${b.id}`, _new: true, day_number: dayNumber,
+      boat_name: b.boat_name, skipper_name: b.skipper_name,
+    })
+    const boatNames = new Set((boats || []).map(b => key(b.boat_name)))
+    for (const s of saved) if (!boatNames.has(key(s.boat_name))) rows.push(s)
+    return rows.sort((a, b) => (a.boat_name || '').localeCompare(b.boat_name || '', undefined, { sensitivity: 'base', numeric: true }))
   }
 
   function fieldFor(session, field) {
@@ -117,17 +133,27 @@ export default function CompetitionAdminSetup({ competition, config, days, boats
     const linesUp  = fieldFor(session, 'lines_up')
     const hours    = computeHours(linesIn, linesUp)
     setSavingSession(p => ({ ...p, [session.id]: true }))
-    const { error: err } = await supabase
-      .from('competition_fishing_sessions')
-      .update({
-        lines_in:      linesIn || null,
-        lines_up:      linesUp || null,
-        fishing_hours: hours,
-        updated_at:    new Date().toISOString(),
-      })
-      .eq('id', session.id)
+    const times = {
+      lines_in:      linesIn || null,
+      lines_up:      linesUp || null,
+      fishing_hours: hours,
+      updated_at:    new Date().toISOString(),
+    }
+    // A boat with no saved row for this day yet (added after setup) gets one
+    // created now; otherwise the existing row is updated. .select('id')
+    // returns the rows actually written, so a change the database silently
+    // refuses is reported instead of looking saved.
+    const { data: written, error: err } = session._new
+      ? await supabase.from('competition_fishing_sessions')
+          .insert({ competition_id: competition.id, day_number: session.day_number,
+                    boat_name: session.boat_name, skipper_name: session.skipper_name || null, ...times })
+          .select('id')
+      : await supabase.from('competition_fishing_sessions')
+          .update(times).eq('id', session.id).select('id')
     setSavingSession(p => ({ ...p, [session.id]: false }))
     if (err) { setError(err.message); return }
+    if (!written || written.length === 0) { setError(`${session.boat_name}: times NOT saved - the database did not allow the change.`); return }
+    setSessionForm(f => { const n = { ...f }; delete n[session.id]; return n })
     await loadFishingSessions()
   }
 
