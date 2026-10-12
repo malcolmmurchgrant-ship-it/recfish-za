@@ -267,6 +267,13 @@ export function validateDraftFish(fish, speciesCfg) {
   }
   if (speciesCfg.billfish) return null
   if (speciesCfg.kingfish_release) {
+    // A video-verified release (e.g. CBSC Tuna Invitational) can't have its
+    // size judged at the scales - the fish is gone. Size is judged by the
+    // Video Verifier from the video instead, so no scorer confirmation is
+    // required (and the release is never skipped on save for lack of one).
+    // Releases WITHOUT video verification (e.g. Gamefish Kingfish, measured
+    // by the scorer before release) still need the confirmation.
+    if (speciesCfg.require_video_evidence) return null
     return fish.measured_min_size
       ? null
       : `Must confirm minimum size${speciesCfg.min_size_mm ? ` (≥${speciesCfg.min_size_mm}mm)` : ''} before release`

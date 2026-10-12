@@ -206,7 +206,7 @@ export default function CompetitionAdminVideoReview({ competitionId, isVideoVeri
         </div>
         <div style={{ fontSize: '0.85rem', color: GREY }}>
           Review each release's video — in the app if one is attached, otherwise the one
-          sent to you (e.g. by WhatsApp) — confirm minimum size was met, then decide. Made a wrong call?
+          sent to you (e.g. by WhatsApp) — judge whether the fish met the minimum size, then decide. Made a wrong call?
           Open "Recently decided" below and use Reset to Pending — that puts it straight
           back in this queue for another look, rather than editing the catch directly.
         </div>
@@ -259,9 +259,12 @@ export default function CompetitionAdminVideoReview({ competitionId, isVideoVeri
               <span style={S.label}>Species</span>
               <div style={{ marginBottom: 8 }}>{item.species_name}</div>
 
-              <span style={S.label}>Minimum size confirmed at logging</span>
-              <div style={{ marginBottom: 8, color: item.measured_min_size ? GREEN : RED, fontWeight: 600 }}>
-                {item.measured_min_size ? '✓ Yes' : '✗ Not confirmed'}
+              {/* Size can't be checked at the scales for a released fish, so it is
+                  part of the verifier's judgement from the video. Older releases
+                  that the scorer did confirm still show that. */}
+              <span style={S.label}>Minimum size</span>
+              <div style={{ marginBottom: 8, color: item.measured_min_size ? GREEN : '#374151', fontWeight: 600 }}>
+                {item.measured_min_size ? '✓ Confirmed by scorer at logging' : '👁 Judge from the video — if it looks under the minimum, choose Not Verified'}
               </div>
 
               <span style={S.label}>Points if verified</span>

@@ -1084,15 +1084,20 @@ function MeasuredFishRow({ fish, index, speciesPicker, autoWeight, calculating, 
               ) : fish.video_status === 'not_verified' ? (
                 <span style={S.badge(RED)}>0 pts ✗ Not Verified</span>
               ) : (
-                <span style={S.badge(fish.measured_min_size ? PURPLE : '#9ca3af')}>
+                <span style={S.badge((fish.measured_min_size || fish._cfg?.require_video_evidence) ? PURPLE : '#9ca3af')}>
                   {pts} pts {fish._cfg?.require_video_evidence ? '⏳ pending review' : '📸'}
                 </span>
               )}
-              <label style={{ fontSize: '0.68rem', color: fish.measured_min_size ? PURPLE : RED, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 2 }}>
-                <input type='checkbox' checked={!!fish.measured_min_size}
-                  onChange={e => onChange(index, { ...fish, measured_min_size: e.target.checked })} />
-                Min size
-              </label>
+              {/* Min-size tick: only for releases the scorer can measure before
+                  release (e.g. Gamefish Kingfish). Video-verified releases are
+                  size-checked by the Video Verifier from the video instead. */}
+              {!fish._cfg?.require_video_evidence && (
+                <label style={{ fontSize: '0.68rem', color: fish.measured_min_size ? PURPLE : RED, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <input type='checkbox' checked={!!fish.measured_min_size}
+                    onChange={e => onChange(index, { ...fish, measured_min_size: e.target.checked })} />
+                  Min size
+                </label>
+              )}
               {/* Video evidence: only rendered for species that set
                   require_video_evidence in their config (e.g. CBSC Tuna
                   Invitational's Open+Release species). The existing
