@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { AuthProvider } from './contexts/AuthContext'
 import { SessionProvider, useSession } from './contexts/SessionContext'
 import { supabase } from './lib/supabase'
+import { isOwner } from './utils/owners'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import ResetPassword from './pages/ResetPassword'
@@ -28,7 +29,6 @@ import SessionEndSummaryModal from './components/SessionEndSummaryModal'
 
 const NAVY = '#1e3a8a'
 
-const OWNER_ID       = 'b9c5048a-b229-46af-9042-44551b162d75'
 const CATCH_ROLES    = ['admin', 'tournament_director']
 const GAMEFISH_ID    = '3855034f-ab39-4297-9be4-ba9a7e566ce0'
 
@@ -72,7 +72,7 @@ function Navigation() {
     supabase.auth.getUser().then(({ data }) => {
       const uid = data?.user?.id
       if (!uid) return
-      if (uid === OWNER_ID) { setCanEnterGamefish(true); return }
+      if (isOwner(uid)) { setCanEnterGamefish(true); return }
       supabase
         .from('competition_user_roles')
         .select('role')
