@@ -2,12 +2,12 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { effectiveStatus } from '../utils/competitionStatus'
+import { isOwner } from '../utils/owners'
 
 const NAVY  = '#1e3a8a'
 const GOLD  = '#d97706'
 const GREEN = '#16a34a'
 
-const OWNER_ID    = 'b9c5048a-b229-46af-9042-44551b162d75'
 const CATCH_ROLES = ['admin', 'tournament_director']
 
 // ─── Competition-specific page links ─────────────────────────────────────────
@@ -246,7 +246,7 @@ export default function Competitions() {
     supabase.auth.getUser().then(({ data }) => {
       const uid = data?.user?.id || null
       if (!uid) return
-      if (uid === OWNER_ID) { setCatchAccess('all'); return }
+      if (isOwner(uid)) { setCatchAccess('all'); return }
       supabase
         .from('competition_user_roles')
         .select('competition_id, role')

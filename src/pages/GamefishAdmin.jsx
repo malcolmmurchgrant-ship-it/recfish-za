@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { isOwner } from '../utils/owners'
 
 const COMPETITION_ID = '3855034f-ab39-4297-9be4-ba9a7e566ce0'
-const OWNER_ID       = 'b9c5048a-b229-46af-9042-44551b162d75'
 const SCORER_ID      = '6b41ebd4-e66f-47a0-9ca7-f22d9f5ee7fd'
 const LINE_CLASS     = 10
 
@@ -486,7 +486,7 @@ export default function GamefishAdmin() {
   // ── Auth check ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!user) { setChecking(false); return }
-    if ([OWNER_ID, SCORER_ID].includes(user.id)) {
+    if (isOwner(user.id) || user.id === SCORER_ID) {
       setAuthorised(true); setChecking(false); return
     }
     supabase.from('competition_user_roles').select('role')
