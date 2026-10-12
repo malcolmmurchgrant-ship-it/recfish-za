@@ -233,11 +233,11 @@ export default function CompetitionAdminScoreboard({
       {viewMode === 'individual' && (
         <div style={S.card}>
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.84rem' }}>
               <thead>
                 <tr style={{ background: NAVY, color: 'white' }}>
                   {['Rank','Angler','Boat','Team','LC', ...(usesBoatPercentage ? ['Angler %'] : []), 'Points', ...(showWeight ? ['Weight'] : []), 'Species','Catches','CPUE'].map(h => (
-                    <th key={h} style={{ padding: '0.5rem 0.75rem', textAlign: h === 'Rank' ? 'center' : 'left', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{h}</th>
+                    <th key={h} style={{ padding: '0.45rem 0.5rem', textAlign: h === 'Rank' ? 'center' : 'left', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -247,10 +247,10 @@ export default function CompetitionAdminScoreboard({
                   return (
                   <tr key={s.participantId}
                     style={{ background: i % 2 === 0 ? 'white' : '#f8fafc', borderBottom: '1px solid #e5e7eb' }}>
-                    <td style={{ padding: '0.5rem 0.75rem', textAlign: 'center', fontWeight: 700, color: RANK_COLORS[s.rank] || NAVY }}>
+                    <td style={{ padding: '0.45rem 0.5rem', textAlign: 'center', fontWeight: 700, color: RANK_COLORS[s.rank] || NAVY }}>
                       {s.rank <= 3 ? ['🥇','🥈','🥉'][s.rank - 1] : s.rank}
                     </td>
-                    <td style={{ padding: '0.5rem 0.75rem', fontWeight: 600, color: NAVY, whiteSpace: 'nowrap' }}>
+                    <td style={{ padding: '0.45rem 0.5rem', fontWeight: 600, color: NAVY, whiteSpace: 'nowrap' }}>
                       <button
                         onClick={() => goToAnglersCard(s.participantId)}
                         title="Open this angler's card in the Catch Logger"
@@ -259,35 +259,35 @@ export default function CompetitionAdminScoreboard({
                       </button>
                       {s.anglerNumber && <span style={{ color: GREY, fontWeight: 400 }}> #{s.anglerNumber}</span>}
                     </td>
-                    <td style={{ padding: '0.5rem 0.75rem', color: GREY, fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                    <td style={{ padding: '0.45rem 0.5rem', color: GREY, fontSize: '0.8rem', minWidth: 70 }}>
                       {boatNameForTeam(s.teamId) || '—'}
                     </td>
-                    <td style={{ padding: '0.5rem 0.75rem', color: GREY, fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                    <td style={{ padding: '0.45rem 0.5rem', color: GREY, fontSize: '0.8rem', minWidth: 80 }}>
                       {s.teamName || '—'}
                     </td>
-                    <td style={{ padding: '0.5rem 0.75rem', color: GREY, fontSize: '0.82rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                    <td style={{ padding: '0.45rem 0.5rem', color: GREY, fontSize: '0.82rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
                       {(s.lineClass || lineClassKg) ? `${s.lineClass || lineClassKg}kg` : '—'}
                     </td>
                     {usesBoatPercentage && (
-                      <td style={{ padding: '0.5rem 0.75rem', fontWeight: 700, color: NAVY, textAlign: 'right' }}>
+                      <td style={{ padding: '0.45rem 0.5rem', fontWeight: 700, color: NAVY, textAlign: 'right' }}>
                         {(s.anglerPercentage || 0).toFixed(2)}%
                       </td>
                     )}
-                    <td style={{ padding: '0.5rem 0.75rem', color: GREY, textAlign: 'right' }}>
+                    <td style={{ padding: '0.45rem 0.5rem', color: GREY, textAlign: 'right' }}>
                       {s.totalPoints.toFixed(2)}
                     </td>
                     {showWeight && (
-                      <td style={{ padding: '0.5rem 0.75rem', color: GREY, textAlign: 'right' }}>
+                      <td style={{ padding: '0.45rem 0.5rem', color: GREY, textAlign: 'right' }}>
                         {s.totalWeightKg.toFixed(2)}
                       </td>
                     )}
-                    <td style={{ padding: '0.5rem 0.75rem', textAlign: 'center', color: GREY }}>
+                    <td style={{ padding: '0.45rem 0.5rem', textAlign: 'center', color: GREY }}>
                       {s.speciesCount}
                     </td>
-                    <td style={{ padding: '0.5rem 0.75rem', textAlign: 'center', color: GREY }}>
+                    <td style={{ padding: '0.45rem 0.5rem', textAlign: 'center', color: GREY }}>
                       {s.catchCount}
                     </td>
-                    <td style={{ padding: '0.5rem 0.75rem', textAlign: 'right', color: GREY }}>
+                    <td style={{ padding: '0.45rem 0.5rem', textAlign: 'right', color: GREY }}>
                       {anglerOverallCpue?.cpue != null ? anglerOverallCpue.cpue.toFixed(2) : '—'}
                     </td>
                   </tr>
