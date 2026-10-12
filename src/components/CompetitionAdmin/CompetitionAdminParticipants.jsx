@@ -120,7 +120,7 @@ export default function CompetitionAdminParticipants({ competition, config, days
   async function handleSaveEdit() {
     if (!editAngler?.full_name?.trim()) { setError('Name is required'); return }
     setSaving(true); setError('')
-    const { error: err } = await supabase
+    const { data: changed, error: err } = await supabase
       .from('competition_participants')
       .update({
         full_name:      editAngler.full_name.trim(),
@@ -131,7 +131,15 @@ export default function CompetitionAdminParticipants({ competition, config, days
         is_captain:     editAngler.is_captain,
       })
       .eq('id', editingAnglerId)
+      .select('id')
     if (err) { setError(err.message); setSaving(false); return }
+    // The database's row security can skip an update without an error;
+    // treat "no rows changed" as a failed save, never as saved.
+    if (!changed || changed.length === 0) {
+      setError('Not saved: the database did not allow this change to the angler. Nothing was stored — please tell the organiser.')
+      setSaving(false)
+      return
+    }
     setSaving(false)
     setEditingAnglerId(null)
     setEditAngler(null)
