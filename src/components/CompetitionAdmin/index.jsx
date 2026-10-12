@@ -235,6 +235,7 @@ export default function CompetitionAdmin({ competitionId }) {
           config={config}
           days={days}
           boats={boats}
+          teams={teams}
           isAdmin={isAdmin}
           onReload={reloadAll}
         />
