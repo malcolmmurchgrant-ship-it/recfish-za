@@ -39,7 +39,7 @@ const STATUS_LABELS = {
   archived:    'Archived',
 }
 
-export default function CompetitionAdminSetup({ competition, config, days, boats, isAdmin, onReload }) {
+export default function CompetitionAdminSetup({ competition, config, days, boats, teams = [], isAdmin, onReload }) {
   const [editing,  setEditing]  = useState(false)
   const [saving,   setSaving]   = useState(false)
   const [error,    setError]    = useState('')
@@ -85,6 +85,19 @@ export default function CompetitionAdminSetup({ competition, config, days, boats
       .eq('competition_id', competition.id)
     if (!err) setFishingSessions(data || [])
     setLoadingSessions(false)
+  }
+
+  // Team name(s) fishing from a boat, for display beside the boat name in
+  // Boat Times - e.g. "Alter Ego · Motley Crew". A team with the same name
+  // as its boat (e.g. Nenya) isn't repeated.
+  function teamNamesForBoat(boatName) {
+    const key = n => (n || '').trim().toLowerCase()
+    const boat = (boats || []).find(b => key(b.boat_name) === key(boatName))
+    if (!boat) return ''
+    return (teams || [])
+      .filter(t => t.boat_id === boat.id && key(t.team_name) !== key(boatName))
+      .map(t => t.team_name + (t.team_suffix ? ` ${t.team_suffix}` : ''))
+      .join(', ')
   }
 
   // One row per boat for a day, in A-Z order by boat name. Built from the
@@ -506,7 +519,12 @@ export default function CompetitionAdminSetup({ competition, config, days, boats
                           return (
                             <div key={session.id} style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 0.8fr auto', gap: '0.6rem', alignItems: 'center', background: 'white', borderRadius: 6, padding: '0.5rem 0.75rem', border: '1px solid #e5e7eb' }}>
                               <div>
-                                <div style={{ fontWeight: 600, color: NAVY, fontSize: '0.88rem' }}>{session.boat_name}</div>
+                                <div style={{ fontWeight: 600, color: NAVY, fontSize: '0.88rem' }}>
+                                  {session.boat_name}
+                                  {teamNamesForBoat(session.boat_name) && (
+                                    <span style={{ fontWeight: 500, color: '#374151' }}> · {teamNamesForBoat(session.boat_name)}</span>
+                                  )}
+                                </div>
                                 <div style={{ fontSize: '0.75rem', color: GREY }}>{session.skipper_name}</div>
                               </div>
                               <div>
