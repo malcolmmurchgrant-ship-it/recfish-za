@@ -681,7 +681,7 @@ export default function MyCatches() {
               <p style={{ color: '#6b7280' }}>Catches recorded in official SADSAA competitions will appear here once your angler profile is linked to competition entries.</p>
             </div>
           ) : (
-            <CompetitionHistory catches={competitionCatches} facets={Array.isArray(anglerProfile.facets) ? anglerProfile.facets : []} angler={anglerProfile} />
+            <CompetitionHistory catches={competitionCatches} facets={Array.isArray(anglerProfile.facets) ? anglerProfile.facets : []} angler={anglerProfile} userId={user?.id} />
           )}
         </>
       )}
