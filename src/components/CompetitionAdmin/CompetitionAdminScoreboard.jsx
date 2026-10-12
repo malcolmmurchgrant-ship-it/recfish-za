@@ -169,7 +169,16 @@ export default function CompetitionAdminScoreboard({
   // the template's scoring_config rather than a per-row field that never
   // existed.
   const showWeight = config?.scoring?.method !== 'points'
-  const lineClassKg = config?.scoring?.line_class_kg ?? competition?.default_line_class_kg ?? null
+  // Competition-wide line class, used when an angler has none of their own.
+  const lineClassKg = config?.scoring?.line_class_kg ?? competition?.default_line_class_kg ?? config?.scoring?.default_line_class_kg ?? null
+  // Each angler's boat, via their team's boat (fixed-boat formats such as the
+  // CBSC Invitational, e.g. Motley Crew -> Alter Ego). Blank where a team has
+  // no fixed boat (split-boat formats, where boats change by day).
+  const boatNameForTeam = (teamId) => {
+    const team = (teams || []).find(t => t.id === teamId)
+    const boat = team?.boat_id ? (boats || []).find(b => b.id === team.boat_id) : null
+    return boat?.boat_name || null
+  }
 
   return (
     <div>
@@ -227,7 +236,7 @@ export default function CompetitionAdminScoreboard({
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
               <thead>
                 <tr style={{ background: NAVY, color: 'white' }}>
-                  {['Rank','Angler','Team','LC', ...(usesBoatPercentage ? ['Angler %'] : []), 'Points', ...(showWeight ? ['Weight'] : []), 'Species','Catches','CPUE'].map(h => (
+                  {['Rank','Angler','Boat','Team','LC', ...(usesBoatPercentage ? ['Angler %'] : []), 'Points', ...(showWeight ? ['Weight'] : []), 'Species','Catches','CPUE'].map(h => (
                     <th key={h} style={{ padding: '0.5rem 0.75rem', textAlign: h === 'Rank' ? 'center' : 'left', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -251,10 +260,13 @@ export default function CompetitionAdminScoreboard({
                       {s.anglerNumber && <span style={{ color: GREY, fontWeight: 400 }}> #{s.anglerNumber}</span>}
                     </td>
                     <td style={{ padding: '0.5rem 0.75rem', color: GREY, fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
+                      {boatNameForTeam(s.teamId) || '—'}
+                    </td>
+                    <td style={{ padding: '0.5rem 0.75rem', color: GREY, fontSize: '0.82rem', whiteSpace: 'nowrap' }}>
                       {s.teamName || '—'}
                     </td>
-                    <td style={{ padding: '0.5rem 0.75rem', color: GREY, fontSize: '0.82rem', textAlign: 'center' }}>
-                      {lineClassKg ? `${lineClassKg}kg` : '—'}
+                    <td style={{ padding: '0.5rem 0.75rem', color: GREY, fontSize: '0.82rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                      {(s.lineClass || lineClassKg) ? `${s.lineClass || lineClassKg}kg` : '—'}
                     </td>
                     {usesBoatPercentage && (
                       <td style={{ padding: '0.5rem 0.75rem', fontWeight: 700, color: NAVY, textAlign: 'right' }}>
@@ -282,7 +294,7 @@ export default function CompetitionAdminScoreboard({
                   )
                 })}
                 {filteredStandings.length === 0 && (
-                  <tr><td colSpan={showWeight ? 10 : 9} style={{ padding: '1.5rem', textAlign: 'center', color: GREY, fontStyle: 'italic' }}>No catches recorded yet.</td></tr>
+                  <tr><td colSpan={(showWeight ? 11 : 10) + (usesBoatPercentage ? 1 : 0)} style={{ padding: '1.5rem', textAlign: 'center', color: GREY, fontStyle: 'italic' }}>No catches recorded yet.</td></tr>
                 )}
               </tbody>
             </table>
