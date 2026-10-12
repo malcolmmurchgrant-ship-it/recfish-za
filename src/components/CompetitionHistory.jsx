@@ -132,8 +132,81 @@ function CompetitionCard({ group, defaultOpen }) {
   )
 }
 
+// ── Nomination Pack (PDF of the current discipline) ─────────────────────────
+function NominationPackPanel({ catches, discipline, angler }) {
+  const [open, setOpen] = useState(false)
+  const [period, setPeriod] = useState('3')
+  const [includeAll, setIncludeAll] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+  const d = DISCIPLINE_BY_KEY[discipline]
+
+  const download = async () => {
+    setBusy(true); setMsg('')
+    try {
+      // loaded only when needed - keeps the PDF library out of the page load
+      const { buildNominationPack } = await import('../utils/nominationPack')
+      const { doc, name, count } = buildNominationPack({ catches, discipline, period, includeAll, angler })
+      if (!count) { setMsg('No catches in that period - choose a longer one.'); return }
+      doc.save(name)
+      setMsg(`✅ Downloaded: ${count} catch${count === 1 ? '' : 'es'}.`)
+    } catch (e) {
+      console.error('Nomination Pack failed:', e)
+      setMsg('❌ Could not create the PDF: ' + (e.message || e))
+    } finally { setBusy(false) }
+  }
+
+  if (!open) {
+    return (
+      <button type="button" onClick={() => setOpen(true)} data-testid="nomination-open"
+        style={{ padding: '0.55rem 1rem', borderRadius: 8, border: 'none', background: '#16a34a', color: 'white',
+          fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', marginBottom: '1rem' }}>
+        📄 Nomination Pack — {d?.label}
+      </button>
+    )
+  }
+  const label = { display: 'block', fontSize: '0.78rem', fontWeight: 700, color: '#374151', marginBottom: '0.25rem' }
+  return (
+    <div data-testid="nomination-panel" style={{ background: '#f0fdf4', border: '2px solid #86efac', borderRadius: 10, padding: '0.9rem 1rem', marginBottom: '1rem' }}>
+      <div style={{ fontWeight: 800, color: '#166534', marginBottom: '0.3rem' }}>📄 Nomination Pack — {d?.label}</div>
+      <div style={{ fontSize: '0.8rem', color: '#166534', marginBottom: '0.75rem' }}>
+        A PDF to attach to your nomination: your details, a summary, your top 10 catches (Section 15) and your competition record, most recent first.
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.9rem', alignItems: 'flex-end' }}>
+        <div>
+          <label style={label} htmlFor="np-period">Seasons</label>
+          <select id="np-period" value={period} onChange={e => setPeriod(e.target.value)}
+            style={{ padding: '0.45rem 0.6rem', borderRadius: 6, border: '1px solid #d1d5db', fontSize: '0.88rem' }}>
+            <option value="1">This season only</option>
+            <option value="2">Last 2 seasons</option>
+            <option value="3">Last 3 seasons</option>
+            <option value="5">Last 5 seasons</option>
+            <option value="all">All seasons</option>
+          </select>
+        </div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', paddingBottom: '0.45rem' }}>
+          <input type="checkbox" checked={includeAll} onChange={e => setIncludeAll(e.target.checked)} />
+          Add every catch as an appendix
+        </label>
+      </div>
+      <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.85rem', flexWrap: 'wrap' }}>
+        <button type="button" onClick={download} disabled={busy} data-testid="nomination-download"
+          style={{ padding: '0.55rem 1.1rem', borderRadius: 8, border: 'none', background: busy ? '#9ca3af' : '#16a34a',
+            color: 'white', fontWeight: 700, fontSize: '0.88rem', cursor: busy ? 'wait' : 'pointer' }}>
+          {busy ? 'Creating PDF…' : '⬇ Download PDF'}
+        </button>
+        <button type="button" onClick={() => { setOpen(false); setMsg('') }}
+          style={{ padding: '0.55rem 1rem', borderRadius: 8, border: '1px solid #d1d5db', background: 'white', fontSize: '0.85rem', cursor: 'pointer' }}>
+          Close
+        </button>
+      </div>
+      {msg && <div style={{ marginTop: '0.6rem', fontSize: '0.83rem', fontWeight: 600, color: msg.startsWith('✅') ? '#166534' : '#991b1b' }}>{msg}</div>}
+    </div>
+  )
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────────
-export default function CompetitionHistory({ catches, facets = [] }) {
+export default function CompetitionHistory({ catches, facets = [], angler = {} }) {
   const split = useMemo(() => splitByDiscipline(catches), [catches])
   const tabs = useMemo(() => orderedDisciplines(split, facets), [split, facets])
   const [tab, setTab] = useState(() => readTab())
@@ -163,6 +236,10 @@ export default function CompetitionHistory({ catches, facets = [] }) {
         {tabs.map(t => tabBtn(t.key, `${t.icon} ${t.short}`, split[t.key].length))}
         {tabs.length > 1 && tabBtn('all', 'All', Object.values(split).reduce((n, l) => n + l.length, 0))}
       </div>
+
+      {active !== 'all' && (
+        <NominationPackPanel key={active} catches={list} discipline={active} angler={angler} />
+      )}
 
       <SummaryCard discipline={active === 'all' ? 'all' : active} s={summary} />
 
