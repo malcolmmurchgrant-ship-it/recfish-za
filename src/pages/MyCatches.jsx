@@ -50,7 +50,7 @@ export default function MyCatches() {
   const [claimableRecords, setClaimableRecords] = useState([])
   const [claiming, setClaiming] = useState(false)
   const [claimMessage, setClaimMessage] = useState('')
-  const [facets, setFacets] = useState([])   // angler's disciplines (Profile) - orders the tabs
+  const [anglerProfile, setAnglerProfile] = useState({})   // name, club, province, disciplines - for tabs & Nomination Pack
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({ total: 0, released: 0, totalWeight: 0, competitions: 0 })
 
@@ -63,8 +63,10 @@ export default function MyCatches() {
   }
 
   const loadFacets = async () => {
-    const { data } = await supabase.from('users').select('facets').eq('id', user.id).maybeSingle()
-    setFacets(Array.isArray(data?.facets) ? data.facets : [])
+    const { data } = await supabase.from('users')
+      .select('full_name, club_name, province, angler_number, wpdsaa_number, facets')
+      .eq('id', user.id).maybeSingle()
+    setAnglerProfile(data || {})
   }
 
   const loadSocialCatches = async () => {
@@ -679,7 +681,7 @@ export default function MyCatches() {
               <p style={{ color: '#6b7280' }}>Catches recorded in official SADSAA competitions will appear here once your angler profile is linked to competition entries.</p>
             </div>
           ) : (
-            <CompetitionHistory catches={competitionCatches} facets={facets} />
+            <CompetitionHistory catches={competitionCatches} facets={Array.isArray(anglerProfile.facets) ? anglerProfile.facets : []} angler={anglerProfile} />
           )}
         </>
       )}
