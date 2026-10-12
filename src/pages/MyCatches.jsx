@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import CompetitionHistory from '../components/CompetitionHistory'
 import { useAuth } from '../contexts/AuthContext'
 
 // ── Data quality tier config ──────────────────────────────────────────────────
@@ -49,6 +50,7 @@ export default function MyCatches() {
   const [claimableRecords, setClaimableRecords] = useState([])
   const [claiming, setClaiming] = useState(false)
   const [claimMessage, setClaimMessage] = useState('')
+  const [facets, setFacets] = useState([])   // angler's disciplines (Profile) - orders the tabs
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({ total: 0, released: 0, totalWeight: 0, competitions: 0 })
 
@@ -56,8 +58,13 @@ export default function MyCatches() {
 
   const loadAll = async () => {
     setLoading(true)
-    await Promise.all([loadSocialCatches(), loadCompetitionCatches(), loadClaimableRecords()])
+    await Promise.all([loadSocialCatches(), loadCompetitionCatches(), loadClaimableRecords(), loadFacets()])
     setLoading(false)
+  }
+
+  const loadFacets = async () => {
+    const { data } = await supabase.from('users').select('facets').eq('id', user.id).maybeSingle()
+    setFacets(Array.isArray(data?.facets) ? data.facets : [])
   }
 
   const loadSocialCatches = async () => {
@@ -92,7 +99,7 @@ export default function MyCatches() {
         id, created_at, fishing_date, weight_kg, length_cm,
         retained, notes, points, species_name, line_class_kg,
         scoring, angler_verified,
-        competition:competition_id ( id, name, venue, start_date ),
+        competition:competition_id ( id, name, venue, start_date, discipline ),
         day:competition_day_id ( day_number )
       `)
       .eq('angler_id', user.id)
@@ -672,85 +679,7 @@ export default function MyCatches() {
               <p style={{ color: '#6b7280' }}>Catches recorded in official SADSAA competitions will appear here once your angler profile is linked to competition entries.</p>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {/* Group by competition */}
-              {(() => {
-                const grouped = {}
-                competitionCatches.forEach(c => {
-                  const compName = c.competition?.name || 'Unknown Competition'
-                  if (!grouped[compName]) grouped[compName] = { meta: c.competition, catches: [] }
-                  grouped[compName].catches.push(c)
-                })
-                return Object.entries(grouped).map(([compName, group]) => (
-                  <div key={compName} style={{ background: 'white', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
-                    {/* Competition header */}
-                    <div style={{ background: '#1e3a8a', padding: '0.85rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                      <div>
-                        <div style={{ fontWeight: '700', color: 'white', fontSize: '1rem' }}>{compName}</div>
-                        {group.meta && (
-                          <div style={{ fontSize: '0.8rem', color: '#93c5fd', marginTop: '0.15rem' }}>
-                            📍 {group.meta.venue}
-                            {group.meta.start_date && ` · ${new Date(group.meta.start_date).toLocaleDateString('en-ZA', { year: 'numeric', month: 'long' })}`}
-                          </div>
-                        )}
-                      </div>
-                      <span style={{ background: '#fef3c7', color: '#92400e', borderRadius: '12px', padding: '0.25rem 0.75rem', fontSize: '0.8rem', fontWeight: '700' }}>
-                        🥇 {group.catches.length} catch{group.catches.length !== 1 ? 'es' : ''}
-                      </span>
-                    </div>
-
-                    {/* Catches in this competition */}
-                    {group.catches.map((c, i) => (
-                      <div key={c.id} style={{ padding: '1rem 1.25rem', borderBottom: i < group.catches.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
-                          <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '0.35rem' }}>
-                              <span style={{ fontWeight: '700', fontSize: '1rem' }}>
-                                {c.species_name || 'Unknown Species'}
-                              </span>
-                              {!c.retained && (
-                                <span style={{ fontSize: '0.72rem', padding: '0.2rem 0.55rem', background: '#d1fae5', color: '#065f46', borderRadius: '10px', fontWeight: '500' }}>
-                                  ✓ Released
-                                </span>
-                              )}
-                              {c.angler_verified && (
-                                <span style={{ fontSize: '0.72rem', padding: '0.2rem 0.55rem', background: '#ede9fe', color: '#5b21b6', borderRadius: '10px', fontWeight: '500' }}>
-                                  ✓ Angler Verified
-                                </span>
-                              )}
-                            </div>
-                            <div style={{ display: 'flex', gap: '1.25rem', fontSize: '0.85rem', color: '#374151', flexWrap: 'wrap' }}>
-                              {c.fishing_date && (
-                                <div>
-                                  <strong>{c.day?.day_number ? `Day ${c.day.day_number}: ` : ''}</strong>
-                                  {new Date(c.fishing_date).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                </div>
-                              )}
-                              {c.weight_kg && <div><strong>Weight: </strong>{c.weight_kg} kg</div>}
-                              {c.length_cm && <div><strong>Length: </strong>{c.length_cm} cm</div>}
-                              {c.line_class_kg && <div><strong>Line: </strong>{c.line_class_kg} kg</div>}
-                              {c.points > 0 && (
-                                <div style={{ color: '#d97706', fontWeight: '600' }}>
-                                  ★ {c.points} pts
-                                </div>
-                              )}
-                            </div>
-                            {c.notes && (
-                              <p style={{ marginTop: '0.5rem', fontSize: '0.82rem', color: '#6b7280', fontStyle: 'italic' }}>
-                                "{c.notes}"
-                              </p>
-                            )}
-                          </div>
-                          <span style={{ fontSize: '0.72rem', padding: '0.2rem 0.6rem', background: '#fef3c7', color: '#92400e', border: '1px solid #fcd34d', borderRadius: '10px', fontWeight: '600', whiteSpace: 'nowrap' }}>
-                            🥇 TD Verified
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ))
-              })()}
-            </div>
+            <CompetitionHistory catches={competitionCatches} facets={facets} />
           )}
         </>
       )}
