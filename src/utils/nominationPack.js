@@ -10,14 +10,15 @@
 //   4. Competition record, by year (newest first)
 //   5. Optional appendix - every catch, by year and competition
 //
-// Team / individual placings (Sections 13, 17 & 19) are NOT included: they
-// come from official results, not from catches. The pack says so.
+// Team, boat and skipper, and team / individual placings (Sections 13, 17 &
+// 19) where available - see anglerPlacings.js for when placings are given.
 
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import {
   DISCIPLINE_BY_KEY, summarise, outstandingCatches, groupByYearAndCompetition, yearOfCatch,
 } from './catchDisciplines'
+import { placeText } from './anglerPlacings'
 
 const NAVY = [30, 58, 138]
 const GOLD_BG = [254, 243, 199]
@@ -46,7 +47,7 @@ export function periodLabel(period, catches) {
   return `Last ${period} season${Number(period) === 1 ? '' : 's'} (${span})`
 }
 
-export function buildNominationPack({ catches, discipline, period = 'all', includeAll = true, angler = {} }) {
+export function buildNominationPack({ catches, discipline, period = 'all', includeAll = true, angler = {}, placings = {} }) {
   const d = DISCIPLINE_BY_KEY[discipline] || { label: 'All disciplines' }
   const list = filterByPeriod(catches, period)
   const s = summarise(list)
@@ -158,38 +159,51 @@ export function buildNominationPack({ catches, discipline, period = 'all', inclu
   // ── 4. Competition record by year ─────────────────────────────────────────
   section('4. Competition Record (most recent first)')
   const compRows = []
+  let anyPlacing = false, anyMissing = false
   for (const yr of years) {
-    compRows.push([{ content: String(yr.year), colSpan: 6, styles: { fontStyle: 'bold', fillColor: PALE, textColor: NAVY } }])
+    compRows.push([{ content: String(yr.year), colSpan: 7, styles: { fontStyle: 'bold', fillColor: PALE, textColor: NAVY } }])
     for (const g of yr.competitions) {
       const pts = g.catches.reduce((t, c) => t + n(c.points), 0)
-      const heavy = g.catches.reduce((b, c) => (n(c.weight_kg) > n(b?.weight_kg) ? c : b), null)
       const rel = g.catches.filter(c => c.retained === false).length
+      const pl = placings[g.competition?.id] || {}
+      const crew = [pl.team, pl.boat && `Boat: ${pl.boat}`, pl.skipper && `Skipper: ${pl.skipper}`].filter(Boolean).join('\n')
+      const teamPl = placeText(pl.teamPlace, pl.teamCount)
+      const indPl = placeText(pl.anglerPlace, pl.anglerCount)
+      if (teamPl || indPl) anyPlacing = true; else anyMissing = true
       compRows.push([
-        g.competition?.name || 'Unknown competition',
-        g.competition?.venue || '',
+        (g.competition?.name || 'Unknown competition') + (g.competition?.venue ? `\n${g.competition.venue}` : ''),
         monthYear(g.competition?.start_date || g.catches[0]?.fishing_date),
+        crew || '—',
+        teamPl || '—',
+        indPl || '—',
         String(g.catches.length) + (showReleases && rel ? ` (${rel} rel.)` : ''),
         fmtNum(pts),
-        heavy ? `${fmtNum(heavy.weight_kg)} kg ${heavy.species_name}` : '',
       ])
     }
   }
   autoTable(doc, {
     startY: y, margin: { left: M, right: M }, theme: 'grid',
-    headStyles: { fillColor: NAVY, textColor: 255, fontSize: 8.5 },
-    styles: { fontSize: 8.5, cellPadding: 1.5, textColor: DARK },
-    head: [['Competition', 'Venue', 'Date', 'Catches', 'Points', 'Heaviest fish']],
+    headStyles: { fillColor: NAVY, textColor: 255, fontSize: 8 },
+    styles: { fontSize: 8, cellPadding: 1.4, textColor: DARK, valign: 'middle' },
+    head: [['Competition', 'Date', 'Team / Boat / Skipper', 'Team place', 'Individual place', 'Catches', 'Points']],
     body: compRows,
-    columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' } },
+    columnStyles: {
+      0: { cellWidth: 50 }, 1: { cellWidth: 17 }, 2: { cellWidth: 42 },
+      3: { halign: 'center', fontStyle: 'bold' }, 4: { halign: 'center', fontStyle: 'bold' },
+      5: { halign: 'right' }, 6: { halign: 'right' },
+    },
   })
   y = doc.lastAutoTable.finalY + 6
 
-  doc.setFont('helvetica', 'italic'); doc.setFontSize(8.5); doc.setTextColor(...GRAY)
-  const note = doc.splitTextToSize(
-    'Team and individual placings (Nomination Form Sections 13, 17 & 19) are not part of this record — ' +
-    'please confirm them from the official tournament results (available from your Provincial Secretary).', W - 2 * M)
-  if (y + note.length * 4 > 285) { doc.addPage(); y = 16 }
-  doc.text(note, M, y); y += note.length * 4 + 4
+  const notes = []
+  if (anyPlacing) notes.push('Placings are calculated by RecFish ZA from the published competition results — the same standings shown on the official RecFish ZA scoreboard.')
+  if (anyMissing) notes.push('"—" means no placing is available: the competition was imported from a post-event catch return without scoring, or its results have not been published yet.')
+  if (notes.length) {
+    doc.setFont('helvetica', 'italic'); doc.setFontSize(8.5); doc.setTextColor(...GRAY)
+    const note = doc.splitTextToSize(notes.join(' '), W - 2 * M)
+    if (y + note.length * 4 > 285) { doc.addPage(); y = 16 }
+    doc.text(note, M, y); y += note.length * 4 + 4
+  }
 
   // ── 5. Appendix - every catch ─────────────────────────────────────────────
   if (includeAll && list.length) {

@@ -9,6 +9,8 @@ import {
   DISCIPLINE_BY_KEY, splitByDiscipline, orderedDisciplines, summarise,
   outstandingCatches, groupByYearAndCompetition,
 } from '../utils/catchDisciplines'
+import { supabase } from '../lib/supabase'
+import { loadAnglerPlacings, placeText } from '../utils/anglerPlacings'
 
 const NAVY = '#1e3a8a'
 const GOLD = '#92400e'
@@ -105,7 +107,7 @@ function SummaryCard({ discipline, s }) {
 }
 
 // ── Competition card (collapsible) ───────────────────────────────────────────
-function CompetitionCard({ group, defaultOpen }) {
+function CompetitionCard({ group, defaultOpen, placing }) {
   const [open, setOpen] = useState(defaultOpen)
   const comp = group.competition || {}
   const total = group.catches.reduce((n, c) => n + (Number(c.points) || 0), 0)
@@ -119,6 +121,17 @@ function CompetitionCard({ group, defaultOpen }) {
           <div style={{ fontSize: '0.78rem', color: '#93c5fd', marginTop: '0.1rem' }}>
             {comp.venue && `📍 ${comp.venue}`}{comp.start_date && ` · ${fmtDate(comp.start_date, { month: 'long', year: 'numeric' })}`}
           </div>
+          {placing && (placing.team || placing.boat) && (
+            <div style={{ fontSize: '0.78rem', color: '#e0e7ff', marginTop: '0.15rem' }}>
+              {placing.team && `👥 ${placing.team}`}{placing.boat && ` · 🚤 ${placing.boat}`}{placing.skipper && ` · Skipper ${placing.skipper}`}
+            </div>
+          )}
+          {placing?.placingsAvailable && (
+            <div data-testid="placing" style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.35rem' }}>
+              {placing.teamPlace && <span style={{ background: '#fde68a', color: GOLD, borderRadius: 10, padding: '0.1rem 0.5rem', fontSize: '0.74rem', fontWeight: 800 }}>Team {placeText(placing.teamPlace, placing.teamCount)}</span>}
+              {placing.anglerPlace && <span style={{ background: '#fde68a', color: GOLD, borderRadius: 10, padding: '0.1rem 0.5rem', fontSize: '0.74rem', fontWeight: 800 }}>Individual {placeText(placing.anglerPlace, placing.anglerCount)}</span>}
+            </div>
+          )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <span style={{ background: '#fef3c7', color: GOLD, borderRadius: 12, padding: '0.2rem 0.65rem', fontSize: '0.78rem', fontWeight: 700 }}>
@@ -133,7 +146,7 @@ function CompetitionCard({ group, defaultOpen }) {
 }
 
 // ── Nomination Pack (PDF of the current discipline) ─────────────────────────
-function NominationPackPanel({ catches, discipline, angler }) {
+function NominationPackPanel({ catches, discipline, angler, placings }) {
   const [open, setOpen] = useState(false)
   const [period, setPeriod] = useState('3')
   const [includeAll, setIncludeAll] = useState(true)
@@ -146,7 +159,7 @@ function NominationPackPanel({ catches, discipline, angler }) {
     try {
       // loaded only when needed - keeps the PDF library out of the page load
       const { buildNominationPack } = await import('../utils/nominationPack')
-      const { doc, name, count } = buildNominationPack({ catches, discipline, period, includeAll, angler })
+      const { doc, name, count } = buildNominationPack({ catches, discipline, period, includeAll, angler, placings })
       if (!count) { setMsg('No catches in that period - choose a longer one.'); return }
       doc.save(name)
       setMsg(`✅ Downloaded: ${count} catch${count === 1 ? '' : 'es'}.`)
@@ -206,7 +219,15 @@ function NominationPackPanel({ catches, discipline, angler }) {
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
-export default function CompetitionHistory({ catches, facets = [], angler = {} }) {
+export default function CompetitionHistory({ catches, facets = [], angler = {}, userId }) {
+  // Team / boat / skipper and placings per competition (loaded once).
+  const [placings, setPlacings] = useState({})
+  useEffect(() => {
+    let live = true
+    if (userId && catches.length) loadAnglerPlacings(supabase, userId).then(p => { if (live) setPlacings(p) })
+    return () => { live = false }
+  }, [userId, catches.length])
+
   const split = useMemo(() => splitByDiscipline(catches), [catches])
   const tabs = useMemo(() => orderedDisciplines(split, facets), [split, facets])
   const [tab, setTab] = useState(() => readTab())
@@ -238,7 +259,7 @@ export default function CompetitionHistory({ catches, facets = [], angler = {} }
       </div>
 
       {active !== 'all' && (
-        <NominationPackPanel key={active} catches={list} discipline={active} angler={angler} />
+        <NominationPackPanel key={active} catches={list} discipline={active} angler={angler} placings={placings} />
       )}
 
       <SummaryCard discipline={active === 'all' ? 'all' : active} s={summary} />
@@ -270,7 +291,7 @@ export default function CompetitionHistory({ catches, facets = [], angler = {} }
           </div>
           {y.competitions.map((g, gi) => (
             <CompetitionCard key={(g.competition?.id || g.competition?.name || gi) + active}
-              group={g} defaultOpen={yi === 0 && gi === 0 && g.catches.length <= 15} />
+              group={g} placing={placings[g.competition?.id]} defaultOpen={yi === 0 && gi === 0 && g.catches.length <= 15} />
           ))}
         </div>
       ))}
