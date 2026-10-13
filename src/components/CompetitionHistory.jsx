@@ -150,23 +150,58 @@ function NominationPackPanel({ catches, discipline, angler, placings }) {
   const [open, setOpen] = useState(false)
   const [period, setPeriod] = useState('3')
   const [includeAll, setIncludeAll] = useState(true)
-  const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
   const d = DISCIPLINE_BY_KEY[discipline]
 
-  const download = async () => {
-    setBusy(true); setMsg('')
+  // The PDF code is loaded when the panel opens, so that tapping Download
+  // runs straight away. Phones only allow a download or the Share sheet
+  // directly from a tap - waiting for code to load first made some phones
+  // silently ignore the download while the page still said "Downloaded".
+  const [builder, setBuilder] = useState(null)
+  const [fileUrl, setFileUrl] = useState(null)      // fallback "Open the PDF" link
+  const [fileName, setFileName] = useState('')
+  useEffect(() => {
+    if (!open || builder) return
+    import('../utils/nominationPack').then(m => setBuilder(() => m.buildNominationPack))
+      .catch(e => setMsg('❌ Could not load the PDF maker: ' + (e.message || e)))
+  }, [open, builder])
+  useEffect(() => () => { if (fileUrl) URL.revokeObjectURL(fileUrl) }, [fileUrl])
+
+  const isPhone = typeof navigator !== 'undefined' &&
+    (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent)))
+
+  const download = () => {
+    if (!builder) { setMsg('One moment - the PDF maker is still loading. Tap again in a second.'); return }
+    setMsg('')
+    let built
     try {
-      // loaded only when needed - keeps the PDF library out of the page load
-      const { buildNominationPack } = await import('../utils/nominationPack')
-      const { doc, name, count } = buildNominationPack({ catches, discipline, period, includeAll, angler, placings })
-      if (!count) { setMsg('No catches in that period - choose a longer one.'); return }
-      doc.save(name)
-      setMsg(`✅ Downloaded: ${count} catch${count === 1 ? '' : 'es'}.`)
+      built = builder({ catches, discipline, period, includeAll, angler, placings })
     } catch (e) {
       console.error('Nomination Pack failed:', e)
-      setMsg('❌ Could not create the PDF: ' + (e.message || e))
-    } finally { setBusy(false) }
+      setMsg('❌ Could not create the PDF: ' + (e.message || e)); return
+    }
+    const { doc, name, count } = built
+    if (!count) { setMsg('No catches in that period - choose a longer one.'); return }
+    const blob = doc.output('blob')
+    if (fileUrl) URL.revokeObjectURL(fileUrl)
+    setFileUrl(URL.createObjectURL(blob)); setFileName(name)
+    const done = `✅ PDF ready (${count} catch${count === 1 ? '' : 'es'}).`
+
+    // Phones: open the Share sheet - "Save to Files", Drive, WhatsApp, email...
+    let file = null
+    try { file = new File([blob], name, { type: 'application/pdf' }) } catch { /* old browser */ }
+    if (isPhone && file && navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: name })
+        .then(() => setMsg(done + ' Shared / saved.'))
+        .catch(err => {
+          if (err?.name === 'AbortError') setMsg(done + ' Use "Open the PDF" below if you still need it.')
+          else { doc.save(name); setMsg(done + ' If it does not appear in Downloads, tap "Open the PDF" below.') }
+        })
+      return
+    }
+    // Computers (and phones without sharing): normal download.
+    doc.save(name)
+    setMsg(done + (isPhone ? ' If it does not appear in Downloads, tap "Open the PDF" below.' : ' Check your Downloads folder.'))
   }
 
   if (!open) {
@@ -203,17 +238,23 @@ function NominationPackPanel({ catches, discipline, angler, placings }) {
         </label>
       </div>
       <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.85rem', flexWrap: 'wrap' }}>
-        <button type="button" onClick={download} disabled={busy} data-testid="nomination-download"
-          style={{ padding: '0.55rem 1.1rem', borderRadius: 8, border: 'none', background: busy ? '#9ca3af' : '#16a34a',
-            color: 'white', fontWeight: 700, fontSize: '0.88rem', cursor: busy ? 'wait' : 'pointer' }}>
-          {busy ? 'Creating PDF…' : '⬇ Download PDF'}
+        <button type="button" onClick={download} disabled={!builder} data-testid="nomination-download"
+          style={{ padding: '0.55rem 1.1rem', borderRadius: 8, border: 'none', background: !builder ? '#9ca3af' : '#16a34a',
+            color: 'white', fontWeight: 700, fontSize: '0.88rem', cursor: !builder ? 'wait' : 'pointer' }}>
+          {!builder ? 'Preparing…' : isPhone ? '⬇ Save / Share PDF' : '⬇ Download PDF'}
         </button>
         <button type="button" onClick={() => { setOpen(false); setMsg('') }}
           style={{ padding: '0.55rem 1rem', borderRadius: 8, border: '1px solid #d1d5db', background: 'white', fontSize: '0.85rem', cursor: 'pointer' }}>
           Close
         </button>
       </div>
-      {msg && <div style={{ marginTop: '0.6rem', fontSize: '0.83rem', fontWeight: 600, color: msg.startsWith('✅') ? '#166534' : '#991b1b' }}>{msg}</div>}
+      {msg && <div data-testid="nomination-msg" style={{ marginTop: '0.6rem', fontSize: '0.83rem', fontWeight: 600, color: msg.startsWith('✅') ? '#166534' : '#991b1b' }}>{msg}</div>}
+      {fileUrl && (
+        <a href={fileUrl} download={fileName} target="_blank" rel="noopener noreferrer" data-testid="nomination-open-pdf"
+          style={{ display: 'inline-block', marginTop: '0.5rem', fontSize: '0.85rem', fontWeight: 700, color: '#166534' }}>
+          📄 Open the PDF ({fileName})
+        </a>
+      )}
     </div>
   )
 }
