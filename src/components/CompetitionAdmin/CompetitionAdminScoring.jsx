@@ -78,10 +78,12 @@ export default function CompetitionAdminScoring({
 
   // Moved above cpueData - it's used there for the CPUE boat_id fallback,
   // and needs to exist before that call, not after it.
+  // Sorted A-Z so the Team dropdown is easy to scan (it was in whatever
+  // order the anglers happened to load).
   const teams = [...new Map(
     participants.filter(p => p.competition_teams)
       .map(p => [p.team_id, p.competition_teams])
-  ).values()]
+  ).values()].sort((a, b) => (a.team_name || a.province || '').localeCompare(b.team_name || b.province || ''))
 
   // Predator-damaged fish are recorded for adjudication but are not catches: left out of CPUE.
   const cpueData = buildCpueData(catches.filter(c => c.data_quality !== 'rejected' && !isPredatorCatch(c)), participants, days, boats, fishingSessions, teams)
