@@ -80,7 +80,7 @@ export default function CompetitionAdminParticipants({ competition, config, days
   // ── Add angler ────────────────────────────────────────────────────────────
   async function handleAddAngler() {
     setSaving(true); setError('')
-    const { error: err } = await supabase
+    const { data: added, error: err } = await supabase
       .from('competition_participants')
       .insert({
         competition_id: competition.id,
@@ -92,7 +92,12 @@ export default function CompetitionAdminParticipants({ competition, config, days
         is_captain:     newAngler.is_captain,
         status:         'registered',
       })
+      .select('id')
     if (err) { setError(err.message); setSaving(false); return }
+    if (!added || added.length === 0) {
+      setError('Not saved: the database did not allow adding this angler. Nothing was stored.')
+      setSaving(false); return
+    }
     setNewAngler({ full_name: '', angler_number: '', team_id: '', line_class_kg: '', category: 'open', is_captain: false })
     setAddingAngler(false)
     setSaving(false)
@@ -183,7 +188,11 @@ export default function CompetitionAdminParticipants({ competition, config, days
 
   const lineClasses = config?.scoring?.line_class?.available_classes || []
   const hasLineClass = config?.scoring?.line_class?.enabled
-  const hasTeams = config?.team?.has_teams
+  // Show the Team field whenever the competition actually has teams - not
+  // only when its scoring template says so. Some competitions (e.g. the CBSC
+  // Invitational, one team per boat) have teams but no template flag, which
+  // left no way to put a new angler on a boat.
+  const hasTeams = !!config?.team?.has_teams || teams.length > 0
 
   const filtered = participants.filter(p =>
     !search || p.full_name?.toLowerCase().includes(search.toLowerCase()) ||
