@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
+import BoatsAndTeams from './BoatsAndTeams'
 
 const NAVY = '#1e3a8a'
 const GREY = '#6b7280'
@@ -428,6 +429,12 @@ export default function CompetitionAdminSetup({ competition, config, days, boats
           </div>
         )}
       </div>
+
+      {/* ── Boats & Teams (add / edit / remove) ──────────────────────────── */}
+      {isAdmin && (
+        <BoatsAndTeams competition={competition} boats={boats} teams={teams}
+          onChanged={() => { onReload?.(); loadFishingSessions() }} />
+      )}
 
       {/* ── Day / Session management ─────────────────────────────────────── */}
       {days?.length > 0 && (
