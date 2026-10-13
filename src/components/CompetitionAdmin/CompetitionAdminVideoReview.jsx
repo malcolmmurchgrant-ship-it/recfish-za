@@ -12,6 +12,12 @@
 // Both are permanent decisions from this screen's point of view - see
 // UniversalCatchLogger.jsx's videoAlreadyDecided handling, which respects
 // whatever gets set here and never silently resets it.
+//
+// Evidence trail: every decided release stays listed under "Decided" (all of
+// them, not just the latest), with its video playable in place, who decided,
+// when, and the note. Reset to Pending asks for a reason and keeps the earlier
+// decision in the catch's verification note as history - it never erases it.
+// Videos are never deleted by the app.
 
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
@@ -29,7 +35,6 @@ const S = {
   label:  { fontSize: '0.78rem', fontWeight: 700, color: GREY, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4, display: 'block' },
 }
 
-const RECENT_LIMIT = 20
 
 export default function CompetitionAdminVideoReview({ competitionId, isVideoVerifier, onReload }) {
   const { user } = useAuth()
@@ -40,6 +45,15 @@ export default function CompetitionAdminVideoReview({ competitionId, isVideoVeri
   const [busyId, setBusyId] = useState(null)
   const [noteDrafts, setNoteDrafts] = useState({})
   const [showRecent, setShowRecent] = useState(false)
+  const [names, setNames] = useState({})          // user id -> name, for "decided by"
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [dayFilter, setDayFilter] = useState('all')
+  const [search, setSearch] = useState('')
+  const [openVideo, setOpenVideo] = useState(null) // id of the decided release whose video is open
+
+  const myName = user?.user_metadata?.full_name || user?.email || 'Video Verifier'
+  const nameOf = (id) => !id ? '' : id === user?.id ? myName : (names[id] || 'another verifier')
+  const fmtWhen = (iso) => { try { return new Date(iso).toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) } catch { return '' } }
 
   const loadAll = async () => {
     setLoading(true)
@@ -47,7 +61,7 @@ export default function CompetitionAdminVideoReview({ competitionId, isVideoVeri
 
     const baseSelect = `
         id, species_name, pending_points, points, video_url, measured_min_size,
-        fishing_date, created_at, video_status, verified_at, verification_note,
+        fishing_date, created_at, video_status, verified_at, verified_by, verification_note,
         competition_participants ( full_name ),
         competition_teams ( team_name ),
         competition_boats ( boat_name ),
@@ -67,7 +81,7 @@ export default function CompetitionAdminVideoReview({ competitionId, isVideoVeri
         .eq('competition_id', competitionId)
         .in('video_status', ['verified', 'not_verified'])
         .order('verified_at', { ascending: false })
-        .limit(RECENT_LIMIT),
+        .range(0, 4999),
     ])
 
     if (pendingError || recentError) {
@@ -75,6 +89,13 @@ export default function CompetitionAdminVideoReview({ competitionId, isVideoVeri
     } else {
       setPending(pendingData || [])
       setRecent(recentData || [])
+      // Names of whoever decided. Owners/admins can look these up; anyone
+      // else sees their own name and "another verifier" for the rest.
+      const ids = [...new Set((recentData || []).map(r => r.verified_by).filter(Boolean))]
+      if (ids.length) {
+        const { data: users } = await supabase.rpc('lookup_users_by_ids', { lookup_ids: ids })
+        if (Array.isArray(users)) setNames(Object.fromEntries(users.map(u => [u.id, u.full_name || u.email])))
+      }
     }
     setLoading(false)
   }
@@ -89,7 +110,9 @@ export default function CompetitionAdminVideoReview({ competitionId, isVideoVeri
     setError('')
 
     const item = pending.find(p => p.id === catchId)
-    const note = noteDrafts[catchId] || ''
+    // Keep any history left by an earlier Reset to Pending under the new note.
+    const history = (item?.verification_note || '').trim()
+    const note = [String(noteDrafts[catchId] || '').trim(), history].filter(Boolean).join('\n')
 
     // pending_points is deliberately left as-is here, not cleared to null
     // - keeping the real computed value around means a wrongly-decided
@@ -138,24 +161,37 @@ export default function CompetitionAdminVideoReview({ competitionId, isVideoVeri
   }
 
   const resetToPending = async (catchId) => {
+    const item = recent.find(r => r.id === catchId)
+    const reason = window.prompt('Why is this release going back to Pending? (kept in its record)')
+    if (reason === null) return
+    if (!reason.trim()) { setError('Please give a reason for resetting - it is kept as part of the record.'); return }
     setBusyId(catchId)
     setError('')
+    const was = item?.video_status === 'verified' ? 'Verified' : 'Not Verified'
+    const entry = `[Reset to Pending ${fmtWhen(new Date().toISOString())} by ${myName}: ${reason.trim()}. ` +
+      `Was ${was} by ${nameOf(item?.verified_by)} on ${fmtWhen(item?.verified_at)}` +
+      `${item?.verification_note ? ` - note: ${item.verification_note}` : ''}]`
 
-    const { error: updateError } = await supabase
+    const { data: changed, error: updateError } = await supabase
       .from('competition_catches')
       .update({
         video_status: 'pending',
         points: 0,
         verified_by: null,
         verified_at: null,
-        verification_note: null,
+        verification_note: entry,
       })
       .eq('id', catchId)
+      .select('id')
 
     setBusyId(null)
 
     if (updateError) {
       setError('Failed to reset: ' + updateError.message)
+      return
+    }
+    if (!changed || changed.length === 0) {
+      setError('Reset NOT saved: the database did not allow this change. The decision stands.')
       return
     }
 
@@ -207,8 +243,8 @@ export default function CompetitionAdminVideoReview({ competitionId, isVideoVeri
         <div style={{ fontSize: '0.85rem', color: GREY }}>
           Review each release's video — in the app if one is attached, otherwise the one
           sent to you (e.g. by WhatsApp) — judge whether the fish met the minimum size, then decide. Made a wrong call?
-          Open "Recently decided" below and use Reset to Pending — that puts it straight
-          back in this queue for another look, rather than editing the catch directly.
+          Open "Decided releases" below and use Reset to Pending (with a reason) — that puts it
+          back in this queue for another look. The earlier decision is kept in its history.
         </div>
       </div>
 
@@ -267,6 +303,12 @@ export default function CompetitionAdminVideoReview({ competitionId, isVideoVeri
                 {item.measured_min_size ? '✓ Confirmed by scorer at logging' : '👁 Judge from the video — if it looks under the minimum, choose Not Verified'}
               </div>
 
+              {item.verification_note && (
+                <div style={{ fontSize: '0.78rem', color: ORANGE, background: '#fff7ed', borderRadius: 6, padding: '0.4rem 0.55rem', marginBottom: 8, whiteSpace: 'pre-line' }}>
+                  <strong>History:</strong> {item.verification_note}
+                </div>
+              )}
+
               <span style={S.label}>Points if verified</span>
               <div style={{ marginBottom: 12, fontWeight: 700, fontSize: '1.1rem', color: NAVY }}>
                 {item.pending_points ?? 0} pts
@@ -306,46 +348,94 @@ export default function CompetitionAdminVideoReview({ competitionId, isVideoVeri
         </div>
       ))}
 
-      <div style={{ ...S.card, cursor: 'pointer' }} onClick={() => setShowRecent(s => !s)}>
+      <div style={{ ...S.card, cursor: 'pointer' }} onClick={() => setShowRecent(s => !s)} data-testid="decided-toggle">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontWeight: 700, color: NAVY }}>
-            Recently decided (last {recent.length})
+            Decided releases ({recent.length}) — {recent.filter(r => r.video_status === 'verified').length} verified · {recent.filter(r => r.video_status === 'not_verified').length} not verified
           </div>
           <div style={{ color: GREY }}>{showRecent ? '▲ Hide' : '▼ Show'}</div>
         </div>
       </div>
 
-      {showRecent && recent.map(item => (
-        <div key={item.id} style={{ ...S.card, borderLeft: `4px solid ${item.video_status === 'verified' ? GREEN : RED}` }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-            <div>
-              <span style={{
-                display: 'inline-block', padding: '0.15rem 0.6rem', borderRadius: 12, fontSize: '0.75rem',
-                fontWeight: 700, color: 'white', background: item.video_status === 'verified' ? GREEN : RED, marginRight: 8,
-              }}>
-                {item.video_status === 'verified' ? '✓ Verified' : '✗ Not Verified'}
-              </span>
-              <strong>{item.species_name}</strong> — {item.competition_participants?.full_name || 'Unknown angler'}
-              <div style={{ fontSize: '0.8rem', color: GREY }}>
-                {item.competition_teams?.team_name} · Day {item.competition_days?.day_number} ·{' '}
-                {item.points} pts ·{' '}
-                {item.verified_at ? new Date(item.verified_at).toLocaleString() : ''}
-              </div>
+      {showRecent && (() => {
+        const days = [...new Set(recent.map(r => r.competition_days?.day_number).filter(Boolean))].sort((a, b) => a - b)
+        const q = search.trim().toLowerCase()
+        const shown = recent.filter(r =>
+          (statusFilter === 'all' || r.video_status === statusFilter) &&
+          (dayFilter === 'all' || String(r.competition_days?.day_number) === dayFilter) &&
+          (!q || [r.competition_participants?.full_name, r.competition_teams?.team_name, r.competition_boats?.boat_name, r.species_name]
+                  .some(v => (v || '').toLowerCase().includes(q))))
+        const ctl = { padding: '0.45rem 0.55rem', borderRadius: 6, border: '1px solid #d1d5db', fontSize: '0.85rem' }
+        return (
+          <>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={ctl} data-testid="decided-status">
+                <option value="all">All decisions</option>
+                <option value="verified">Verified</option>
+                <option value="not_verified">Not Verified</option>
+              </select>
+              <select value={dayFilter} onChange={e => setDayFilter(e.target.value)} style={ctl}>
+                <option value="all">All days</option>
+                {days.map(d => <option key={d} value={String(d)}>Day {d}</option>)}
+              </select>
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Angler, boat, team or species…" style={{ ...ctl, flex: 1, minWidth: 180 }} data-testid="decided-search" />
             </div>
-            <button
-              onClick={() => resetToPending(item.id)}
-              disabled={busyId === item.id}
-              style={{
-                background: ORANGE, color: 'white', border: 'none', borderRadius: 6,
-                padding: '0.5rem 0.9rem', fontWeight: 700, cursor: busyId === item.id ? 'not-allowed' : 'pointer',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              ↺ Reset to Pending
-            </button>
-          </div>
-        </div>
-      ))}
+            {shown.length === 0 && <div style={{ ...S.card, textAlign: 'center', color: GREY }}>No decided releases match.</div>}
+            {shown.map(item => (
+              <div key={item.id} data-testid="decided-item" style={{ ...S.card, borderLeft: `4px solid ${item.video_status === 'verified' ? GREEN : RED}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem' }}>
+                  <div style={{ flex: 1, minWidth: 220 }}>
+                    <span style={{
+                      display: 'inline-block', padding: '0.15rem 0.6rem', borderRadius: 12, fontSize: '0.75rem',
+                      fontWeight: 700, color: 'white', background: item.video_status === 'verified' ? GREEN : RED, marginRight: 8,
+                    }}>
+                      {item.video_status === 'verified' ? '✓ Verified' : '✗ Not Verified'}
+                    </span>
+                    <strong>{item.species_name}</strong> — {item.competition_participants?.full_name || 'Unknown angler'}
+                    <div style={{ fontSize: '0.8rem', color: GREY, marginTop: 2 }}>
+                      {item.competition_teams?.team_name} · {item.competition_boats?.boat_name} · Day {item.competition_days?.day_number} · {item.points} pts
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: '#374151', marginTop: 4 }} data-testid="decided-by">
+                      Decided by <strong>{nameOf(item.verified_by)}</strong>{item.verified_at ? ` · ${fmtWhen(item.verified_at)}` : ''}
+                    </div>
+                    {item.verification_note && (
+                      <div style={{ fontSize: '0.8rem', color: '#374151', background: '#f9fafb', borderRadius: 6, padding: '0.4rem 0.55rem', marginTop: 6, whiteSpace: 'pre-line' }}>
+                        <strong>Note:</strong> {item.verification_note}
+                      </div>
+                    )}
+                    <div style={{ marginTop: 8 }}>
+                      {item.video_url ? (
+                        openVideo === item.id ? (
+                          <video src={item.video_url} controls autoPlay data-testid="decided-video"
+                            style={{ width: 300, maxWidth: '100%', borderRadius: 6, background: '#000', display: 'block' }} />
+                        ) : (
+                          <button onClick={() => setOpenVideo(item.id)} data-testid="decided-watch"
+                            style={{ background: NAVY, color: 'white', border: 'none', borderRadius: 6, padding: '0.4rem 0.8rem', fontWeight: 600, cursor: 'pointer' }}>
+                            ▶ Watch video
+                          </button>
+                        )
+                      ) : (
+                        <span style={{ fontSize: '0.8rem', color: GREY }}>📱 No video in the app (checked from WhatsApp)</span>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => resetToPending(item.id)}
+                    disabled={busyId === item.id}
+                    style={{
+                      background: ORANGE, color: 'white', border: 'none', borderRadius: 6,
+                      padding: '0.5rem 0.9rem', fontWeight: 700, cursor: busyId === item.id ? 'not-allowed' : 'pointer',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    ↺ Reset to Pending
+                  </button>
+                </div>
+              </div>
+            ))}
+          </>
+        )
+      })()}
     </div>
   )
 }
