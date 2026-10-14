@@ -21,6 +21,8 @@
 // one catch recorded, numbered in date order. The competition has five
 // calendar days (20-24 Oct), so the 2nd fishing day might be calendar Day 3.
 
+import { heaviestTunaRuleOn, pickScoringTuna, isRuleTunaName, isYellowfinName, isBigeyeOrBluefinName } from './heaviestTunaRule'
+
 const DAILY_PRIZE_DAYS = 3
 
 const isYellowfin = (name) => /yellow\s*fin/i.test(name || '')
@@ -94,7 +96,7 @@ export function ordinal(n) {
 // participants / teams / boats / days: the competition's rows.
 // upToFishingDay: include fishing days 1..N only (null = every day fished).
 export function computeInvitationalPrizes({
-  catches = [], participants = [], teams = [], boats = [], days = [], upToFishingDay = null,
+  catches = [], participants = [], teams = [], boats = [], days = [], upToFishingDay = null, scoringConfig = null,
 }) {
   const warnings = []
 
@@ -143,6 +145,41 @@ export function computeInvitationalPrizes({
     .filter(c => fishingDayOf[dayIdOf(c)] && fishingDayOf[dayIdOf(c)] <= lastDay)
     .map(c => ({ ...c, _fishingDay: fishingDayOf[dayIdOf(c)], _person: participantOf(c) }))
 
+  // ── Yellowfin / Bigeye / Southern Bluefin rule (heaviestTunaRule.js) ────
+  // Only the heaviest of an angler's weighed YF / BE / SBT each day scores.
+  // The Catch Logger saves the lighter one with 0 points; this re-checks the
+  // saved points so a fish whose points don't follow the rule is flagged.
+  const ruleOn = heaviestTunaRuleOn(scoringConfig)
+  const byAnglerDay = {}
+  for (const c of inScope) {
+    if (!isWeighedCatch(c) || !isRuleTunaName(c.species_name)) continue
+    const key = `${c._person?.id}|${c._fishingDay}`
+    ;(byAnglerDay[key] = byAnglerDay[key] || []).push(c)
+  }
+  const ruleProblems = []
+  let bothWeighedNoRule = 0
+  for (const group of Object.values(byAnglerDay)) {
+    if (group.length < 2) continue
+    if (!ruleOn) {
+      if (group.some(c => isYellowfinName(c.species_name)) && group.some(c => isBigeyeOrBluefinName(c.species_name))) bothWeighedNoRule++
+      continue
+    }
+    const winner = pickScoringTuna(group)
+    for (const c of group) {
+      const pts = num(c.points)
+      if ((c !== winner && pts > 0) || (c === winner && pts <= 0)) {
+        ruleProblems.push(`${c._person?.full_name || 'Unknown'} (Fishing Day ${c._fishingDay})`)
+        break
+      }
+    }
+  }
+  if (ruleProblems.length) {
+    warnings.push(`Yellowfin / Bigeye rule: the saved points don't follow the rule for ${ruleProblems.join(', ')}. Open that angler's day in the Catch Logger and press Save.`)
+  }
+  if (bothWeighedNoRule) {
+    warnings.push(`${bothWeighedNoRule} angler-day(s) have both a Yellowfin and a Bigeye / Southern Bluefin weighed, but the "only the heaviest scores" rule is not switched on for this competition (SQL 152).`)
+  }
+
   const weighed  = inScope.filter(isWeighedCatch)
   const releases = inScope.filter(isReleaseCatch)
   const pending  = releases.filter(c => c.video_status === 'pending')
@@ -157,7 +194,7 @@ export function computeInvitationalPrizes({
     weightKg: r3(num(c.weight_kg)),
     points: r2(num(c.points)),
     fishingDay: c._fishingDay,
-    result: `${num(c.weight_kg).toFixed(2)} kg${c.species_name ? ` · ${c.species_name}` : ''}`,
+    result: `${num(c.weight_kg).toFixed(2)} kg${c.species_name ? ` · ${c.species_name}` : ''}${ruleOn && isRuleTunaName(c.species_name) && num(c.points) <= 0 ? ' (no points - lighter than the angler\'s other tuna that day)' : ''}`,
     detail: `Fishing Day ${c._fishingDay}`,
   })
   const byWeight = (list) => rankBy(list, c => num(c.weight_kg), v => r3(v))
@@ -256,6 +293,7 @@ export function computeInvitationalPrizes({
   // ── Prize categories ────────────────────────────────────────────────────
   const yellowfin = slots(byWeight(weighed.filter(c => isYellowfin(c.species_name))), 5, fishDesc)
   const longfin   = slots(byWeight(weighed.filter(c => isLongfin(c.species_name))), 3, fishDesc)
+  const bigeyeBluefin = slots(byWeight(weighed.filter(c => isBigeyeOrBluefinName(c.species_name))), 1, fishDesc)[0]
   const topFishRanked = byWeight(weighed)
   const topFish   = slots(topFishRanked, 1, fishDesc)[0]
 
@@ -269,6 +307,7 @@ export function computeInvitationalPrizes({
     longfin,
     yellowfin,
     overall: slots(overallRanked, 10, personDesc('total', 'pts')),
+    bigeyeBluefin,
     topFish,
   }
   tieWarn('Catch & Release', prizes.release)
@@ -277,6 +316,7 @@ export function computeInvitationalPrizes({
   tieWarn('Longfin', prizes.longfin)
   tieWarn('Yellowfin', prizes.yellowfin)
   tieWarn('Overall Most Points', prizes.overall)
+  tieWarn('Biggest Bigeye or Southern Bluefin Tuna', [prizes.bigeyeBluefin])
   tieWarn('Overall Biggest Fish', [prizes.topFish])
 
   return {
@@ -326,6 +366,7 @@ export function buildRunOfShow(result) {
         : t.status === 'no_fish' ? 'No tuna weighed this day'
         : (t.day?.date ? `Calendar Day ${t.day.day_number} (${t.day.date})` : ''),
   }, { dailyStatus: t.status }))
+  add('Biggest Bigeye or Southern Bluefin Tuna', 'Heaviest BE / SBT', 'App', result.prizes.bigeyeBluefin)
   add('Overall Biggest Fish', 'Top Fish', 'App', result.prizes.topFish)
   for (const p of [3, 2, 1]) {
     const ref = result.boatRanking.filter(b => b.place === p)

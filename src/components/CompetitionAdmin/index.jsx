@@ -296,6 +296,7 @@ export default function CompetitionAdmin({ competitionId }) {
       {shownTab === 'prizegiving' && (
         <CompetitionAdminPrizegiving
           competition={competition}
+          config={config}
           catches={standingsCatches}
           participants={participants}
           teams={teams}
