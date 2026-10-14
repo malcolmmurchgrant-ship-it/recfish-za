@@ -23,6 +23,7 @@ import CompetitionAdminScoreboard   from './CompetitionAdminScoreboard'
 import CompetitionAdminReports      from './CompetitionAdminReports'
 import RolesTab                     from './CompetitionAdminRoles'
 import CompetitionAdminVideoReview  from './CompetitionAdminVideoReview'
+import CompetitionAdminPrizegiving  from './CompetitionAdminPrizegiving'
 
 const NAVY = '#1e3a8a'
 const GREY = '#6b7280'
@@ -34,12 +35,13 @@ const TABS = [
   { id: 'scoring',      label: '📋 Scoring',       minRole: 'scorer' },
   { id: 'scoreboard',   label: '🏆 Scoreboard',   minRole: 'viewer' },
   { id: 'video-review', label: '🎥 Video Review', minRole: 'video_verifier' },
+  { id: 'prizegiving',  label: '🏅 Prizegiving',  minRole: 'scorer', videoEvents: true },
   { id: 'reports',      label: '📊 Reports',       minRole: 'admin'  },
   { id: 'roles',        label: '🔐 Roles',         minRole: 'admin'  },
 ]
 
 export default function CompetitionAdmin({ competitionId }) {
-  const VALID_TABS = ['setup', 'participants', 'scoring', 'scoreboard', 'video-review', 'reports', 'roles']
+  const VALID_TABS = ['setup', 'participants', 'scoring', 'scoreboard', 'video-review', 'prizegiving', 'reports', 'roles']
   const [searchParams] = useSearchParams()
   const tabFromUrl = searchParams.get('tab')
   const [activeTab,     setActiveTab]     = useState(VALID_TABS.includes(tabFromUrl) ? tabFromUrl : 'scoring')
@@ -162,7 +164,12 @@ export default function CompetitionAdmin({ competitionId }) {
   }
 
   // ── Visible tabs based on role ────────────────────────────────────────────
+  // The Prizegiving tab works out the CBSC Tuna Invitational's prizes
+  // (weighed tuna + video-verified releases), so it is shown only for a
+  // competition with video-verified release species.
+  const hasVideoReleases = (config?.species?.eligible_species || []).some(s => s?.require_video_evidence)
   const visibleTabs = TABS.filter(t => {
+    if (t.videoEvents && !hasVideoReleases) return false
     if (t.minRole === 'viewer') return canView || isScorer || isAdmin
     if (t.minRole === 'scorer') return isScorer || isAdmin
     if (t.minRole === 'admin')  return isAdmin
@@ -283,6 +290,18 @@ export default function CompetitionAdmin({ competitionId }) {
           competitionId={competitionId}
           isVideoVerifier={isVideoVerifier}
           onReload={reloadCatches}
+        />
+      )}
+
+      {shownTab === 'prizegiving' && (
+        <CompetitionAdminPrizegiving
+          competition={competition}
+          catches={standingsCatches}
+          participants={participants}
+          teams={teams}
+          boats={boats}
+          days={days}
+          onReload={reloadAll}
         />
       )}
 
