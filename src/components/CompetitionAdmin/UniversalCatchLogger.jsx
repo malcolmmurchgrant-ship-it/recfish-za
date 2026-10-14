@@ -41,6 +41,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
+import { heaviestTunaRuleOn, pickScoringTuna, isRuleTunaName, ruleNote } from '../../utils/heaviestTunaRule'
 import { supabase } from '../../lib/supabase'
 import { useCompetitionConfig } from './hooks/useCompetitionConfig'
 import { useCatchLoggerData } from './hooks/useCatchLoggerData'
@@ -504,7 +505,7 @@ export default function UniversalCatchLogger({ competitionId }) {
 
   const scoredMeasured = useMemo(() => {
     const seenSpecies = new Set()
-    return measuredDraft.map(fish => {
+    const rows = measuredDraft.map(fish => {
       const cfg = findSpeciesConfig(config?.species, fish.species)
       const isFirstOfSpecies = fish.species && !seenSpecies.has(fish.species)
       if (fish.species) seenSpecies.add(fish.species)
@@ -512,6 +513,20 @@ export default function UniversalCatchLogger({ competitionId }) {
       const warning = validateDraftFish(fish, cfg)
       return { ...fish, _cfg: cfg, _scored: scored, _warning: warning }
     })
+    // CBSC Invitational rule (heaviestTunaRule.js): of this angler's weighed
+    // Yellowfin / Bigeye / Southern Bluefin today, only the heaviest scores;
+    // the others keep their weight but score 0. Off unless the competition's
+    // scoring config sets heaviest_tuna_only.
+    if (!heaviestTunaRuleOn(config?.scoring)) return rows
+    const weighed = rows.filter(f => f.species && !f._warning && f._cfg
+      && !f._cfg.predator_damaged && !f._cfg.kingfish_release && !f._cfg.billfish
+      && (parseFloat(f.weight_kg) || 0) > 0)
+    const speciesOf = (f) => f._cfg?.species_name || f.species
+    const winner = pickScoringTuna(weighed, { species: speciesOf, weight: f => f.weight_kg })
+    if (!winner) return rows
+    return rows.map(f => (weighed.includes(f) && f !== winner && isRuleTunaName(speciesOf(f)))
+      ? { ...f, _scored: { ...f._scored, points: 0, detail: ruleNote(speciesOf(winner)) }, _zeroedByTunaRule: ruleNote(speciesOf(winner)) }
+      : f)
   }, [measuredDraft, config])
 
   const scoredUnitCount = useMemo(() => {
@@ -1119,8 +1134,13 @@ function MeasuredFishRow({ fish, index, speciesPicker, autoWeight, calculating, 
             </div>
           ) : (
             <div>
-              <div style={{ fontWeight: 700, color: NAVY, fontSize: '1rem' }}>{pts > 0 ? pts.toFixed(2) : '—'}</div>
+              <div style={{ fontWeight: 700, color: NAVY, fontSize: '1rem' }}>{pts > 0 ? pts.toFixed(2) : (fish._zeroedByTunaRule ? '0' : '—')}</div>
               <div style={{ fontSize: '0.7rem', color: '#6b7280' }}>pts</div>
+              {fish._zeroedByTunaRule && (
+                <div data-testid="tuna-rule-note" style={{ fontSize: '0.68rem', color: '#b45309', maxWidth: 170, lineHeight: 1.25, marginTop: 2 }}>
+                  {fish._zeroedByTunaRule}
+                </div>
+              )}
             </div>
           )}
         </div>

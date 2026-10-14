@@ -21,7 +21,7 @@ const S = {
   btn: (bg) => ({ background: bg, color: 'white', border: 'none', borderRadius: 8, padding: '0.6rem 1.1rem', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem' }),
 }
 
-export default function CompetitionAdminPrizegiving({ competition, catches, participants, teams, boats, days, onReload }) {
+export default function CompetitionAdminPrizegiving({ competition, config, catches, participants, teams, boats, days, onReload }) {
   const [upTo, setUpTo] = useState('all')
   const [showFull, setShowFull] = useState(false)
   const [builder, setBuilder] = useState(null)
@@ -32,7 +32,8 @@ export default function CompetitionAdminPrizegiving({ competition, catches, part
   const result = useMemo(() => computeInvitationalPrizes({
     catches, participants, teams, boats, days,
     upToFishingDay: upTo === 'all' ? null : Number(upTo),
-  }), [catches, participants, teams, boats, days, upTo])
+    scoringConfig: config?.scoring,
+  }), [catches, participants, teams, boats, days, upTo, config])
   const rows = useMemo(() => buildRunOfShow(result), [result])
 
   // Load the PDF maker up front, so tapping the button works on phones

@@ -7,6 +7,7 @@ import { supabase } from '../../lib/supabase'
 import { calculateCatchPoints, groupCatchesBySpecies, buildCpueData } from './utils/scoringEngine'
 import { disqualifyParticipant } from './utils/disqualificationActions'
 import { isPredatorCatch } from './utils/catchLoggerScoring'
+import { heaviestTunaRuleOn, pickScoringTuna, isRuleTunaName } from '../../utils/heaviestTunaRule'
 
 const NAVY  = '#1e3a8a'
 const GREY  = '#6b7280'
@@ -667,6 +668,42 @@ export default function CompetitionAdminScoring({
   )
 }
 
+// ── Heaviest-tuna rule after a single-fish edit ──────────────────────────────
+// CBSC Invitational (heaviestTunaRule.js): only the heaviest of an angler's
+// weighed Yellowfin / Bigeye / Southern Bluefin each day scores. Editing one
+// fish's weight, species or day here can change which one that is, so the
+// angler's day (old and new day) is re-checked and the points corrected.
+// Weight-based scoring only - the rule is about weights.
+async function reapplyHeaviestTunaRule(config, participantId, dayIds) {
+  const scoringConfig = config?.scoring || {}
+  if (!heaviestTunaRuleOn(scoringConfig) || !participantId) return
+  if ((scoringConfig.method || 'points') === 'points') return
+  for (const dayId of [...new Set(dayIds.filter(Boolean))]) {
+    const { data: rows, error } = await supabase
+      .from('competition_catches')
+      .select('id, species_name, weight_kg, points, line_class_kg, video_status, retained, scoring, data_quality')
+      .eq('participant_id', participantId)
+      .eq('competition_day_id', dayId)
+    if (error) throw error
+    const weighed = (rows || []).filter(r => !r.video_status && r.retained !== false && r.scoring !== false
+      && r.data_quality !== 'rejected' && r.data_quality !== 'disqualified' && (parseFloat(r.weight_kg) || 0) > 0)
+    const winner = pickScoringTuna(weighed)
+    for (const r of weighed) {
+      if (!isRuleTunaName(r.species_name)) continue
+      const want = r === winner
+        ? calculateCatchPoints({ scoringConfig, weightKg: parseFloat(r.weight_kg) || 0,
+            lineClassKg: parseInt(r.line_class_kg) || scoringConfig?.line_class?.default_kg || 10,
+            fishCount: 1, isBillfish: false, isKingfishRelease: false, isFirstFish: true }).points
+        : 0
+      if (Math.abs((parseFloat(r.points) || 0) - want) < 0.0005) continue
+      const { data: upd, error: uErr } = await supabase.from('competition_catches')
+        .update({ points: want, scored_at: new Date().toISOString() }).eq('id', r.id).select('id')
+      if (uErr) throw uErr
+      if (!upd?.length) throw new Error('The database did not allow the points of the other tuna that day to be corrected.')
+    }
+  }
+}
+
 // ── CatchEditModal ────────────────────────────────────────────────────────────
 function CatchEditModal({ catch_, config, participants, days, onSave, onClose }) {
   const scoringMethod = config?.scoring?.method || 'percentage'
@@ -732,6 +769,12 @@ function CatchEditModal({ catch_, config, participants, days, onSave, onClose })
       .eq('id', catch_.id)
 
     if (err) { setError(err.message); setSaving(false); return }
+    try {
+      await reapplyHeaviestTunaRule(config, catch_.participant_id, [catch_.competition_day_id, form.competition_day_id])
+    } catch (e) {
+      setError('Saved, but the Yellowfin / Bigeye rule could not be re-applied: ' + (e.message || e) + ' - open this angler\'s day in the Catch Logger and save it.')
+      setSaving(false); return
+    }
     setSaving(false)
     onSave()
   }
