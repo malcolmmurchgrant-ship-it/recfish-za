@@ -3,6 +3,7 @@
 // Angler registration, team assignment, boat draw, line class, DQ management.
 
 import { useState, useEffect } from 'react'
+import { divisionLabel, isLady, isJunior, isSenior, categoryFromFlags } from '../../utils/anglerDivisions'
 import { supabase } from '../../lib/supabase'
 import { disqualifyParticipant, reinstateParticipant } from './utils/disqualificationActions'
 
@@ -45,7 +46,7 @@ export default function CompetitionAdminParticipants({ competition, config, days
   // New angler registration state
   const [addingAngler, setAddingAngler]   = useState(false)
   const [newAngler,    setNewAngler]      = useState({
-    full_name: '', angler_number: '', team_id: '', line_class_kg: '', category: 'open', is_captain: false, is_skipper: false,
+    full_name: '', angler_number: '', team_id: '', line_class_kg: '', category: 'open', is_lady: false, is_junior: false, is_senior: false, is_captain: false, is_skipper: false,
   })
 
   // Edit existing angler state — same field shape as add, but keyed to a
@@ -93,7 +94,10 @@ export default function CompetitionAdminParticipants({ competition, config, days
         angler_number:  newAngler.angler_number.trim() || null,
         team_id:        newAngler.team_id || null,
         line_class_kg:  newAngler.line_class_kg ? parseInt(newAngler.line_class_kg) : null,
-        category:       newAngler.category,
+        is_lady:        !!newAngler.is_lady,
+        is_junior:      !!newAngler.is_junior,
+        is_senior:      !!newAngler.is_senior,
+        category:       categoryFromFlags(newAngler),   // old single category, kept in step
         is_captain:     newAngler.is_captain,
         is_skipper:     newAngler.is_skipper,
         status:         'registered',
@@ -104,7 +108,7 @@ export default function CompetitionAdminParticipants({ competition, config, days
       setError('Not saved: the database did not allow adding this angler. Nothing was stored.')
       setSaving(false); return
     }
-    setNewAngler({ full_name: '', angler_number: '', team_id: '', line_class_kg: '', category: 'open', is_captain: false, is_skipper: false })
+    setNewAngler({ full_name: '', angler_number: '', team_id: '', line_class_kg: '', category: 'open', is_lady: false, is_junior: false, is_senior: false, is_captain: false, is_skipper: false })
     setAddingAngler(false)
     setSaving(false)
     // Small delay to ensure DB write is committed before re-fetching
@@ -117,7 +121,7 @@ export default function CompetitionAdminParticipants({ competition, config, days
     setEditAngler({
       full_name: p.full_name || '', angler_number: p.angler_number || '',
       team_id: p.team_id || '', line_class_kg: p.line_class_kg ? String(p.line_class_kg) : '',
-      category: p.category || 'open', is_captain: !!p.is_captain, is_skipper: !!p.is_skipper,
+      category: p.category || 'open', is_lady: isLady(p), is_junior: isJunior(p), is_senior: isSenior(p), is_captain: !!p.is_captain, is_skipper: !!p.is_skipper,
     })
     setError('')
   }
@@ -138,7 +142,10 @@ export default function CompetitionAdminParticipants({ competition, config, days
         angler_number:  editAngler.angler_number.trim() || null,
         team_id:        editAngler.team_id || null,
         line_class_kg:  editAngler.line_class_kg ? parseInt(editAngler.line_class_kg) : null,
-        category:       editAngler.category,
+        is_lady:        !!editAngler.is_lady,
+        is_junior:      !!editAngler.is_junior,
+        is_senior:      !!editAngler.is_senior,
+        category:       categoryFromFlags(editAngler),  // old single category, kept in step
         is_captain:     editAngler.is_captain,
         is_skipper:     editAngler.is_skipper,
       })
@@ -307,14 +314,18 @@ export default function CompetitionAdminParticipants({ competition, config, days
                   </div>
                 )}
                 <div>
+                  {/* Lady / Junior / Senior are separate tick boxes - a junior
+                      girl can be both Lady and Junior. None ticked = Open. */}
                   <label style={S.label}>Category</label>
-                  <select style={S.select} value={newAngler.category}
-                    onChange={e => setNewAngler(a => ({ ...a, category: e.target.value }))}>
-                    <option value="open">Open</option>
-                    <option value="junior">Junior</option>
-                    <option value="ladies">Ladies</option>
-                    <option value="senior">Senior</option>
-                  </select>
+                  <div style={{ display: 'flex', gap: '0.9rem', flexWrap: 'wrap', padding: '0.45rem 0' }}>
+                    {[['is_lady', 'Lady'], ['is_junior', 'Junior'], ['is_senior', 'Senior']].map(([key, label]) => (
+                      <label key={key} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: '0.9rem' }}>
+                        <input type="checkbox" data-testid={`newAngler-${key}`} checked={!!newAngler[key]}
+                          onChange={e => setNewAngler(a => ({ ...a, [key]: e.target.checked }))} />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
                 </div>
                 {hasLineClass && lineClasses.length > 0 && (
                   <div>
@@ -396,14 +407,18 @@ export default function CompetitionAdminParticipants({ competition, config, days
                   </div>
                 )}
                 <div>
+                  {/* Lady / Junior / Senior are separate tick boxes - a junior
+                      girl can be both Lady and Junior. None ticked = Open. */}
                   <label style={S.label}>Category</label>
-                  <select style={S.select} value={editAngler.category}
-                    onChange={e => setEditAngler(a => ({ ...a, category: e.target.value }))}>
-                    <option value="open">Open</option>
-                    <option value="junior">Junior</option>
-                    <option value="ladies">Ladies</option>
-                    <option value="senior">Senior</option>
-                  </select>
+                  <div style={{ display: 'flex', gap: '0.9rem', flexWrap: 'wrap', padding: '0.45rem 0' }}>
+                    {[['is_lady', 'Lady'], ['is_junior', 'Junior'], ['is_senior', 'Senior']].map(([key, label]) => (
+                      <label key={key} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', cursor: 'pointer', fontSize: '0.9rem' }}>
+                        <input type="checkbox" data-testid={`editAngler-${key}`} checked={!!editAngler[key]}
+                          onChange={e => setEditAngler(a => ({ ...a, [key]: e.target.checked }))} />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
                 </div>
                 {hasLineClass && lineClasses.length > 0 && (
                   <div>
@@ -455,7 +470,7 @@ export default function CompetitionAdminParticipants({ competition, config, days
                   </div>
                   <div style={{ fontSize: '0.82rem', color: GREY, marginTop: 2 }}>
                     {p.competition_teams?.team_name || p.competition_teams?.province || ''}
-                    {p.category && ` · ${p.category}`}
+                    {divisionLabel(p) ? ` · ${divisionLabel(p)}` : ' · Open'}
                     {p.line_class_kg && ` · ${p.line_class_kg}kg LC`}
                   </div>
                   {isDQ(p) && p.notes && (

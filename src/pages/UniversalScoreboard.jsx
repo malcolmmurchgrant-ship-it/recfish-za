@@ -12,6 +12,7 @@ import { computeStandings, calcPoints, getFishingHours, getTotalFishingHours, ge
 import ScoreboardTV from '../components/ScoreboardTV'
 import { getSponsorLogos } from '../utils/sponsorLogos'
 import PublishedResultsDownload from '../components/PublishedResultsDownload'
+import { divisionLabel } from '../utils/anglerDivisions'
 
 const NAVY  = '#1e3a8a'
 const GOLD  = '#d97706'
@@ -439,7 +440,7 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
                     <div style={{ fontSize: '0.78rem', color: GREY }}>
                       {a.team}
                       {a.lineClass && ` · ${a.lineClass}kg LC`}
-                      {a.category && a.category !== 'open' && ` · ${a.category}`}
+                      {divisionLabel(a) && ` · ${divisionLabel(a)}`}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
