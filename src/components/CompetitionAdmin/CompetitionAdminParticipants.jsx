@@ -151,6 +151,44 @@ export default function CompetitionAdminParticipants({ competition, config, days
     load()
   }
 
+  // ── Remove angler (withdrawn before fishing) ──────────────────────────────
+  // For an angler who pulled out. Refused if the angler has any catch
+  // recorded - then the result must stand, so Disqualify is the right tool.
+  // Their boat-draw rows go too. Admin / TD only (the database allows the
+  // delete for the competition's admins and TDs and the owners only).
+  async function handleRemove(p) {
+    setError('')
+    const team = p.competition_teams?.team_name ? ` (${p.competition_teams.team_name})` : ''
+    if (!window.confirm(`Remove ${p.full_name}${team} from this competition?\n\nUse this for an angler who has withdrawn. It cannot be undone - you would have to add them again.`)) return
+    setSaving(true)
+    try {
+      let q = supabase.from('competition_catches').select('id', { count: 'exact', head: true }).eq('competition_id', competition.id)
+      q = p.user_id ? q.or(`participant_id.eq.${p.id},angler_id.eq.${p.user_id}`) : q.eq('participant_id', p.id)
+      const { count, error: cErr } = await q
+      if (cErr) throw cErr
+      if (count > 0) {
+        setError(`${p.full_name} has ${count} catch${count === 1 ? '' : 'es'} recorded, so can't be removed. Use 🚫 DQ instead.`)
+        return
+      }
+      const { error: dErr } = await supabase.from('competition_boat_draws').delete()
+        .eq('competition_id', competition.id).eq('participant_id', p.id)
+      if (dErr && dErr.code !== '42703') throw dErr   // 42703: table has no participant_id column
+      const { data: gone, error: pErr } = await supabase.from('competition_participants').delete()
+        .eq('id', p.id).select('id')
+      if (pErr) throw pErr
+      if (!gone || gone.length === 0) {
+        setError(`${p.full_name} was NOT removed: the database did not allow it. Only the competition's admins / TD and the owners can remove anglers.`)
+        return
+      }
+      if (editingAnglerId === p.id) handleCancelEdit()
+      load()
+    } catch (err) {
+      setError(`Could not remove ${p.full_name}: ${err.message || err}`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   // ── DQ angler ─────────────────────────────────────────────────────────────
   // Delegates to disqualificationActions.js -- see that file for why (three
   // independent copies of this logic used to exist and drift apart).
@@ -302,6 +340,13 @@ export default function CompetitionAdminParticipants({ competition, config, days
             </div>
           )}
 
+          {/* Messages from Remove (the add / edit / DQ forms show their own) */}
+          {error && !addingAngler && !editingAnglerId && !dqModal && (
+            <div data-testid="participants-error" style={{ ...S.card, background: '#fef2f2', border: '1px solid #fca5a5', color: RED, fontSize: '0.88rem' }}>
+              {error}
+            </div>
+          )}
+
           {/* Participant list */}
           {filtered.length === 0 ? (
             <div style={{ ...S.card, color: GREY, textAlign: 'center', fontStyle: 'italic' }}>
@@ -410,6 +455,13 @@ export default function CompetitionAdminParticipants({ competition, config, days
                       <button onClick={() => handleReinstate(p)}
                         style={{ ...S.btn(GREEN), padding: '0.3rem 0.7rem', fontSize: '0.78rem' }}>
                         ↩ Reinstate
+                      </button>
+                    )}
+                    {isAdmin && (
+                      <button onClick={() => handleRemove(p)} disabled={saving} data-testid="remove-angler"
+                        title="Remove an angler who has withdrawn (only if no catches are recorded)"
+                        style={{ background: 'white', color: RED, border: `1px solid ${RED}`, borderRadius: 6, padding: '0.3rem 0.7rem', fontSize: '0.78rem', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer' }}>
+                        🗑 Remove
                       </button>
                     )}
                   </div>
