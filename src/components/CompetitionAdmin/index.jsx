@@ -36,7 +36,10 @@ const TABS = [
   { id: 'scoreboard',   label: '🏆 Scoreboard',   minRole: 'viewer' },
   { id: 'video-review', label: '🎥 Video Review', minRole: 'video_verifier' },
   { id: 'prizegiving',  label: '🏅 Prizegiving',  minRole: 'scorer', videoEvents: true },
-  { id: 'reports',      label: '📊 Reports',       minRole: 'admin'  },
+  // Read Only users may open Reports to view and download results. Everything
+  // on it that changes data (Publish, Prize Categories, Sponsor logos) shows
+  // only to admins, and the database refuses those changes for anyone else.
+  { id: 'reports',      label: '📊 Reports',       minRole: 'viewer' },
   { id: 'roles',        label: '🔐 Roles',         minRole: 'admin'  },
 ]
 

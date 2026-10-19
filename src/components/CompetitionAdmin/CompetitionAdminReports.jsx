@@ -309,7 +309,9 @@ export default function CompetitionAdminReports({
             <div style={{ fontSize: '0.78rem', color: GREY, marginTop: 2 }}>
               {isLocked
                 ? `Published ${new Date(competition.results_published_at).toLocaleString('en-ZA')} — all results and catches are locked`
-                : 'Prize categories and results can still be edited. Publish to lock everything.'}
+                : isAdmin
+                  ? 'Prize categories and results can still be edited. Publish to lock everything.'
+                  : 'Results are provisional until the organisers publish them.'}
             </div>
           </div>
           {isAdmin && !isLocked && standings.length > 0 && (
