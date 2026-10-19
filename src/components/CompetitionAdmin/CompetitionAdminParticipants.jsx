@@ -45,7 +45,7 @@ export default function CompetitionAdminParticipants({ competition, config, days
   // New angler registration state
   const [addingAngler, setAddingAngler]   = useState(false)
   const [newAngler,    setNewAngler]      = useState({
-    full_name: '', angler_number: '', team_id: '', line_class_kg: '', category: 'open', is_captain: false,
+    full_name: '', angler_number: '', team_id: '', line_class_kg: '', category: 'open', is_captain: false, is_skipper: false,
   })
 
   // Edit existing angler state — same field shape as add, but keyed to a
@@ -95,6 +95,7 @@ export default function CompetitionAdminParticipants({ competition, config, days
         line_class_kg:  newAngler.line_class_kg ? parseInt(newAngler.line_class_kg) : null,
         category:       newAngler.category,
         is_captain:     newAngler.is_captain,
+        is_skipper:     newAngler.is_skipper,
         status:         'registered',
       })
       .select('id')
@@ -103,7 +104,7 @@ export default function CompetitionAdminParticipants({ competition, config, days
       setError('Not saved: the database did not allow adding this angler. Nothing was stored.')
       setSaving(false); return
     }
-    setNewAngler({ full_name: '', angler_number: '', team_id: '', line_class_kg: '', category: 'open', is_captain: false })
+    setNewAngler({ full_name: '', angler_number: '', team_id: '', line_class_kg: '', category: 'open', is_captain: false, is_skipper: false })
     setAddingAngler(false)
     setSaving(false)
     // Small delay to ensure DB write is committed before re-fetching
@@ -116,7 +117,7 @@ export default function CompetitionAdminParticipants({ competition, config, days
     setEditAngler({
       full_name: p.full_name || '', angler_number: p.angler_number || '',
       team_id: p.team_id || '', line_class_kg: p.line_class_kg ? String(p.line_class_kg) : '',
-      category: p.category || 'open', is_captain: !!p.is_captain,
+      category: p.category || 'open', is_captain: !!p.is_captain, is_skipper: !!p.is_skipper,
     })
     setError('')
   }
@@ -139,6 +140,7 @@ export default function CompetitionAdminParticipants({ competition, config, days
         line_class_kg:  editAngler.line_class_kg ? parseInt(editAngler.line_class_kg) : null,
         category:       editAngler.category,
         is_captain:     editAngler.is_captain,
+        is_skipper:     editAngler.is_skipper,
       })
       .eq('id', editingAnglerId)
       .select('id')
@@ -331,6 +333,14 @@ export default function CompetitionAdminParticipants({ competition, config, days
                         onChange={e => setNewAngler(a => ({ ...a, is_captain: e.target.checked }))} />
                       Team Captain
                     </label>
+                    {/* Skipper and Team Captain are separate tick boxes - one
+                        angler may be both. They decide who does what when
+                        release videos are uploaded. */}
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.9rem', marginLeft: '0.9rem' }}>
+                      <input type="checkbox" data-testid="newAngler-skipper" checked={!!newAngler.is_skipper}
+                        onChange={e => setNewAngler(a => ({ ...a, is_skipper: e.target.checked }))} />
+                      Skipper
+                    </label>
                   </div>
                 )}
               </div>
@@ -412,6 +422,14 @@ export default function CompetitionAdminParticipants({ competition, config, days
                         onChange={e => setEditAngler(a => ({ ...a, is_captain: e.target.checked }))} />
                       Team Captain
                     </label>
+                    {/* Skipper and Team Captain are separate tick boxes - one
+                        angler may be both. They decide who does what when
+                        release videos are uploaded. */}
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.9rem', marginLeft: '0.9rem' }}>
+                      <input type="checkbox" data-testid="editAngler-skipper" checked={!!editAngler.is_skipper}
+                        onChange={e => setEditAngler(a => ({ ...a, is_skipper: e.target.checked }))} />
+                      Skipper
+                    </label>
                   </div>
                 )}
               </div>
@@ -431,6 +449,7 @@ export default function CompetitionAdminParticipants({ competition, config, days
                   <div style={{ fontWeight: 700, color: NAVY, display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
                     {isDQ(p) && <span style={S.badge(RED)}>🚫 DQ</span>}
                     {p.is_captain && <span style={S.badge(GOLD)}>© Captain</span>}
+                    {p.is_skipper && <span style={S.badge(NAVY)}>⚓ Skipper</span>}
                     {p.full_name}
                     {p.angler_number && <span style={{ color: GREY, fontWeight: 400, fontSize: '0.85rem' }}>#{p.angler_number}</span>}
                   </div>
@@ -506,7 +525,7 @@ export default function CompetitionAdminParticipants({ competition, config, days
                 {members.map(m => (
                   <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.3rem 0.5rem', background: '#f8fafc', borderRadius: 5, marginBottom: '0.25rem' }}>
                     <div style={{ flex: 1, fontSize: '0.85rem', fontWeight: m.is_captain ? 700 : 400 }}>
-                      {m.full_name}{m.is_captain ? ' ©' : ''}
+                      {m.full_name}{m.is_captain ? ' ©' : ''}{m.is_skipper ? ' ⚓' : ''}
                       {m.angler_number && <span style={{ color: GREY, fontWeight: 400 }}> #{m.angler_number}</span>}
                     </div>
                     {isDQ(m) && <span style={S.badge(RED)}>DQ</span>}
