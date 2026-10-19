@@ -11,6 +11,7 @@ import { supabase } from '../lib/supabase'
 import { computeStandings, calcPoints, getFishingHours, getTotalFishingHours, getDayNumber, calcMultipliedPoints } from '../utils/standings'
 import ScoreboardTV from '../components/ScoreboardTV'
 import { getSponsorLogos } from '../utils/sponsorLogos'
+import PublishedResultsDownload from '../components/PublishedResultsDownload'
 
 const NAVY  = '#1e3a8a'
 const GOLD  = '#d97706'
@@ -350,6 +351,9 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
           🔄 {lastRefresh ? lastRefresh.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' }) : 'Refresh'}
         </button>
       </div>
+
+      {/* ── Official results download (published results, logged-in users) ── */}
+      {isPublished && !embedded && <PublishedResultsDownload competitionId={competitionId} />}
 
       {/* ── Tabs ─────────────────────────────────────────────────────────── */}
       <div style={{ display: 'flex', gap: 0, marginBottom: '1rem', borderRadius: 8, overflow: 'hidden', border: '1px solid #e5e7eb', flexWrap: 'wrap' }}>

@@ -43,6 +43,7 @@ const DEFAULT_PRIZE_CATEGORIES = [
 
 export default function CompetitionAdminReports({
   competition, config, catches, participants, teams, days, boats, isAdmin,
+  downloadsOnly = false,   // public Scoreboard (published results): just the download card
 }) {
   const [xlsxMode,      setXlsxMode]      = useState(config?.reporting?.xlsx_mode || 'multi_sheet')
   const [prizeCategories, setPrizeCats]   = useState(
@@ -297,6 +298,68 @@ export default function CompetitionAdminReports({
     setPrizeCats(cats => cats.filter((_, i) => i !== index))
   }
 
+  const downloadCard = (
+<div style={S.card}>
+        <div style={S.section}>Download Reports</div>
+
+        {/* XLSX mode selector */}
+        <div style={{ marginBottom: '1rem' }}>
+          <label style={S.label}>XLSX Format</label>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            {[
+              { id: 'multi_sheet',  label: 'Multi-sheet (Standings + Catches + Prizes)' },
+              { id: 'single_sheet', label: 'Single-sheet (all on one worksheet — club use)' },
+            ].map(m => (
+              <label key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.88rem', cursor: 'pointer', padding: '0.4rem 0.75rem', borderRadius: 6, background: xlsxMode === m.id ? '#eff6ff' : '#f8fafc', border: `1px solid ${xlsxMode === m.id ? '#93c5fd' : '#e5e7eb'}` }}>
+                <input type="radio" name="xlsxMode" value={m.id} checked={xlsxMode === m.id}
+                  onChange={() => setXlsxMode(m.id)} />
+                {m.label}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0.75rem' }}>
+          {[
+            { type: 'csv',        label: '📄 Download CSV',           desc: 'Spreadsheet-ready results' },
+            { type: 'xlsx',       label: '📊 Download Excel (.xls)',  desc: xlsxMode === 'multi_sheet' ? '3 worksheets' : 'Single worksheet' },
+            // PDF options hidden until the generate-competition-pdf Edge
+            // Function actually exists — confirmed via the Supabase
+            // dashboard that zero Edge Functions are deployed on this
+            // project at all, so these three always failed silently.
+            // Flip PDF_ENABLED to true once that function is built and
+            // deployed; no other change needed here.
+            ...(PDF_ENABLED ? [
+              { type: 'pdf',        label: '📋 Full Results PDF',       desc: 'Standings, teams, skippers, species — printable summary' },
+            ] : []),
+          ].map(r => (
+            <button key={r.type} onClick={() => handleDownload(r.type)}
+              disabled={!!downloading || standings.length === 0}
+              style={{ ...S.btn(NAVY, 'white', !!downloading || standings.length === 0), textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+              <span>{downloading === r.type ? 'Generating…' : r.label}</span>
+              <span style={{ fontSize: '0.72rem', opacity: 0.75, fontWeight: 400 }}>{r.desc}</span>
+            </button>
+          ))}
+        </div>
+        {standings.length === 0 && (
+          <div style={{ fontSize: '0.82rem', color: GREY, marginTop: '0.5rem', fontStyle: 'italic' }}>
+            Reports available once catches are logged.
+          </div>
+        )}
+      </div>
+  )
+
+  // Public Scoreboard, after Publish Final Results: only the download card,
+  // built by exactly the same code as the organisers' own Reports tab.
+  if (downloadsOnly) {
+    return (
+      <div>
+        {error && <div style={{ ...S.card, background: '#fef2f2', border: '1px solid #fca5a5', color: RED }}>{error}</div>}
+        {downloadCard}
+      </div>
+    )
+  }
+
   return (
     <div>
       {/* ── Results status ───────────────────────────────────────────────── */}
@@ -466,55 +529,7 @@ export default function CompetitionAdminReports({
         </div>
       )}
 
-      {/* ── Download reports ─────────────────────────────────────────────── */}
-      <div style={S.card}>
-        <div style={S.section}>Download Reports</div>
-
-        {/* XLSX mode selector */}
-        <div style={{ marginBottom: '1rem' }}>
-          <label style={S.label}>XLSX Format</label>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            {[
-              { id: 'multi_sheet',  label: 'Multi-sheet (Standings + Catches + Prizes)' },
-              { id: 'single_sheet', label: 'Single-sheet (all on one worksheet — club use)' },
-            ].map(m => (
-              <label key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.88rem', cursor: 'pointer', padding: '0.4rem 0.75rem', borderRadius: 6, background: xlsxMode === m.id ? '#eff6ff' : '#f8fafc', border: `1px solid ${xlsxMode === m.id ? '#93c5fd' : '#e5e7eb'}` }}>
-                <input type="radio" name="xlsxMode" value={m.id} checked={xlsxMode === m.id}
-                  onChange={() => setXlsxMode(m.id)} />
-                {m.label}
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0.75rem' }}>
-          {[
-            { type: 'csv',        label: '📄 Download CSV',           desc: 'Spreadsheet-ready results' },
-            { type: 'xlsx',       label: '📊 Download Excel (.xls)',  desc: xlsxMode === 'multi_sheet' ? '3 worksheets' : 'Single worksheet' },
-            // PDF options hidden until the generate-competition-pdf Edge
-            // Function actually exists — confirmed via the Supabase
-            // dashboard that zero Edge Functions are deployed on this
-            // project at all, so these three always failed silently.
-            // Flip PDF_ENABLED to true once that function is built and
-            // deployed; no other change needed here.
-            ...(PDF_ENABLED ? [
-              { type: 'pdf',        label: '📋 Full Results PDF',       desc: 'Standings, teams, skippers, species — printable summary' },
-            ] : []),
-          ].map(r => (
-            <button key={r.type} onClick={() => handleDownload(r.type)}
-              disabled={!!downloading || standings.length === 0}
-              style={{ ...S.btn(NAVY, 'white', !!downloading || standings.length === 0), textAlign: 'left', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-              <span>{downloading === r.type ? 'Generating…' : r.label}</span>
-              <span style={{ fontSize: '0.72rem', opacity: 0.75, fontWeight: 400 }}>{r.desc}</span>
-            </button>
-          ))}
-        </div>
-        {standings.length === 0 && (
-          <div style={{ fontSize: '0.82rem', color: GREY, marginTop: '0.5rem', fontStyle: 'italic' }}>
-            Reports available once catches are logged.
-          </div>
-        )}
-      </div>
+      {downloadCard}
 
       {/* ── Prize categories ─────────────────────────────────────────────── */}
       {!isLocked && isAdmin && (
