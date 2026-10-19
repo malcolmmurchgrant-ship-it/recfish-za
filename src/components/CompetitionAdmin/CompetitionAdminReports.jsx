@@ -9,6 +9,7 @@ import { supabase } from '../../lib/supabase'
 import { downloadCSV, downloadXLSX, downloadPDFReport } from './utils/reportGenerator'
 import { readLogoFile, MAX_LOGOS } from '../../utils/sponsorLogos'
 import { buildIndividualStandings, buildDailyAnglerPercentages, buildBoatPercentageTeamStandings, buildCpueData, buildSkipperRanking } from './utils/scoringEngine'
+import { isLady, isJunior } from '../../utils/anglerDivisions'
 
 // Flip to true once generate-competition-pdf is actually built and deployed
 // as a Supabase Edge Function (confirmed none exist on this project yet).
@@ -167,16 +168,16 @@ export default function CompetitionAdminReports({
   // it's purely which report section an angler's row appears in and what
   // position they're numbered at within that section.
   const openStandings = useMemo(() =>
-    standingsWithCpue.filter(s => s.category !== 'ladies').map((s, i) => ({ ...s, rank: i + 1 })),
+    standingsWithCpue.filter(s => !isLady(s)).map((s, i) => ({ ...s, rank: i + 1 })),
     [standingsWithCpue]
   )
   const ladiesStandings = useMemo(() =>
-    standingsWithCpue.filter(s => s.category === 'ladies').map((s, i) => ({ ...s, rank: i + 1 })),
+    standingsWithCpue.filter(s => isLady(s)).map((s, i) => ({ ...s, rank: i + 1 })),
     [standingsWithCpue]
   )
   // Juniors ranked among themselves (Junior prizes) - shown under Ladies.
   const juniorStandings = useMemo(() =>
-    standingsWithCpue.filter(s => s.category === 'junior').map((s, i) => ({ ...s, rank: i + 1 })),
+    standingsWithCpue.filter(s => isJunior(s)).map((s, i) => ({ ...s, rank: i + 1 })),
     [standingsWithCpue]
   )
 

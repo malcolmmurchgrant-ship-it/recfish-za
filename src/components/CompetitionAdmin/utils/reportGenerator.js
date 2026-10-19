@@ -25,6 +25,7 @@ import { groupCatchesBySpecies } from './scoringEngine'
 // other files regardless.
 import { supabase } from '../../../lib/supabase'
 import { logoWidthFor } from '../../../utils/sponsorLogos'
+import { divisionLabel, inDivision } from '../../../utils/anglerDivisions'
 
 // ── CSV download ──────────────────────────────────────────────────────────────
 export function downloadCSV(standings, competition, config) {
@@ -364,7 +365,8 @@ ${sheets.map(s => `<h3>${s.name}</h3>${s.content}`).join('\n')}
 
 // "(Lady)" / "(Junior)" after a name in the all-anglers standings table.
 function divisionMark(s) {
-  return s.category === 'ladies' ? ' (Lady)' : s.category === 'junior' ? ' (Junior)' : ''
+  const label = divisionLabel(s)
+  return label ? ` (${label})` : ''
 }
 
 function standingsTable(standings, showWeight, _usesBoatPercentage, markLadies = false) {
@@ -528,7 +530,7 @@ function buildPrizeRows(standings, catches, config, teamStandings = []) {
     // 'junior'. Falls back to every angler when not set, so this changes
     // nothing for any category that doesn't use it.
     const pool = cat.filter_category
-      ? standings.filter(s => s.category === cat.filter_category)
+      ? standings.filter(s => inDivision(s, cat.filter_category))
       : standings
 
     if (cat.criteria === 'manual') {

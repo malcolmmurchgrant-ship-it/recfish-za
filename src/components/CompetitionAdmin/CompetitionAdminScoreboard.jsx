@@ -8,6 +8,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { buildIndividualStandings, aggregateTeamScores, buildBoatPercentageTeamStandings, buildDailyAnglerPercentages, buildCpueData, buildSkipperRanking } from './utils/scoringEngine'
+import { inDivision } from '../../utils/anglerDivisions'
 
 const NAVY  = '#1e3a8a'
 const GREY  = '#6b7280'
@@ -70,7 +71,7 @@ export default function CompetitionAdminScoreboard({
   const filteredStandings = useMemo(() => {
     if (categoryFilter === 'all') return individualStandings
     return individualStandings
-      .filter(s => s.category === categoryFilter)
+      .filter(s => inDivision(s, categoryFilter))
       .map((s, i) => ({ ...s, rank: i + 1 }))
   }, [individualStandings, categoryFilter])
 

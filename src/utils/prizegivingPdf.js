@@ -8,6 +8,7 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { buildRunOfShow } from './invitationalPrizes'
+import { divisionLabel } from './anglerDivisions'
 
 const NAVY = [30, 58, 138]
 const AMBER = [180, 83, 9]
@@ -95,7 +96,7 @@ export function buildPrizegivingPdf({ competitionName, result, upToLabel }) {
     startY: 22,
     head: [['Place', 'Angler', 'Cat.', 'Boat', 'Weighed pts', 'Daily tuna left out', 'Release pts', 'Total', 'Pending videos']],
     body: result.overallRanked.map(a => [
-      a.place + (a.tied ? '=' : ''), a.name, a.category === 'ladies' ? 'Lady' : a.category === 'junior' ? 'Junior' : '',
+      a.place + (a.tied ? '=' : ''), a.name, divisionLabel(a),
       a.boat, a.weighedPoints.toFixed(2), a.excludedPoints ? '-' + a.excludedPoints.toFixed(2) : '',
       a.releasePoints.toFixed(2), a.total.toFixed(2), a.releasesPending || '',
     ]),

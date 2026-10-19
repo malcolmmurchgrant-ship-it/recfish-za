@@ -22,6 +22,7 @@
 // calendar days (20-24 Oct), so the 2nd fishing day might be calendar Day 3.
 
 import { heaviestTunaRuleOn, pickScoringTuna, isRuleTunaName, isYellowfinName, isBigeyeOrBluefinName } from './heaviestTunaRule'
+import { divisionFlags, isLady, isJunior } from './anglerDivisions'
 
 const DAILY_PRIZE_DAYS = 3
 
@@ -119,6 +120,7 @@ export function computeInvitationalPrizes({
       boat: boatNameOfTeam(team),
       team: team?.team_name || '',
       category: p?.category || '',
+      ...divisionFlags(p || {}),
     }
   }
 
@@ -265,8 +267,8 @@ export function computeInvitationalPrizes({
 
   const scored = anglers.filter(a => a.total > 0)
   const overallRanked = rankBy(scored, a => a.total, v => r2(v))
-  const ladiesRanked  = rankBy(scored.filter(a => a.category === 'ladies'), a => a.total, v => r2(v))
-  const juniorRanked  = rankBy(scored.filter(a => a.category === 'junior'), a => a.total, v => r2(v))
+  const ladiesRanked  = rankBy(scored.filter(a => isLady(a)), a => a.total, v => r2(v))
+  const juniorRanked  = rankBy(scored.filter(a => isJunior(a)), a => a.total, v => r2(v))
   const releaseRanked = rankBy(anglers.filter(a => a.releasePoints > 0), a => a.releasePoints, v => r2(v))
 
   // ── Boat average (for the TD's Top Team / auction decision) ─────────────
@@ -325,8 +327,8 @@ export function computeInvitationalPrizes({
     pendingReleases: pending.length,
     counts: {
       anglers: anglers.length,
-      ladies: anglers.filter(a => a.category === 'ladies').length,
-      juniors: anglers.filter(a => a.category === 'junior').length,
+      ladies: anglers.filter(a => isLady(a)).length,
+      juniors: anglers.filter(a => isJunior(a)).length,
       weighed: weighed.length,
       releasesVerified: releases.filter(c => c.video_status === 'verified').length,
       releasesNotVerified: releases.filter(c => c.video_status === 'not_verified').length,

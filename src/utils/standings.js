@@ -5,6 +5,7 @@
 // as the Scoreboard does, instead of keeping a second copy that could drift.
 
 import { buildIndividualStandings, buildBoatPercentageTeamStandings } from '../components/CompetitionAdmin/utils/scoringEngine'
+import { divisionFlags } from './anglerDivisions'
 
 // ── Scoring functions ─────────────────────────────────────────────────────────
 
@@ -264,6 +265,7 @@ export function computeStandings({ competition, template, catches = [], particip
         teamDisplay: team ? team.team_name + (team.team_suffix ? ` ${team.team_suffix}` : '') : (p.competition_teams?.team_name || p.province || ''),
         lineClass: p.line_class_kg,
         category: p.category,
+        ...divisionFlags(p),   // isLady / isJunior / isSenior (tick boxes)
         fish: ac.length,
         kg: Math.round(kg * 1000) / 1000,
         points: Math.round(pts * 100) / 100,

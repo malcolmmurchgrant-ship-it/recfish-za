@@ -7,6 +7,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { computeInvitationalPrizes, buildRunOfShow } from '../../utils/invitationalPrizes'
+import { divisionLabel } from '../../utils/anglerDivisions'
 
 const NAVY = '#1e3a8a'
 const GREY = '#6b7280'
@@ -202,7 +203,7 @@ export default function CompetitionAdminPrizegiving({ competition, config, catch
                   <tr key={a.participantId}>
                     <td style={S.td}>{a.place}{a.tied ? '=' : ''}</td>
                     <td style={S.td}>{a.name}</td>
-                    <td style={S.td}>{a.category === 'ladies' ? 'Lady' : a.category === 'junior' ? 'Junior' : ''}</td>
+                    <td style={S.td}>{divisionLabel(a)}</td>
                     <td style={S.td}>{a.boat}</td>
                     <td style={S.td}>{a.weighedPoints.toFixed(2)}</td>
                     <td style={S.td}>{a.excludedPoints ? '−' + a.excludedPoints.toFixed(2) : ''}</td>
