@@ -447,11 +447,11 @@ export default function CompetitionAdminParticipants({ competition, config, days
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
                 <div>
                   <div style={{ fontWeight: 700, color: NAVY, display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                    {isDQ(p) && <span style={S.badge(RED)}>🚫 DQ</span>}
-                    {p.is_captain && <span style={S.badge(GOLD)}>© Captain</span>}
-                    {p.is_skipper && <span style={S.badge(NAVY)}>⚓ Skipper</span>}
                     {p.full_name}
                     {p.angler_number && <span style={{ color: GREY, fontWeight: 400, fontSize: '0.85rem' }}>#{p.angler_number}</span>}
+                    {p.is_captain && <span style={S.badge(GOLD)}>© Captain</span>}
+                    {p.is_skipper && <span style={S.badge(NAVY)}>⚓ Skipper</span>}
+                    {isDQ(p) && <span style={S.badge(RED)}>🚫 DQ</span>}
                   </div>
                   <div style={{ fontSize: '0.82rem', color: GREY, marginTop: 2 }}>
                     {p.competition_teams?.team_name || p.competition_teams?.province || ''}
