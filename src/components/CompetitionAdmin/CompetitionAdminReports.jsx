@@ -174,6 +174,11 @@ export default function CompetitionAdminReports({
     standingsWithCpue.filter(s => s.category === 'ladies').map((s, i) => ({ ...s, rank: i + 1 })),
     [standingsWithCpue]
   )
+  // Juniors ranked among themselves (Junior prizes) - shown under Ladies.
+  const juniorStandings = useMemo(() =>
+    standingsWithCpue.filter(s => s.category === 'junior').map((s, i) => ({ ...s, rank: i + 1 })),
+    [standingsWithCpue]
+  )
 
   // ── Save reporting config ─────────────────────────────────────────────────
   async function saveReportingConfig() {
@@ -267,9 +272,9 @@ export default function CompetitionAdminReports({
       if (type === 'csv') {
         downloadCSV(standingsWithCpue, competition, config)
       } else if (type === 'xlsx') {
-        downloadXLSX(standingsWithCpue, catches, competition, config, xlsxMode, { participants, dailyRecords, teamStandings: generalTeamStandings, ladiesTeamStandings, cpueData, openStandings, ladiesStandings, skipperRanking })
+        downloadXLSX(standingsWithCpue, catches, competition, config, xlsxMode, { participants, dailyRecords, teamStandings: generalTeamStandings, ladiesTeamStandings, cpueData, openStandings, ladiesStandings, juniorStandings, skipperRanking })
       } else if (type === 'pdf') {
-        downloadPDFReport(standingsWithCpue, catches, competition, config, { teamStandings: generalTeamStandings, ladiesTeamStandings, openStandings, ladiesStandings, skipperRanking, sponsorLogos, sponsorName })
+        downloadPDFReport(standingsWithCpue, catches, competition, config, { teamStandings: generalTeamStandings, ladiesTeamStandings, openStandings, ladiesStandings, juniorStandings, skipperRanking, sponsorLogos, sponsorName })
       } else if (type === 'pdf_prize' || type === 'pdf_scorer') {
         throw new Error('This PDF type isn\'t built yet — only Full Results PDF is available so far.')
       }
