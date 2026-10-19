@@ -25,6 +25,7 @@ const S = {
 export default function CompetitionAdminParticipants({ competition, config, days, isAdmin, isScorer }) {
   const [participants, setParticipants]   = useState([])
   const [teams,        setTeams]          = useState([])
+  const [boats,        setBoats]          = useState([])
   const [loading,      setLoading]        = useState(true)
   const [activeTab,    setActiveTab]      = useState('anglers')
   const [search,       setSearch]         = useState('')
@@ -62,7 +63,7 @@ export default function CompetitionAdminParticipants({ competition, config, days
   async function load() {
     if (!competition?.id) return
     setLoading(true)
-    const [{ data: parts }, { data: tms }] = await Promise.all([
+    const [{ data: parts }, { data: tms }, { data: bts }] = await Promise.all([
       supabase.from('competition_participants')
         .select('*, competition_teams(id, team_name, province, team_type)')
         .eq('competition_id', competition.id)
@@ -71,9 +72,13 @@ export default function CompetitionAdminParticipants({ competition, config, days
         .select('*')
         .eq('competition_id', competition.id)
         .order('team_name'),
+      supabase.from('competition_boats')
+        .select('id, boat_name')
+        .eq('competition_id', competition.id),
     ])
     setParticipants(parts || [])
     setTeams(tms || [])
+    setBoats(bts || [])
     setLoading(false)
   }
 
@@ -484,8 +489,15 @@ export default function CompetitionAdminParticipants({ competition, config, days
               <div key={team.id} style={{ ...S.card, borderLeft: `4px solid ${team.is_disqualified ? RED : NAVY}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
                   <div>
-                    <div style={{ fontWeight: 700, color: NAVY }}>
+                    <div style={{ fontWeight: 700, color: NAVY }} data-testid="participants-team-heading">
                       {team.team_name || team.province || ''}
+                      {(() => {
+                        // "Team - Boat" (e.g. African Vintage Tackle - Rapha); a
+                        // team named after its boat shows the name once.
+                        const boatName = boats.find(b => b.id === team.boat_id)?.boat_name || ''
+                        const same = boatName && boatName.trim().toLowerCase() === (team.team_name || '').trim().toLowerCase()
+                        return boatName && !same ? ` - ${boatName}` : ''
+                      })()}
                     </div>
                     <div style={{ fontSize: '0.8rem', color: GREY }}>{members.length} members · {dqCount > 0 ? `${dqCount} DQ'd` : 'All eligible'}</div>
                   </div>
