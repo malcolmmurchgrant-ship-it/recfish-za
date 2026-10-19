@@ -348,10 +348,22 @@ export default function BoatsAndTeams({ competition, boats = [], teams = [], onC
         ) : (
           <div key={t.id} style={S.row}>
             <div>
-              <div style={{ fontWeight: 700 }}>{teamLabel(t)}</div>
-              <div style={{ fontSize: '0.8rem', color: GREY }}>
-                Boat: {boats.find(b => b.id === t.boat_id)?.boat_name || '—'} · {anglerCount([t.id])} angler(s)
-              </div>
+              {(() => {
+                // "Team - Boat" (e.g. African Vintage Tackle - Rapha). When the
+                // team is named after its boat, the name is shown once.
+                const boatName = boats.find(b => b.id === t.boat_id)?.boat_name || ''
+                const sameName = boatName && az(t.team_name, boatName) === 0
+                return (
+                  <>
+                    <div style={{ fontWeight: 700 }} data-testid="team-heading">
+                      {teamLabel(t)}{boatName && !sameName ? ` - ${boatName}` : ''}
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: GREY }}>
+                      {boatName ? '' : 'No boat assigned · '}{anglerCount([t.id])} angler(s)
+                    </div>
+                  </>
+                )
+              })()}
             </div>
             <div style={{ display: 'flex', gap: '0.4rem' }}>
               <button onClick={() => setEditTeam({ id: t.id, team_name: t.team_name || '', boat_id: t.boat_id || '' })} style={S.btn()}>✎ Edit</button>
