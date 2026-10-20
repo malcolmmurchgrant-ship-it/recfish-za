@@ -306,7 +306,7 @@ export function buildIndividualStandings(catches, participants, days, boats, sco
       teamName:       p.competition_teams?.team_name || p.competition_teams?.province || null,
       lineClass:      p.line_class_kg,
       category:       p.category,
-      ...divisionFlags(p),   // isLady / isJunior / isSenior (tick boxes)
+      ...divisionFlags(p),   // isLady / isJunior (tick boxes)
       totalPoints:    0,
       totalWeightKg:  0,
       catchCount:     0,
