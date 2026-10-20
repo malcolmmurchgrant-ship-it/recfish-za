@@ -50,7 +50,16 @@ export function calcPointsScoring({
 }
 
 // ── Kingfish photo-measure-release ────────────────────────────────────────────
-export function calcKingfishRelease(scoringConfig) {
+// speciesCfg is optional - a per-species `release_points` value takes
+// priority (CBSC Tuna Invitational: 20 pts for a verified Yellowfin /
+// Bigeye / Southern Bluefin release, 5 pts for Longfin, all in the same
+// competition). Falls back to the single competition-wide value, then 5,
+// exactly as before for any competition that doesn't set release_points
+// (e.g. Gamefish Nationals Kingfish). This was written on 22 Sep but never
+// reached the live app; restored 20 Oct 2026.
+export function calcKingfishRelease(scoringConfig, speciesCfg) {
+  const own = parseFloat(speciesCfg?.release_points)
+  if (Number.isFinite(own)) return own
   return scoringConfig?.photo_release_fixed_points ?? 5
 }
 
@@ -93,7 +102,7 @@ export function calculateCatchPoints({
   // Kingfish photo-measure-release
   if (isKingfishRelease) {
     if (!isMeasured400mm) return { points: 0, method: 'kingfish_release_invalid', detail: 'Under 400mm — no points' }
-    const pts = calcKingfishRelease(scoringConfig)
+    const pts = calcKingfishRelease(scoringConfig, speciesRule)
     return { points: pts, method: 'kingfish_release', detail: `📸 ${pts}pts` }
   }
 
