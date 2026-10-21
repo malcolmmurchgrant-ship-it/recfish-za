@@ -742,6 +742,14 @@ function CatchEditModal({ catch_, config, participants, days, onSave, onClose })
       // zeroing it on Disqualified; everything else preserves whatever the
       // catch logger originally calculated with full context.
       points = form.data_quality === 'disqualified' ? 0 : parseFloat(catch_.points ?? 0)
+    } else if (catch_.video_status || catch_.retained === false) {
+      // A release (e.g. a video-verified Invitational release, or a Gamefish
+      // Kingfish release) is scored by flat release points, set when it was
+      // logged and awarded by the Video Verifier - never from a weight. This
+      // modal must not re-score it as a weighed fish (that gave 0, wiping a
+      // verified 20-point release on any edit, even a note). Keep its points;
+      // only Disqualified zeroes them.
+      points = form.data_quality === 'disqualified' ? 0 : parseFloat(catch_.points ?? 0)
     } else {
       const result = calculateCatchPoints({
         scoringConfig,
