@@ -428,7 +428,7 @@ export default function CompetitionAdminScoring({
                         </div>
                         <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
                           <span style={{ fontWeight: 700, color: c.data_quality === 'disqualified' ? RED : NAVY }}>
-                            {c.data_quality === 'disqualified' ? '0' : parseFloat(c.points || 0).toFixed(2)}
+                            {(c.data_quality === 'disqualified' || c.data_quality === 'rejected') ? '0' : parseFloat(c.points || 0).toFixed(2)}
                           </span>
                           {(isAdmin || isScorer) && !isLocked && (
                             <button onClick={() => setEditing(c)}
@@ -501,7 +501,7 @@ export default function CompetitionAdminScoring({
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: '0.68rem', color: GREY, textTransform: 'uppercase' }}>Points</div>
                   <div style={{ fontWeight: 700, color: c.data_quality === 'disqualified' ? RED : NAVY, fontSize: '1.05rem' }}>
-                    {c.data_quality === 'disqualified' ? '0' : parseFloat(c.points || 0).toFixed(2)}
+                    {(c.data_quality === 'disqualified' || c.data_quality === 'rejected') ? '0' : parseFloat(c.points || 0).toFixed(2)}
                   </div>
                 </div>
                 {(isAdmin || isScorer) && !isLocked && (
@@ -658,6 +658,7 @@ export default function CompetitionAdminScoring({
         <CatchEditModal
           catch_={editing}
           config={config}
+          isAdmin={isAdmin}
           participants={participants}
           days={days}
           onSave={() => { setEditing(null); onCatchUpdate() }}
@@ -705,7 +706,7 @@ async function reapplyHeaviestTunaRule(config, participantId, dayIds) {
 }
 
 // ── CatchEditModal ────────────────────────────────────────────────────────────
-function CatchEditModal({ catch_, config, participants, days, onSave, onClose }) {
+function CatchEditModal({ catch_, config, participants, days, onSave, onClose, isAdmin }) {
   const scoringMethod = config?.scoring?.method || 'percentage'
   const [form,   setForm]   = useState({
     species_name:   catch_.species_name   || '',
@@ -721,6 +722,27 @@ function CatchEditModal({ catch_, config, participants, days, onSave, onClose })
   })
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState('')
+
+  // Delete this one catch outright (e.g. a test entry, or a fish logged
+  // against the wrong angler). Admins / TDs only. Not offered for
+  // 'points'-method unit-count rows, where one row can carry a whole
+  // species total for the day - those are corrected on the Catch Logger card.
+  const isRelease = !!catch_.video_status || catch_.retained === false
+  const canDelete = isAdmin && (scoringMethod !== 'points' || isRelease)
+  async function handleDelete() {
+    const who = participants.find(p => p.id === catch_.participant_id || (catch_.angler_id && p.user_id === catch_.angler_id))?.full_name || 'this angler'
+    const what = `${catch_.species_name || 'catch'}${isRelease ? ' release' : (catch_.weight_kg ? ` ${parseFloat(catch_.weight_kg).toFixed(2)} kg` : '')}`
+    if (!window.confirm(`Delete ${who}'s ${what} completely?\n\nIt disappears from the Scoring list, Video Review, the Scoreboard and all reports. This cannot be undone.`)) return
+    setSaving(true); setError('')
+    const { data: gone, error: err } = await supabase.from('competition_catches').delete().eq('id', catch_.id).select('id')
+    if (err) { setError(err.message); setSaving(false); return }
+    if (!gone || gone.length === 0) { setError('NOT deleted: the database did not allow it. Only the competition\'s admins / TD and the owners can delete catches.'); setSaving(false); return }
+    try {
+      await reapplyHeaviestTunaRule(config, catch_.participant_id, [catch_.competition_day_id])
+    } catch { /* the catch is gone either way; the Prizegiving check flags any rule mismatch */ }
+    setSaving(false)
+    onSave()
+  }
 
   async function handleSave() {
     setSaving(true); setError('')
@@ -870,6 +892,12 @@ function CatchEditModal({ catch_, config, participants, days, onSave, onClose })
             {saving ? 'Saving…' : '✓ Save Changes'}
           </button>
           <button onClick={onClose} style={S.btn(GREY)}>Cancel</button>
+          {canDelete && (
+            <button onClick={handleDelete} disabled={saving} data-testid="delete-catch"
+              style={{ marginLeft: 'auto', background: 'white', color: RED, border: `1px solid ${RED}`, borderRadius: 6, padding: '0.5rem 1rem', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer' }}>
+              🗑 Delete catch
+            </button>
+          )}
         </div>
       </div>
     </div>
