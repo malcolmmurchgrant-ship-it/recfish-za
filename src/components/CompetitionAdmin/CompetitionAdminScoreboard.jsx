@@ -310,9 +310,19 @@ export default function CompetitionAdminScoreboard({
             <label style={S.label}>Day</label>
             <select style={S.select} value={dailyDayFilter} onChange={e => setDailyDayFilter(e.target.value)}>
               <option value="all">All Days</option>
-              {[...new Set(dailyRecords.map(d => d.dayNumber))].filter(n => n != null).sort((a, b) => a - b).map(n => (
-                <option key={n} value={n}>Day {n}</option>
-              ))}
+              {/* Every competition day that isn't cancelled is listed from the
+                  start (plus any other day that has catches), so a day can be
+                  picked before its first catch is logged. */}
+              {[...new Set([
+                ...(days || []).filter(d => !d.cancelled).map(d => d.day_number),
+                ...dailyRecords.map(d => d.dayNumber),
+              ])].filter(n => n != null).sort((a, b) => a - b).map(n => {
+                const day = (days || []).find(d => d.day_number === n)
+                const label = day?.date
+                  ? ` — ${new Date(day.date + 'T00:00:00').toLocaleDateString('en-ZA', { weekday: 'short', day: 'numeric', month: 'short' })}`
+                  : ''
+                return <option key={n} value={n}>Day {n}{label}</option>
+              })}
             </select>
           </div>
           <div style={{ fontSize: '0.78rem', color: GREY, marginBottom: '0.75rem' }}>
@@ -357,7 +367,7 @@ export default function CompetitionAdminScoreboard({
                   )
                 })}
                 {filteredDaily.length === 0 && (
-                  <tr><td colSpan={7} style={{ padding: '1.5rem', textAlign: 'center', color: GREY, fontStyle: 'italic' }}>No catches recorded yet.</td></tr>
+                  <tr><td colSpan={7} style={{ padding: '1.5rem', textAlign: 'center', color: GREY, fontStyle: 'italic' }}>{dailyDayFilter === 'all' ? 'No catches recorded yet.' : `No catches logged for Day ${dailyDayFilter} yet.`}</td></tr>
                 )}
               </tbody>
             </table>
