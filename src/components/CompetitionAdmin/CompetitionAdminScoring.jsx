@@ -8,6 +8,7 @@ import { calculateCatchPoints, groupCatchesBySpecies, buildCpueData } from './ut
 import { disqualifyParticipant } from './utils/disqualificationActions'
 import { isPredatorCatch } from './utils/catchLoggerScoring'
 import { heaviestTunaRuleOn, pickScoringTuna, isRuleTunaName } from '../../utils/heaviestTunaRule'
+import { dayLabel } from '../../utils/dayLabels'
 
 const NAVY  = '#1e3a8a'
 const GREY  = '#6b7280'
@@ -281,7 +282,7 @@ export default function CompetitionAdminScoring({
           <label style={S.label}>Day</label>
           <select style={S.select} value={dayFilter} onChange={e => setDayFilter(e.target.value)}>
             <option value="all">All Days</option>
-            {days.map(d => <option key={d.day_number} value={d.day_number}>Day {d.day_number} — {d.date}</option>)}
+            {days.map(d => <option key={d.day_number} value={d.day_number}>{dayLabel(d)}</option>)}
           </select>
         </div>
         {teams.length > 0 && (
@@ -855,7 +856,7 @@ function CatchEditModal({ catch_, config, participants, days, onSave, onClose, i
             <label style={S.label}>Day</label>
             <select style={S.select} value={form.competition_day_id}
               onChange={e => setForm(f => ({ ...f, competition_day_id: e.target.value }))}>
-              {days.map(d => <option key={d.id} value={d.id}>Day {d.day_number} — {d.date}</option>)}
+              {days.map(d => <option key={d.id} value={d.id}>{dayLabel(d)}</option>)}
             </select>
           </div>
           <div>

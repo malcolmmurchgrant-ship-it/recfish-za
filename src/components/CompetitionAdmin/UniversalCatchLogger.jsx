@@ -46,6 +46,7 @@ import { supabase } from '../../lib/supabase'
 import { useCompetitionConfig } from './hooks/useCompetitionConfig'
 import { useCatchLoggerData } from './hooks/useCatchLoggerData'
 import VideoUpload from '../VideoUpload'
+import { dayLabel, defaultFishingDay } from '../../utils/dayLabels'
 import {
   buildSpeciesPicker,
   findSpeciesConfig,
@@ -299,7 +300,7 @@ export default function UniversalCatchLogger({ competitionId }) {
       const requestedDayNum = parseInt(searchParams.get('day'), 10)
       const sortedDays = [...days].sort((a, b) => a.day_number - b.day_number)
       const targetDay = (!Number.isNaN(requestedDayNum) && sortedDays.find(d => d.day_number === requestedDayNum))
-        || sortedDays[0]
+        || defaultFishingDay(sortedDays)
 
       skipDayResetRef.current = true
       skipTeamBoatResetRef.current = true
@@ -312,6 +313,11 @@ export default function UniversalCatchLogger({ competitionId }) {
         if (p?.competition_teams?.id) setTeamId(p.competition_teams.id)
       }
       setParticipantId(linkParticipantId)
+    } else {
+      // Opened without a link: start on today's fishing day (or the first
+      // day that isn't cancelled), not on a cancelled Day 1.
+      const start = defaultFishingDay(days)
+      if (start) setDay(start.id)
     }
 
     didInitRef.current = true
@@ -806,10 +812,15 @@ export default function UniversalCatchLogger({ competitionId }) {
           <option value=''>Select day…</option>
           {days.map(d => (
             <option key={d.id} value={d.id}>
-              Day {d.day_number}{d.date ? ` — ${new Date(d.date).toLocaleDateString('en-ZA', { weekday: 'long', day: 'numeric', month: 'long' })}` : ''}{d.cancelled ? ' (Cancelled)' : ''}
+              {dayLabel(d, { long: true })}
             </option>
           ))}
         </select>
+        {selectedDay?.cancelled && (
+          <div data-testid="cancelled-day-warning" style={{ marginTop: '0.6rem', padding: '0.6rem 0.75rem', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 6, color: RED, fontWeight: 600, fontSize: '0.88rem' }}>
+            ⚠ This day was cancelled{selectedDay.cancellation_reason ? ` (${selectedDay.cancellation_reason})` : ''} — catches logged here won't count in any result. Choose a fishing day.
+          </div>
+        )}
       </div>
 
       {day && (
