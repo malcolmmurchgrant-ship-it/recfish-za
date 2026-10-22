@@ -13,6 +13,7 @@ import ScoreboardTV from '../components/ScoreboardTV'
 import { getSponsorLogos } from '../utils/sponsorLogos'
 import PublishedResultsDownload from '../components/PublishedResultsDownload'
 import { divisionLabel } from '../utils/anglerDivisions'
+import { applyDailyBiggestTunaExclusion } from '../utils/dailyBiggestTunaExclusion'
 
 const NAVY  = '#1e3a8a'
 const GOLD  = '#d97706'
@@ -82,7 +83,7 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
       { data: dayData },
     ] = await Promise.all([
       supabase.from('competitions')
-        .select('*, competition_templates(discipline, level, category, scoring_config, team_config, session_structure)')
+        .select('*, competition_templates(discipline, level, category, scoring_config, team_config, session_structure, species_config)')
         .eq('id', competitionId).single(),
       supabase.from('competition_catches')
         .select('*, competition_teams(id, team_name, province), competition_days(id, day_number, date)')
@@ -125,8 +126,17 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
     return () => clearInterval(interval)
   }, [load, embedded])
 
+  // CBSC Invitational: each day's Daily Biggest Tuna scores 0 towards totals
+  // here, the same as on the Prizegiving tab (TD's request, 22 Oct 2026).
+  // Other competitions are returned unchanged.
+  const standingCatches = applyDailyBiggestTunaExclusion(catches, {
+    participants, teams, boats, days,
+    scoringConfig: template?.scoring_config, speciesConfig: template?.species_config,
+  })
+  const dailyBiggestCount = standingCatches.filter(c => c.daily_biggest_excluded).length
+
   const { scoringConfig, teamConfig, discipline, isPublished, isSplitBoat, teamMap, anglerMap, boatMap, dayMap, dateToDay, fishingDays, totalHours, cancelledDays, scoringCatches, filteredCatches, useMultiplier, teamPercentageMap, teamParticipantIds, userIdToParticipantId, teamStandings, anglerPercentageMap, anglerStandings } =
-    computeStandings({ competition, template, catches, participants, teams, boats, days, dayFilter })
+    computeStandings({ competition, template, catches: standingCatches, participants, teams, boats, days, dayFilter })
 
   // ── Skipper standings ─────────────────────────────────────────────────────
   // Match catches directly by their own boat_id — every catch always
@@ -204,7 +214,9 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
       anglerName: anglerMap[c.angler_id || c.participant_id]?.full_name || '',
       teamName:   c.competition_teams?.team_name || teamMap[c.team_id]?.team_name || '',
       dayNum:     c.competition_days?.day_number || dateToDay[c.fishing_date] || '?',
-      pts:        calcPoints(c, scoringConfig),
+      // The Daily Biggest Tuna still shows here with its real points (it is
+      // still one of the top fish), marked as left out of the totals.
+      pts:        c.daily_biggest_excluded ? parseFloat(c.original_points || 0) : calcPoints(c, scoringConfig),
     }))
     .sort((a, b) => b.pts - a.pts)
     .slice(0, 10)
@@ -355,6 +367,12 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
 
       {/* ── Official results download (published results, logged-in users) ── */}
       {isPublished && !embedded && <PublishedResultsDownload competitionId={competitionId} />}
+
+      {dailyBiggestCount > 0 && (
+        <div style={{ fontSize: '0.8rem', color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '0.5rem 0.75rem', marginBottom: '0.75rem' }}>
+          🏆 Each day's Daily Biggest Tuna wins its prize, so that fish's points are left out of the totals below, as in the prize standings.
+        </div>
+      )}
 
       {/* ── Tabs ─────────────────────────────────────────────────────────── */}
       <div style={{ display: 'flex', gap: 0, marginBottom: '1rem', borderRadius: 8, overflow: 'hidden', border: '1px solid #e5e7eb', flexWrap: 'wrap' }}>
@@ -525,6 +543,7 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
               <div style={{ flex: 1, minWidth: 140 }}>
                 <div style={{ fontWeight: 700 }}>{c.anglerName || '—'}</div>
                 <div style={{ fontSize: '0.78rem', color: GREY }}>{c.teamName} · Day {c.dayNum}</div>
+                {c.daily_biggest_excluded && <div style={{ fontSize: '0.72rem', color: GOLD, fontWeight: 700 }}>🏆 Daily Biggest Tuna — points not in totals</div>}
               </div>
               <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                 <div style={{ textAlign: 'center' }}>
@@ -576,6 +595,7 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
                     <span style={S.badge('#374151')}>{c.species_name}</span>
                     <span style={{ fontWeight: 600, color: GOLD, fontSize: '0.85rem' }}>{c.weight_kg ? `${parseFloat(c.weight_kg).toFixed(2)}kg` : '📸 Released'}</span>
                     {c.line_class_kg && <span style={{ fontSize: '0.78rem', color: GREY }}>{c.line_class_kg}kg LC</span>}
+                    {c.daily_biggest_excluded && <span style={{ fontSize: '0.72rem', color: GOLD, fontWeight: 700 }} title={`${parseFloat(c.original_points || 0).toFixed(2)} pts left out of the totals`}>🏆 Daily Biggest Tuna</span>}
                     <span style={{ fontWeight: 700, color: NAVY, minWidth: 60, textAlign: 'right', fontSize: '0.85rem' }}>
                       {calcPoints(c, scoringConfig).toFixed(2)}pts
                     </span>

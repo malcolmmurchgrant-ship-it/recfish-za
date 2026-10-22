@@ -334,6 +334,10 @@ export function computeInvitationalPrizes({
       releasesNotVerified: releases.filter(c => c.video_status === 'not_verified').length,
     },
     dailyTuna,
+    // Ids of the Daily Biggest Tuna fish whose points are left out of the
+    // anglers' totals (both fish when tied). The Scoreboard, TV display and
+    // Reports use this through dailyBiggestTunaExclusion.js.
+    excludedCatchIds: [...excludedCatchIds],
     prizes,
     overallRanked,
     boatRanking,

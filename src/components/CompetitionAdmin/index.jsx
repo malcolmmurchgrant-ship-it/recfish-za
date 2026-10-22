@@ -24,6 +24,7 @@ import CompetitionAdminReports      from './CompetitionAdminReports'
 import RolesTab                     from './CompetitionAdminRoles'
 import CompetitionAdminVideoReview  from './CompetitionAdminVideoReview'
 import CompetitionAdminPrizegiving  from './CompetitionAdminPrizegiving'
+import { applyDailyBiggestTunaExclusion } from '../../utils/dailyBiggestTunaExclusion'
 
 const NAVY = '#1e3a8a'
 const GREY = '#6b7280'
@@ -75,6 +76,13 @@ export default function CompetitionAdmin({ competitionId }) {
   // the Scoreboard and Reports never see them, so no fish count, tie-break or
   // report can include one. Memoised so the list keeps a stable identity.
   const standingsCatches = useMemo(() => catches.filter(c => !isPredatorCatch(c)), [catches])
+  // Scoreboard and Reports: each day's Daily Biggest Tuna scores 0 towards
+  // totals (CBSC Invitational only), matching the Prizegiving tab, which
+  // works the rule out itself from standingsCatches.
+  const scoreboardCatches = useMemo(() => applyDailyBiggestTunaExclusion(standingsCatches, {
+    participants, teams, boats, days,
+    scoringConfig: config?.scoring, speciesConfig: config?.species,
+  }), [standingsCatches, participants, teams, boats, days, config])
 
   // ── Load participants, days, teams ────────────────────────────────────────
   useEffect(() => {
@@ -279,7 +287,7 @@ export default function CompetitionAdmin({ competitionId }) {
         <CompetitionAdminScoreboard
           competition={competition}
           config={config}
-          catches={standingsCatches}
+          catches={scoreboardCatches}
           participants={participants}
           teams={teams}
           days={days}
@@ -313,7 +321,7 @@ export default function CompetitionAdmin({ competitionId }) {
         <CompetitionAdminReports
           competition={competition}
           config={config}
-          catches={standingsCatches}
+          catches={scoreboardCatches}
           participants={participants}
           teams={teams}
           days={days}

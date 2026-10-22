@@ -10,6 +10,10 @@ import { divisionFlags } from './anglerDivisions'
 // ── Scoring functions ─────────────────────────────────────────────────────────
 
 export function calcPoints(catch_, scoringConfig) {
+  // A Daily Biggest Tuna winner (CBSC Invitational) scores nothing towards
+  // totals - see dailyBiggestTunaExclusion.js. Checked first so a zero-point
+  // row never falls back to its weight below.
+  if (catch_?.daily_biggest_excluded) return 0
   if (!catch_ || !scoringConfig) return parseFloat(catch_?.points || 0)
   // Use pre-calculated points if available
   if (catch_.points && parseFloat(catch_.points) > 0) return parseFloat(catch_.points)
