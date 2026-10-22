@@ -86,7 +86,7 @@ export default function CompetitionAdmin({ competitionId }) {
     setLoadingMeta(true)
     const [{ data: parts }, { data: ds }, { data: tms }, { data: bts }] = await Promise.all([
       supabase.from('competition_participants')
-        .select('*, competition_teams(id, team_name, province, team_type)')
+        .select('*, competition_teams(id, team_name, province, team_type, boat_id)')
         .eq('competition_id', competitionId)
         .order('full_name'),
       supabase.from('competition_days')
