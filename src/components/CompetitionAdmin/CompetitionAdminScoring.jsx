@@ -9,6 +9,7 @@ import { disqualifyParticipant } from './utils/disqualificationActions'
 import { isPredatorCatch } from './utils/catchLoggerScoring'
 import { heaviestTunaRuleOn, pickScoringTuna, isRuleTunaName } from '../../utils/heaviestTunaRule'
 import { dayLabel } from '../../utils/dayLabels'
+import { teamBoatLabel } from '../../utils/teamLabels'
 
 const NAVY  = '#1e3a8a'
 const GREY  = '#6b7280'
@@ -290,7 +291,7 @@ export default function CompetitionAdminScoring({
             <label style={S.label}>Team</label>
             <select style={S.select} value={teamFilter} onChange={e => setTeamFilter(e.target.value)}>
               <option value="all">All Teams</option>
-              {teams.map(t => <option key={t.id} value={t.team_name}>{t.team_name || t.province}</option>)}
+              {teams.map(t => <option key={t.id} value={t.team_name}>{teamBoatLabel(t, boats)}</option>)}
             </select>
           </div>
         )}

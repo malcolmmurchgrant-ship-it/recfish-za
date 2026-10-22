@@ -47,6 +47,7 @@ import { useCompetitionConfig } from './hooks/useCompetitionConfig'
 import { useCatchLoggerData } from './hooks/useCatchLoggerData'
 import VideoUpload from '../VideoUpload'
 import { dayLabel, defaultFishingDay } from '../../utils/dayLabels'
+import { teamBoatLabel } from '../../utils/teamLabels'
 import {
   buildSpeciesPicker,
   findSpeciesConfig,
@@ -834,7 +835,7 @@ export default function UniversalCatchLogger({ competitionId }) {
           ) : (
             <select style={S.select} value={teamId} onChange={e => setTeamId(e.target.value)}>
               <option value=''>Select team…</option>
-              {teams.map(t => <option key={t.id} value={t.id}>{t.display_name || t.team_name}</option>)}
+              {teams.map(t => <option key={t.id} value={t.id}>{t.display_name || teamBoatLabel(t, boats)}</option>)}
             </select>
           )}
         </div>
