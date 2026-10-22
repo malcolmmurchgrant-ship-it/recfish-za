@@ -10,6 +10,7 @@ import { downloadCSV, downloadXLSX, downloadPDFReport } from './utils/reportGene
 import { readLogoFile, MAX_LOGOS } from '../../utils/sponsorLogos'
 import { buildIndividualStandings, buildDailyAnglerPercentages, buildBoatPercentageTeamStandings, buildCpueData, buildSkipperRanking } from './utils/scoringEngine'
 import { isLady, isJunior } from '../../utils/anglerDivisions'
+import { dayLabel } from '../../utils/dayLabels'
 
 // Flip to true once generate-competition-pdf is actually built and deployed
 // as a Supabase Edge Function (confirmed none exist on this project yet).
@@ -633,7 +634,7 @@ export default function CompetitionAdminReports({
                       <select style={S.select} value={cat.day_number ?? ''}
                         onChange={e => updatePrizeCat(i, { day_number: e.target.value === '' ? null : Number(e.target.value) })}>
                         <option value="">All days</option>
-                        {(days || []).map(d => <option key={d.id} value={d.day_number}>Day {d.day_number}</option>)}
+                        {(days || []).map(d => <option key={d.id} value={d.day_number}>{dayLabel(d)}</option>)}
                       </select>
                     </div>
                   )}

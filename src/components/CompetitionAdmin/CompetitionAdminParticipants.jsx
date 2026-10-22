@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react'
 import { divisionLabel, isLady, isJunior, categoryFromFlags } from '../../utils/anglerDivisions'
 import { supabase } from '../../lib/supabase'
 import { disqualifyParticipant, reinstateParticipant } from './utils/disqualificationActions'
+import { dayLabel } from '../../utils/dayLabels'
 
 const NAVY = '#1e3a8a'
 const GREY = '#6b7280'
@@ -563,7 +564,7 @@ export default function CompetitionAdminParticipants({ competition, config, days
                 <select style={{ ...S.select, marginBottom: '0.75rem' }} value={dqDayScope} onChange={e => setDqDayScope(e.target.value)}>
                   <option value="" disabled>Select scope…</option>
                   <option value="all">Whole competition (marks angler as DQ'd everywhere)</option>
-                  {days.map(d => <option key={d.id} value={d.id}>Day {d.day_number} only — {d.date}</option>)}
+                  {days.map(d => <option key={d.id} value={d.id}>{dayLabel(d).replace(/^Day (\d+)/, 'Day $1 only')}</option>)}
                 </select>
               </>
             )}
