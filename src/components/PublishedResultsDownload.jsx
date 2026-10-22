@@ -16,6 +16,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useCompetitionConfig } from './CompetitionAdmin/hooks/useCompetitionConfig'
 import { useCompetitionCatches } from './CompetitionAdmin/hooks/useCompetitionCatches'
 import { isPredatorCatch } from './CompetitionAdmin/utils/catchLoggerScoring'
+import { applyDailyBiggestTunaExclusion } from '../utils/dailyBiggestTunaExclusion'
 import CompetitionAdminReports from './CompetitionAdmin/CompetitionAdminReports'
 
 const NAVY = '#1e3a8a'
@@ -64,7 +65,13 @@ function Downloads({ competitionId }) {
     return () => { live = false }
   }, [competitionId])
 
-  const standingsCatches = useMemo(() => catches.filter(c => !isPredatorCatch(c)), [catches])
+  // Same as the admin Reports tab: predator rows out, and the CBSC
+  // Invitational's Daily Biggest Tuna fish scored 0 towards totals.
+  const standingsCatches = useMemo(() => applyDailyBiggestTunaExclusion(
+    catches.filter(c => !isPredatorCatch(c)),
+    { participants: meta?.participants, teams: meta?.teams, boats: meta?.boats, days: meta?.days,
+      scoringConfig: config?.scoring, speciesConfig: config?.species },
+  ), [catches, meta, config])
 
   if (cfgError) return <div style={{ marginTop: '0.5rem', color: '#dc2626', fontSize: '0.85rem' }}>Could not load the results: {cfgError}</div>
   if (cfgLoading || catchesLoading || !meta) return <div style={{ marginTop: '0.5rem', color: GREY, fontSize: '0.85rem' }}>Preparing the results…</div>
