@@ -14,6 +14,8 @@ import { getSponsorLogos } from '../utils/sponsorLogos'
 import PublishedResultsDownload from '../components/PublishedResultsDownload'
 import { divisionLabel } from '../utils/anglerDivisions'
 import { applyDailyBiggestTunaExclusion } from '../utils/dailyBiggestTunaExclusion'
+import WeighInReports from '../components/WeighInReports'
+import { tracksWeighInReports, buildReportStatus, localToday } from '../utils/noCatch'
 
 const NAVY  = '#1e3a8a'
 const GOLD  = '#d97706'
@@ -134,6 +136,13 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
     scoringConfig: template?.scoring_config, speciesConfig: template?.species_config,
   })
   const dailyBiggestCount = standingCatches.filter(c => c.daily_biggest_excluded).length
+
+  // Weigh-in reporting (live competitions): tells "No catch reported" apart
+  // from "not reported yet" instead of a bare 0 / NC. Finished competitions
+  // keep their original display. See utils/noCatch.js.
+  const trackReports = tracksWeighInReports(competition, catches)
+  const reportStatus = trackReports ? buildReportStatus(catches, participants, days) : null
+  const today = localToday()
 
   const { scoringConfig, teamConfig, discipline, isPublished, isSplitBoat, teamMap, anglerMap, boatMap, dayMap, dateToDay, fishingDays, totalHours, cancelledDays, scoringCatches, filteredCatches, useMultiplier, teamPercentageMap, teamParticipantIds, userIdToParticipantId, teamStandings, anglerPercentageMap, anglerStandings } =
     computeStandings({ competition, template, catches: standingCatches, participants, teams, boats, days, dayFilter })
@@ -374,6 +383,10 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
         </div>
       )}
 
+      {trackReports && !embedded && (
+        <WeighInReports catches={catches} participants={participants} teams={teams} boats={boats} days={days} />
+      )}
+
       {/* ── Tabs ─────────────────────────────────────────────────────────── */}
       <div style={{ display: 'flex', gap: 0, marginBottom: '1rem', borderRadius: 8, overflow: 'hidden', border: '1px solid #e5e7eb', flexWrap: 'wrap' }}>
         {TABS.map(t => (
@@ -479,13 +492,22 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
                       const dMult= Math.max(1, dSp - 1)
                       const dPts = useMultiplier ? dRaw * dMult : dRaw
                       const dKg  = dc.reduce((s, c) => s + parseFloat(c.weight_kg || 0), 0)
+                      // Live competitions: say whether a day with no fish was
+                      // reported as No Catch, or not reported yet.
+                      const rep  = reportStatus && dc.length === 0 ? reportStatus(a.id, d.id) : null
+                      const future = d.date && String(d.date).slice(0, 10) > today
+                      const empty = !reportStatus ? 'NC'
+                        : future ? '—'
+                        : rep === 'no_catch' ? '🚫 No catch'
+                        : rep === 'weighed' ? '0 pts'
+                        : '⏳ Not reported'
                       return (
                         <span key={d.id} style={{ fontSize: '0.73rem', background: dc.length > 0 ? '#eff6ff' : '#f9fafb', color: dc.length > 0 ? NAVY : GREY, padding: '0.2rem 0.5rem', borderRadius: 4 }}>
                           D{d.day_number}: {dc.length > 0
                             ? useMultiplier
                               ? `${dc.length}🐟 ${dKg.toFixed(1)}kg ${dRaw.toFixed(1)}×${dMult}=${dPts.toFixed(0)}pts`
                               : `${dc.length}🐟 ${dKg.toFixed(1)}kg ${dPts.toFixed(0)}pts`
-                            : 'NC'}
+                            : empty}
                         </span>
                       )
                     })}

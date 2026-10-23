@@ -25,6 +25,7 @@ import RolesTab                     from './CompetitionAdminRoles'
 import CompetitionAdminVideoReview  from './CompetitionAdminVideoReview'
 import CompetitionAdminPrizegiving  from './CompetitionAdminPrizegiving'
 import { applyDailyBiggestTunaExclusion } from '../../utils/dailyBiggestTunaExclusion'
+import { isNoCatchRow } from '../../utils/noCatch'
 
 const NAVY = '#1e3a8a'
 const GREY = '#6b7280'
@@ -79,10 +80,13 @@ export default function CompetitionAdmin({ competitionId }) {
   // Scoreboard and Reports: each day's Daily Biggest Tuna scores 0 towards
   // totals (CBSC Invitational only), matching the Prizegiving tab, which
   // works the rule out itself from standingsCatches.
+  // "No Catch" records (utils/noCatch.js) are reports, not fish: they are
+  // left out of standings and reports here. The Prizegiving tab and the
+  // weigh-in panel read them from standingsCatches / catches.
   const scoreboardCatches = useMemo(() => applyDailyBiggestTunaExclusion(standingsCatches, {
     participants, teams, boats, days,
     scoringConfig: config?.scoring, speciesConfig: config?.species,
-  }), [standingsCatches, participants, teams, boats, days, config])
+  }).filter(c => !isNoCatchRow(c)), [standingsCatches, participants, teams, boats, days, config])
 
   // ── Load participants, days, teams ────────────────────────────────────────
   useEffect(() => {
@@ -288,6 +292,7 @@ export default function CompetitionAdmin({ competitionId }) {
           competition={competition}
           config={config}
           catches={scoreboardCatches}
+          allCatches={catches}
           participants={participants}
           teams={teams}
           days={days}

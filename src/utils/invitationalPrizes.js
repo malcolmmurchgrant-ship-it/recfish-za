@@ -23,6 +23,7 @@
 
 import { heaviestTunaRuleOn, pickScoringTuna, isRuleTunaName, isYellowfinName, isBigeyeOrBluefinName } from './heaviestTunaRule'
 import { divisionFlags, isLady, isJunior } from './anglerDivisions'
+import { isNoCatchRow } from './noCatch'
 
 const DAILY_PRIZE_DAYS = 3
 
@@ -127,7 +128,13 @@ export function computeInvitationalPrizes({
   // ── Fishing days ────────────────────────────────────────────────────────
   const valid = catches.filter(c => countsAtAll(c) && participantOf(c)?.status !== 'disqualified')
   const dayIdOf = (c) => c.competition_day_id || c.competition_days?.id || null
-  const daysWithCatches = new Set(valid.map(dayIdOf).filter(Boolean))
+  // A day counts as fished once anything is recorded for it - a catch or a
+  // "No Catch" report - so a day when nobody weighed still takes its place in
+  // the Fishing Day numbering (its Daily Biggest Tuna shows "no fish").
+  const daysWithCatches = new Set([
+    ...valid,
+    ...catches.filter(c => isNoCatchRow(c) && participantOf(c)?.status !== 'disqualified'),
+  ].map(dayIdOf).filter(Boolean))
   const fishedDays = [...days]
     .filter(d => !d.cancelled && daysWithCatches.has(d.id))
     .sort((a, b) => (a.day_number || 0) - (b.day_number || 0))
