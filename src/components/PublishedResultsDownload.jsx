@@ -17,6 +17,7 @@ import { useCompetitionConfig } from './CompetitionAdmin/hooks/useCompetitionCon
 import { useCompetitionCatches } from './CompetitionAdmin/hooks/useCompetitionCatches'
 import { isPredatorCatch } from './CompetitionAdmin/utils/catchLoggerScoring'
 import { applyDailyBiggestTunaExclusion } from '../utils/dailyBiggestTunaExclusion'
+import { isNoCatchRow } from '../utils/noCatch'
 import CompetitionAdminReports from './CompetitionAdmin/CompetitionAdminReports'
 
 const NAVY = '#1e3a8a'
@@ -71,7 +72,9 @@ function Downloads({ competitionId }) {
     catches.filter(c => !isPredatorCatch(c)),
     { participants: meta?.participants, teams: meta?.teams, boats: meta?.boats, days: meta?.days,
       scoringConfig: config?.scoring, speciesConfig: config?.species },
-  ), [catches, meta, config])
+  // No Catch records are not fish. Historical imports are left exactly as
+  // they were, so their published downloads don't change.
+  ).filter(c => competition?.is_historical_import || !isNoCatchRow(c)), [catches, meta, config, competition])
 
   if (cfgError) return <div style={{ marginTop: '0.5rem', color: '#dc2626', fontSize: '0.85rem' }}>Could not load the results: {cfgError}</div>
   if (cfgLoading || catchesLoading || !meta) return <div style={{ marginTop: '0.5rem', color: GREY, fontSize: '0.85rem' }}>Preparing the results…</div>

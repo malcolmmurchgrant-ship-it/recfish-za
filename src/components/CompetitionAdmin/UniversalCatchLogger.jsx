@@ -48,6 +48,7 @@ import { useCatchLoggerData } from './hooks/useCatchLoggerData'
 import VideoUpload from '../VideoUpload'
 import { dayLabel, defaultFishingDay } from '../../utils/dayLabels'
 import { teamBoatLabel } from '../../utils/teamLabels'
+import { NO_CATCH, isNoCatchRow } from '../../utils/noCatch'
 import {
   buildSpeciesPicker,
   findSpeciesConfig,
@@ -181,6 +182,9 @@ function aggregateUnitCountRows(rows, speciesName) {
 // concept either and are treated the same as full_boat here.
 const isTeamBased = (teamConfig) => (teamConfig?.team_format || 'full_boat') !== 'split_boat'
 
+// Species-list value for "No Catch" (never a real species name).
+const NO_CATCH_OPTION = '__no_catch__'
+
 export default function UniversalCatchLogger({ competitionId }) {
   const { user } = useAuth()
 
@@ -226,6 +230,13 @@ export default function UniversalCatchLogger({ competitionId }) {
   const [error, setError] = useState('')
   const [activeTab, setActiveTab] = useState('entry')
   const [summaryRows, setSummaryRows] = useState([])
+  // "No Catch" (utils/noCatch.js): the angler reported at the weigh station
+  // with nothing to weigh or release. Saved as one 0-point, non-scoring row
+  // so the Scoreboard can show "No catch" instead of "Not reported".
+  const [noCatch, setNoCatch] = useState(false)
+  const [cardReload, setCardReload] = useState(0)
+  const [teamNoCatchBusy, setTeamNoCatchBusy] = useState(false)
+  const [teamNoCatchMsg, setTeamNoCatchMsg] = useState('')
 
   const splitBoatFormat = !isTeamBased(config?.team)
   const speciesPicker = useMemo(() => buildSpeciesPicker(config?.species), [config])
@@ -327,7 +338,7 @@ export default function UniversalCatchLogger({ competitionId }) {
   // ── Load existing card when angler + day selected ───────────────────────────
   useEffect(() => {
     if (!participant || !selectedDay) {
-      setMeasuredDraft([]); setUnitCountDraft([]); setOriginalRows([]); setRecordNote('')
+      setMeasuredDraft([]); setUnitCountDraft([]); setOriginalRows([]); setRecordNote(''); setNoCatch(false)
       return
     }
     let cancelled = false
@@ -341,10 +352,12 @@ export default function UniversalCatchLogger({ competitionId }) {
       // species config entry (or has no config match at all — preserve it
       // rather than silently drop data if species_config changes later).
       const measuredRows = rows.filter(r => {
+        if (isNoCatchRow(r)) return false
         const cfg = findSpeciesConfig(config?.species, r.species_name)
         return !cfg || (cfg.entry_mode || 'measured') !== 'unit_count'
       })
       setMeasuredDraft(measuredRows.map(r => rowToMeasuredDraft(r, config?.species)))
+      setNoCatch(rows.some(isNoCatchRow))
 
       // Unit-count rows: always rebuild the FULL eligible species list so
       // every species shows a stepper. Each species' count is the number
@@ -363,7 +376,7 @@ export default function UniversalCatchLogger({ competitionId }) {
       setLoadingCard(false)
     })
     return () => { cancelled = true }
-  }, [participant?.id, selectedDay?.id, loadAnglerDayCatches, unitCountSpecies, config])
+  }, [participant?.id, selectedDay?.id, loadAnglerDayCatches, unitCountSpecies, config, cardReload])
 
   // ── Load team/boat summary ───────────────────────────────────────────────────
   useEffect(() => {
@@ -375,7 +388,7 @@ export default function UniversalCatchLogger({ competitionId }) {
       if (!teamId) { setSummaryRows([]); return }
       loadTeamDayCatches(teamId, selectedDay.id).then(setSummaryRows)
     }
-  }, [splitBoatFormat, boatId, teamId, selectedDay, saved, loadBoatDayCatches, loadTeamDayCatches])
+  }, [splitBoatFormat, boatId, teamId, selectedDay, saved, cardReload, loadBoatDayCatches, loadTeamDayCatches])
 
   // ── Measured draft mutators ──────────────────────────────────────────────────
   const measuredBagLimit = config?.scoring?.bag_limit || 10
@@ -389,6 +402,7 @@ export default function UniversalCatchLogger({ competitionId }) {
   const hasPredatorEntries = measuredSpecies.some(s => s.predator_damaged)
   const normalFishCount = measuredDraft.filter(f => !isPredatorRow(f)).length
   const addPredatorFish = () => {
+    setNoCatch(false)
     setMeasuredDraft(prev => [...prev, {
       species: '', weight_kg: '', length_cm: '', line_class_kg: participant?.line_class_kg || '',
       measured_min_size: false, weightSource: 'manual', notes: '', _predatorOnly: true,
@@ -397,6 +411,7 @@ export default function UniversalCatchLogger({ competitionId }) {
 
   const addMeasuredFish = () => {
     if (normalFishCount >= measuredBagLimit) return
+    setNoCatch(false)
     setMeasuredDraft(prev => [...prev, {
       species: '', weight_kg: '', length_cm: '', line_class_kg: participant?.line_class_kg || '',
       measured_min_size: false, weightSource: 'manual', notes: '',
@@ -406,6 +421,13 @@ export default function UniversalCatchLogger({ competitionId }) {
   const removeMeasuredFish = (i) => setMeasuredDraft(prev => prev.filter((_, idx) => idx !== i))
 
   const onMeasuredSpeciesChange = (i, speciesName) => {
+    // "No Catch" picked from the species list: the card becomes a No Catch
+    // report (only offered while this empty row is the card's only fish).
+    if (speciesName === NO_CATCH_OPTION) {
+      setMeasuredDraft(prev => prev.filter((_, idx) => idx !== i))
+      setNoCatch(true)
+      return
+    }
     const cfg = findSpeciesConfig(config?.species, speciesName)
     updateMeasuredFish(i, {
       ...measuredDraft[i],
@@ -756,6 +778,20 @@ export default function UniversalCatchLogger({ competitionId }) {
         }
       }
 
+      // No Catch: kept only while the card has nothing else on it. Once any
+      // fish is saved, the delete-pass below removes the old No Catch row.
+      if (noCatch && keptIds.size === 0) {
+        const existingNoCatch = originalRows.find(isNoCatchRow)
+        if (existingNoCatch) {
+          keptIds.add(existingNoCatch.id)
+        } else {
+          const { data, error: err } = await supabase.from('competition_catches')
+            .insert({ ...noCatchPayload(participant, baseFields), data_quality: newRowDataQuality }).select('id').single()
+          if (err) throw err
+          keptIds.add(data.id)
+        }
+      }
+
       const toDelete = originalRows.filter(r => !keptIds.has(r.id))
       if (toDelete.length > 0) {
         const { error: delErr } = await supabase.from('competition_catches').delete().in('id', toDelete.map(r => r.id))
@@ -765,11 +801,13 @@ export default function UniversalCatchLogger({ competitionId }) {
       const fresh = await loadAnglerDayCatches(participant, selectedDay.id)
       setOriginalRows(fresh)
       const freshMeasured = fresh.filter(r => {
+        if (isNoCatchRow(r)) return false
         const cfg = findSpeciesConfig(config?.species, r.species_name)
         return !cfg || (cfg.entry_mode || 'measured') !== 'unit_count'
       })
       setMeasuredDraft(freshMeasured.map(r => rowToMeasuredDraft(r, config?.species)))
       setUnitCountDraft(unitCountSpecies.map(sp => aggregateUnitCountRows(fresh, sp.name)))
+      setNoCatch(fresh.some(isNoCatchRow))
 
       setSaving(false); setSaved(true)
       setTimeout(() => setSaved(false), 3000)
@@ -777,6 +815,76 @@ export default function UniversalCatchLogger({ competitionId }) {
       console.error('Save error:', err)
       setError(err.message || 'Failed to save scorecard')
       setSaving(false)
+    }
+  }
+
+  // ── No Catch rows ─────────────────────────────────────────────────────────────
+  // One row per angler per day: species 'No Catch', 0 points, scoring false
+  // (never a fish in any standings, report, CPUE or prize).
+  function noCatchPayload(p, base) {
+    return {
+      ...base,
+      species_name: NO_CATCH,
+      weight_kg: null,
+      length_cm: null,
+      line_class_kg: p?.line_class_kg ? parseInt(p.line_class_kg, 10) : (config?.scoring?.default_line_class_kg ?? config?.scoring?.line_class_kg ?? 0),
+      retained: true,
+      scoring: false,
+      points: 0,
+      notes: null,
+    }
+  }
+
+  // Whole team / boat reported nothing: record No Catch for every angler on
+  // it who has nothing logged for this day. Anglers who already have a
+  // catch, release or No Catch are left alone.
+  const markTeamNoCatch = async () => {
+    if (!selectedDay || availableAnglers.length === 0) return
+    setTeamNoCatchMsg('')
+    setTeamNoCatchBusy(true)
+    try {
+      const { data: existing, error: loadErr } = await supabase
+        .from('competition_catches')
+        .select('participant_id, angler_id')
+        .eq('competition_id', competitionId)
+        .eq('competition_day_id', selectedDay.id)
+        .range(0, 9999)
+      if (loadErr) throw loadErr
+      const pidByUser = Object.fromEntries(participants.filter(p => p.user_id).map(p => [p.user_id, p.id]))
+      const reported = new Set((existing || []).map(r => r.participant_id || pidByUser[r.angler_id]).filter(Boolean))
+      const todo = availableAnglers.filter(a => !reported.has(a.id))
+      if (todo.length === 0) {
+        setTeamNoCatchMsg('Every angler here already has a catch, release or No Catch recorded for this day - nothing changed.')
+        return
+      }
+      const where = splitBoatFormat ? (boat?.boat_name || 'this boat') : (team?.display_name || team?.team_name || 'this team')
+      const ok = window.confirm(`Record NO CATCH on Day ${selectedDay.day_number} for ${todo.length} angler${todo.length === 1 ? '' : 's'} of ${where} with nothing logged?\n\n${todo.map(a => a.full_name).join('\n')}`)
+      if (!ok) return
+      const rows = todo.map(a => ({
+        ...noCatchPayload(a, {
+          competition_id: competitionId,
+          competition_day_id: selectedDay.id,
+          angler_id: a.user_id || null,
+          participant_id: a.id,
+          team_id: a.competition_teams?.id || teamId || null,
+          boat_id: splitBoatFormat ? (boatId || null) : null,
+          fishing_date: selectedDay.date || null,
+          entered_by: user?.id,
+        }),
+        data_quality: 'verified',
+      }))
+      const { data: inserted, error: insErr } = await supabase.from('competition_catches').insert(rows).select('id')
+      if (insErr) throw insErr
+      if (!inserted || inserted.length !== rows.length) {
+        throw new Error('the database did not save every row - please check each angler')
+      }
+      setTeamNoCatchMsg(`🚫 No Catch recorded for ${todo.map(a => a.full_name).join(', ')}.`)
+      setCardReload(n => n + 1)
+    } catch (err) {
+      console.error('Team No Catch error:', err)
+      setTeamNoCatchMsg('❌ No Catch NOT saved: ' + (err.message || err))
+    } finally {
+      setTeamNoCatchBusy(false)
     }
   }
 
@@ -850,6 +958,18 @@ export default function UniversalCatchLogger({ competitionId }) {
               <option key={a.id} value={a.id}>{a.is_captain ? `⚓ ${a.full_name} (Captain)` : a.full_name}</option>
             ))}
           </select>
+          {selectedDay && !selectedDay.cancelled && availableAnglers.length > 0 && (
+            <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px dashed #e5e7eb' }}>
+              <button onClick={markTeamNoCatch} disabled={teamNoCatchBusy} data-testid="team-no-catch"
+                style={{ ...S.btn('#4b5563'), opacity: teamNoCatchBusy ? 0.6 : 1 }}>
+                {teamNoCatchBusy ? 'Saving…' : `🚫 No Catch — whole ${splitBoatFormat ? 'boat' : 'team'}`}
+              </button>
+              <div style={{ fontSize: '0.74rem', color: '#6b7280', marginTop: '0.3rem' }}>
+                For a skipper or captain reporting nothing to weigh or release. Records No Catch for every angler here who has nothing logged for this day; anyone with a catch is left alone.
+              </div>
+              {teamNoCatchMsg && <div style={{ fontSize: '0.82rem', marginTop: '0.4rem', fontWeight: 600, color: teamNoCatchMsg.startsWith('❌') ? RED : '#374151' }}>{teamNoCatchMsg}</div>}
+            </div>
+          )}
         </div>
       )}
 
@@ -930,6 +1050,7 @@ export default function UniversalCatchLogger({ competitionId }) {
                       fish={fish}
                       index={i}
                       speciesPicker={(fish._predatorOnly || fish._cfg?.predator_damaged) ? predatorPicker : normalPicker}
+                      allowNoCatch={scoredMeasured.length === 1 && !fish.species && !fish._id && !fish._predatorOnly}
                       autoWeight={autoWeights[i]}
                       calculating={calculatingIndex === i}
                       onSpeciesChange={onMeasuredSpeciesChange}
@@ -981,6 +1102,29 @@ export default function UniversalCatchLogger({ competitionId }) {
                 </div>
               )}
 
+              {totalValidFish + validPredatorCount === 0 && scoredMeasured.every(f => !f.species) && (
+                <div style={{ ...S.card, background: noCatch ? '#f3f4f6' : 'white', border: noCatch ? '2px solid #9ca3af' : undefined }} data-testid="no-catch-card">
+                  {noCatch ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                      <div style={{ flex: 1, minWidth: 200 }}>
+                        <div style={{ fontWeight: 700, color: '#374151' }}>🚫 No Catch</div>
+                        <div style={{ fontSize: '0.8rem', color: '#6b7280' }}>
+                          {originalRows.some(isNoCatchRow) ? 'Recorded' : 'Press Save to record'} — reported at the weigh station with nothing to weigh or release. Scores 0; adding a fish replaces it.
+                        </div>
+                      </div>
+                      <button onClick={() => setNoCatch(false)} style={S.btn('white', '#374151')}>Undo</button>
+                    </div>
+                  ) : (
+                    <>
+                      <button onClick={() => { setMeasuredDraft(prev => prev.filter(f => f.species)); setNoCatch(true) }} style={S.btn('#4b5563')}>🚫 No Catch</button>
+                      <div style={{ fontSize: '0.74rem', color: '#6b7280', marginTop: '0.3rem' }}>
+                        Reported at the weigh station with nothing to weigh or release. Records a 0-point No Catch so the Scoreboard shows this angler as reported.
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
               <div style={S.card}>
                 <div style={{ fontWeight: 700, color: NAVY, marginBottom: '0.5rem' }}>Record / PB Claims</div>
                 <textarea
@@ -1004,7 +1148,7 @@ export default function UniversalCatchLogger({ competitionId }) {
                   only thing actually preventing that from working. */}
               {(() => {
                 const totalRecordable = totalValidFish + validPredatorCount
-                const isBlankNew = totalRecordable === 0 && originalRows.length === 0
+                const isBlankNew = totalRecordable === 0 && originalRows.length === 0 && !noCatch
                 return (
                   <>
                     <button onClick={handleSave} disabled={saving || isBlankNew || overLineBonusPending}
@@ -1012,9 +1156,9 @@ export default function UniversalCatchLogger({ competitionId }) {
                       {saving ? 'Saving…' : overLineBonusPending ? '⏳ Calculating bonus…' : originalRows.length > 0 ? '💾 Update Scorecard' : '💾 Save Scorecard'}
                     </button>
                     {isBlankNew && (
-                      <span style={{ fontSize: '0.82rem', color: '#9ca3af', marginLeft: '0.75rem' }}>Add at least 1 valid catch to save</span>
+                      <span style={{ fontSize: '0.82rem', color: '#9ca3af', marginLeft: '0.75rem' }}>Add at least 1 valid catch, or choose No Catch, to save</span>
                     )}
-                    {!isBlankNew && totalRecordable === 0 && originalRows.length > 0 && (
+                    {!isBlankNew && !noCatch && totalRecordable === 0 && originalRows.length > 0 && (
                       <span style={{ fontSize: '0.82rem', color: RED, marginLeft: '0.75rem' }}>⚠ Saving will remove all logged catches for this angler on this day</span>
                     )}
                     {overLineBonusPending && (
@@ -1033,7 +1177,7 @@ export default function UniversalCatchLogger({ competitionId }) {
               boat={boat}
               selectedDay={selectedDay}
               anglers={availableAnglers}
-              summaryRows={summaryRows.filter(r => !isPredatorCatch(r))}
+              summaryRows={summaryRows.filter(r => !isPredatorCatch(r) && !isNoCatchRow(r))}
               usesMultiplier={usesMultiplier}
             />
           )}
@@ -1046,7 +1190,7 @@ export default function UniversalCatchLogger({ competitionId }) {
 }
 
 // ─── MEASURED FISH ROW ────────────────────────────────────────────────────────
-function MeasuredFishRow({ fish, index, speciesPicker, autoWeight, calculating, onSpeciesChange, onChange, onRemove, onUseCalculated }) {
+function MeasuredFishRow({ fish, index, speciesPicker, allowNoCatch = false, autoWeight, calculating, onSpeciesChange, onChange, onRemove, onUseCalculated }) {
   const pts = fish._scored?.points || 0
 
   return (
@@ -1071,6 +1215,11 @@ function MeasuredFishRow({ fish, index, speciesPicker, autoWeight, calculating, 
               ))}
             </optgroup>
           ))}
+          {allowNoCatch && (
+            <optgroup label='Nothing to weigh'>
+              <option value={NO_CATCH_OPTION}>🚫 No Catch</option>
+            </optgroup>
+          )}
         </select>
 
         <input

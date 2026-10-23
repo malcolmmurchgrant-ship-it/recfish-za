@@ -9,6 +9,8 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { buildIndividualStandings, aggregateTeamScores, buildBoatPercentageTeamStandings, buildDailyAnglerPercentages, buildCpueData, buildSkipperRanking } from './utils/scoringEngine'
 import { inDivision } from '../../utils/anglerDivisions'
+import WeighInReports from '../WeighInReports'
+import { tracksWeighInReports } from '../../utils/noCatch'
 
 const NAVY  = '#1e3a8a'
 const GREY  = '#6b7280'
@@ -27,7 +29,7 @@ const S = {
 const RANK_COLORS = { 1: GOLD, 2: '#9ca3af', 3: '#b45309' }
 
 export default function CompetitionAdminScoreboard({
-  competition, config, catches, participants, teams, days, boats, isAdmin,
+  competition, config, catches, allCatches = null, participants, teams, days, boats, isAdmin,
 }) {
   const navigate = useNavigate()
   // Takes you straight to that angler's real scorecard on the Catch Logger
@@ -183,6 +185,9 @@ export default function CompetitionAdminScoreboard({
 
   return (
     <div>
+      {allCatches && tracksWeighInReports(competition, allCatches) && (
+        <WeighInReports catches={allCatches} participants={participants} teams={teams} boats={boats} days={days} />
+      )}
       {/* ── Controls ────────────────────────────────────────────────────── */}
       <div style={S.card}>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
