@@ -15,7 +15,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useCompetitionConfig } from './CompetitionAdmin/hooks/useCompetitionConfig'
 import { useCompetitionCatches } from './CompetitionAdmin/hooks/useCompetitionCatches'
-import { isPredatorCatch } from './CompetitionAdmin/utils/catchLoggerScoring'
+import { isRecordedOnlyCatch } from './CompetitionAdmin/utils/catchLoggerScoring'
 import { applyDailyBiggestTunaExclusion } from '../utils/dailyBiggestTunaExclusion'
 import { isNoCatchRow } from '../utils/noCatch'
 import CompetitionAdminReports from './CompetitionAdmin/CompetitionAdminReports'
@@ -69,7 +69,7 @@ function Downloads({ competitionId }) {
   // Same as the admin Reports tab: predator rows out, and the CBSC
   // Invitational's Daily Biggest Tuna fish scored 0 towards totals.
   const standingsCatches = useMemo(() => applyDailyBiggestTunaExclusion(
-    catches.filter(c => !isPredatorCatch(c)),
+    catches.filter(c => !isRecordedOnlyCatch(c)),
     { participants: meta?.participants, teams: meta?.teams, boats: meta?.boats, days: meta?.days,
       scoringConfig: config?.scoring, speciesConfig: config?.species },
   // No Catch records are not fish. Historical imports are left exactly as

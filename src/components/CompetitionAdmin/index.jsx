@@ -14,7 +14,7 @@ import { supabase } from '../../lib/supabase'
 import { useCompetitionConfig } from './hooks/useCompetitionConfig'
 import { useCompetitionRoles  } from './hooks/useCompetitionRoles'
 import { useCompetitionCatches} from './hooks/useCompetitionCatches'
-import { isPredatorCatch } from './utils/catchLoggerScoring'
+import { isRecordedOnlyCatch } from './utils/catchLoggerScoring'
 
 import CompetitionAdminSetup        from './CompetitionAdminSetup'
 import CompetitionAdminParticipants from './CompetitionAdminParticipants'
@@ -76,7 +76,7 @@ export default function CompetitionAdmin({ competitionId }) {
   // adjudication and stay visible on the Scoring tab, but they are not catches:
   // the Scoreboard and Reports never see them, so no fish count, tie-break or
   // report can include one. Memoised so the list keeps a stable identity.
-  const standingsCatches = useMemo(() => catches.filter(c => !isPredatorCatch(c)), [catches])
+  const standingsCatches = useMemo(() => catches.filter(c => !isRecordedOnlyCatch(c)), [catches])
   // Scoreboard and Reports: each day's Daily Biggest Tuna scores 0 towards
   // totals (CBSC Invitational only), matching the Prizegiving tab, which
   // works the rule out itself from standingsCatches.

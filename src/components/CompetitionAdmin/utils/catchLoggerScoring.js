@@ -66,6 +66,40 @@ export function isPredatorCatch(row) {
     && row.notes.startsWith('Predator-damaged')
 }
 
+// ── Undersize fish ──────────────────────────────────────────────────────────
+// A fish brought to the scales below the species' minimum weight (e.g. a
+// Longfin under 10 kg at the CBSC Invitational). The scorer ticks
+// "Undersize" in the Catch Logger: the fish is kept on record with its real
+// species and weight for statistics, scores 0, does not count as a fish in
+// any standings, report or prize, and is saved as scoring = false with the
+// note below - the same "recorded but not counted" state as a
+// predator-damaged fish. Asked for by Malcolm, 23 Oct 2026.
+export const UNDERSIZE_NOTE = 'Undersize - below the minimum weight, recorded for statistics, no points'
+
+export function isUndersizeCatch(row) {
+  return !!row
+    && row.scoring === false
+    && row.data_quality !== 'disqualified'
+    && row.data_quality !== 'rejected'
+    && typeof row.notes === 'string'
+    && row.notes.startsWith('Undersize')
+}
+
+// A fish that is on record but never counted: predator-damaged or undersize.
+export function isRecordedOnlyCatch(row) {
+  return isPredatorCatch(row) || isUndersizeCatch(row)
+}
+
+// True when a weighed fish is below its species' minimum weight (the case
+// the Catch Logger offers to record as Undersize).
+export function isBelowMinWeight(fish, speciesCfg) {
+  if (!speciesCfg || speciesCfg.entry_mode === 'unit_count') return false
+  if (speciesCfg.predator_damaged || speciesCfg.billfish || speciesCfg.kingfish_release) return false
+  const minW = parseFloat(speciesCfg.min_weight_kg) || 0
+  const w = parseFloat(fish?.weight_kg) || 0
+  return minW > 0 && w > 0 && w < minW
+}
+
 // ── Auto-calculate weight from length for a measured-mode species ───────────
 // Mirrors LogCatch.jsx's flow exactly: look up the species' best available
 // length-weight formula (Visboekie jsonb first, FishBase table fallback),
