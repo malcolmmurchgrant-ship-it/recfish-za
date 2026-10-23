@@ -35,6 +35,59 @@ const S = {
   label:  { fontSize: '0.78rem', fontWeight: 700, color: GREY, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4, display: 'block' },
 }
 
+// ─── Review player ────────────────────────────────────────────────────────────
+// Shows a release video at its real shape: wide for landscape clips (anglers
+// are asked to film landscape), narrower for portrait ones, with a label
+// saying which the file actually is. "Rotate" turns the picture a quarter
+// turn on screen for a clip that plays sideways (a phone that saved the
+// wrong orientation); it never changes the stored file.
+function ReviewVideo({ src, autoPlay = false, testId }) {
+  const [dims, setDims] = useState(null)   // { w, h } from the file itself
+  const [rot, setRot] = useState(0)        // 0, 90, 180, 270 degrees on screen
+  const sideways = rot % 180 !== 0
+  const shownW = dims ? (sideways ? dims.h : dims.w) : 16
+  const shownH = dims ? (sideways ? dims.w : dims.h) : 9
+  const landscape = shownW >= shownH
+  const fileShape = !dims ? '' : dims.w > dims.h ? 'Landscape' : dims.w < dims.h ? 'Portrait' : 'Square'
+
+  return (
+    <div style={{ width: landscape ? 'min(100%, 640px)' : 'min(100%, 340px)' }}>
+      <div style={{ position: 'relative', width: '100%', aspectRatio: `${shownW} / ${shownH}`, background: '#000', borderRadius: 6, overflow: 'hidden' }}>
+        <video
+          src={src}
+          controls
+          autoPlay={autoPlay}
+          playsInline
+          preload="metadata"
+          data-testid={testId}
+          onLoadedMetadata={e => {
+            const v = e.currentTarget
+            if (v.videoWidth && v.videoHeight) setDims({ w: v.videoWidth, h: v.videoHeight })
+          }}
+          style={sideways && dims
+            ? { position: 'absolute', top: '50%', left: '50%',
+                width: `${(dims.w / dims.h) * 100}%`, height: `${(dims.h / dims.w) * 100}%`,
+                transform: `translate(-50%, -50%) rotate(${rot}deg)`, objectFit: 'contain', background: '#000' }
+            : { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain',
+                transform: rot ? `rotate(${rot}deg)` : undefined, background: '#000' }}
+        />
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: 4, fontSize: '0.75rem', color: GREY, flexWrap: 'wrap' }}>
+        {fileShape && <span data-testid="video-shape">{fileShape === 'Landscape' ? '▭' : fileShape === 'Portrait' ? '▯' : '□'} {fileShape} video{dims ? ` (${dims.w}×${dims.h})` : ''}</span>}
+        <button type="button" onClick={() => setRot(r => (r + 90) % 360)} data-testid="video-rotate"
+          style={{ marginLeft: 'auto', background: 'white', border: '1px solid #d1d5db', borderRadius: 6, padding: '0.2rem 0.55rem', cursor: 'pointer', fontSize: '0.75rem', color: '#374151' }}>
+          ⟳ Rotate
+        </button>
+        {rot !== 0 && (
+          <button type="button" onClick={() => setRot(0)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.75rem', color: GREY, textDecoration: 'underline' }}>
+            Reset
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
 
 export default function CompetitionAdminVideoReview({ competitionId, isVideoVerifier, onReload }) {
   const { user } = useAuth()
@@ -262,11 +315,7 @@ export default function CompetitionAdminVideoReview({ competitionId, isVideoVeri
         <div key={item.id} style={S.card}>
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
             {item.video_url ? (
-              <video
-                src={item.video_url}
-                controls
-                style={{ width: 260, maxWidth: '100%', borderRadius: 6, background: '#000' }}
-              />
+              <ReviewVideo src={item.video_url} />
             ) : (
               <div style={{ width: 260, maxWidth: '100%', borderRadius: 6, background: '#f8fafc', border: '2px dashed #cbd5e1', padding: '0.9rem', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ fontSize: '0.85rem', color: '#374151' }}>
@@ -406,8 +455,7 @@ export default function CompetitionAdminVideoReview({ competitionId, isVideoVeri
                     <div style={{ marginTop: 8 }}>
                       {item.video_url ? (
                         openVideo === item.id ? (
-                          <video src={item.video_url} controls autoPlay data-testid="decided-video"
-                            style={{ width: 300, maxWidth: '100%', borderRadius: 6, background: '#000', display: 'block' }} />
+                          <ReviewVideo src={item.video_url} autoPlay testId="decided-video" />
                         ) : (
                           <button onClick={() => setOpenVideo(item.id)} data-testid="decided-watch"
                             style={{ background: NAVY, color: 'white', border: 'none', borderRadius: 6, padding: '0.4rem 0.8rem', fontWeight: 600, cursor: 'pointer' }}>
