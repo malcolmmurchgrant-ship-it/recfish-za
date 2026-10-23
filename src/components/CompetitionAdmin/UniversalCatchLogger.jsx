@@ -1198,6 +1198,7 @@ export default function UniversalCatchLogger({ competitionId }) {
               selectedDay={selectedDay}
               anglers={availableAnglers}
               summaryRows={summaryRows.filter(r => !isRecordedOnlyCatch(r) && !isNoCatchRow(r))}
+              recordedRows={summaryRows.filter(r => isRecordedOnlyCatch(r) || isNoCatchRow(r))}
               usesMultiplier={usesMultiplier}
             />
           )}
@@ -1524,7 +1525,7 @@ function groupRowsForBadges(rows) {
 }
 
 
-function SummaryTab({ splitBoatFormat, team, boat, selectedDay, anglers, summaryRows, usesMultiplier }) {
+function SummaryTab({ splitBoatFormat, team, boat, selectedDay, anglers, summaryRows, recordedRows = [], usesMultiplier }) {
   // Group by angler_id when present (registered anglers); fall back to
   // participant_id for unregistered anglers, whose rows always have
   // angler_id = null. Without this fallback every unregistered angler's
@@ -1537,6 +1538,10 @@ function SummaryTab({ splitBoatFormat, team, boat, selectedDay, anglers, summary
     byAngler.get(key).push(row)
   }
   const rowsForAngler = (angler) => byAngler.get(angler.user_id || angler.id) || []
+  // Undersize / predator-damaged fish and No Catch reports: shown per angler
+  // so the summary is complete, but never added to any points total.
+  const recordedForAngler = (angler) => recordedRows.filter(r =>
+    (r.participant_id && r.participant_id === angler.id) || (angler.user_id && r.angler_id === angler.user_id))
 
   const teamTotalPts = summaryRows.reduce((s, r) => s + parseFloat(r.points || 0), 0)
   const teamSpeciesCount = new Set(summaryRows.map(r => r.species_name)).size
@@ -1554,7 +1559,7 @@ function SummaryTab({ splitBoatFormat, team, boat, selectedDay, anglers, summary
         <div style={{ fontSize: '0.82rem', color: '#6b7280', marginBottom: '0.75rem' }}>Skipper: {boat.skipper_name}</div>
       )}
 
-      {summaryRows.length === 0 ? (
+      {summaryRows.length === 0 && recordedRows.length === 0 ? (
         <div style={{ color: '#9ca3af', fontStyle: 'italic' }}>No catches entered yet.</div>
       ) : (
         <>
@@ -1578,18 +1583,27 @@ function SummaryTab({ splitBoatFormat, team, boat, selectedDay, anglers, summary
 
           {anglers.map(angler => {
             const rows = rowsForAngler(angler)
+            const recorded = recordedForAngler(angler)
             const anglerPts = rows.reduce((s, r) => s + parseFloat(r.points || 0), 0)
             return (
               <div key={angler.id} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: '0.75rem', marginBottom: '0.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
                   <span style={{ fontWeight: 700 }}>{angler.is_captain ? '⚓ ' : ''}{angler.full_name}</span>
-                  <span style={{ fontWeight: 800, color: NAVY }}>{rows.length > 0 ? `${anglerPts.toFixed(2)} pts` : '—'}</span>
+                  <span style={{ fontWeight: 800, color: NAVY }}>{rows.length > 0 || recorded.some(r => !isNoCatchRow(r)) ? `${anglerPts.toFixed(2)} pts` : '—'}</span>
                 </div>
-                {rows.length > 0 ? (
+                {rows.length > 0 || recorded.length > 0 ? (
                   <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
                     {groupRowsForBadges(rows).map((g, i) => (
                       <span key={i} style={S.badge(g.anyOverLine ? GOLD : '#374151')}>
                         {g.species} {g.count > 1 ? `×${g.count} · ` : g.weight_kg != null ? `${g.weight_kg}kg · ` : ''}{g.points.toFixed(1)}pts
+                      </span>
+                    ))}
+                    {recorded.map(r => (
+                      <span key={r.id} data-testid="summary-recorded" title={r.notes || ''}
+                        style={{ ...S.badge('#9ca3af'), background: '#f3f4f6', color: '#4b5563', border: '1px dashed #9ca3af' }}>
+                        {isNoCatchRow(r)
+                          ? '🚫 No Catch'
+                          : `${isUndersizeCatch(r) ? '📏' : '🦈'} ${r.species_name}${r.weight_kg != null ? ` ${r.weight_kg}kg` : ''} · ${isUndersizeCatch(r) ? 'undersize' : 'predator-damaged'}, no pts`}
                       </span>
                     ))}
                   </div>
