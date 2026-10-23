@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { calculateCatchPoints, groupCatchesBySpecies, buildCpueData } from './utils/scoringEngine'
 import { disqualifyParticipant } from './utils/disqualificationActions'
-import { isPredatorCatch } from './utils/catchLoggerScoring'
+import { isPredatorCatch, isUndersizeCatch, isRecordedOnlyCatch } from './utils/catchLoggerScoring'
 import { heaviestTunaRuleOn, pickScoringTuna, isRuleTunaName } from '../../utils/heaviestTunaRule'
 import { dayLabel } from '../../utils/dayLabels'
 import { teamBoatLabel } from '../../utils/teamLabels'
@@ -89,7 +89,7 @@ export default function CompetitionAdminScoring({
   ).values()].sort((a, b) => (a.team_name || a.province || '').localeCompare(b.team_name || b.province || ''))
 
   // Predator-damaged fish are recorded for adjudication but are not catches: left out of CPUE.
-  const cpueData = buildCpueData(catches.filter(c => c.data_quality !== 'rejected' && !isPredatorCatch(c)), participants, days, boats, fishingSessions, teams)
+  const cpueData = buildCpueData(catches.filter(c => c.data_quality !== 'rejected' && !isRecordedOnlyCatch(c)), participants, days, boats, fishingSessions, teams)
 
   const scoringMethod = config?.scoring?.method || 'percentage'
 
@@ -151,7 +151,7 @@ export default function CompetitionAdminScoring({
     onCatchUpdate()
   }
 
-  const totalFish   = filtered.filter(c => c.data_quality !== 'rejected' && !isPredatorCatch(c)).length
+  const totalFish   = filtered.filter(c => c.data_quality !== 'rejected' && !isRecordedOnlyCatch(c)).length
   const totalPoints = filtered.reduce((s, c) =>
     c.data_quality === 'disqualified' || c.data_quality === 'rejected'
       ? s : s + parseFloat(c.points || 0), 0)
@@ -166,7 +166,7 @@ export default function CompetitionAdminScoring({
   // Species tally for whatever's currently filtered (angler/day/team) —
   // this is the main clutter fix: one row per species instead of one row
   // per raw catch (including the 0-point padding rows).
-  const filteredSpeciesGroups = groupCatchesBySpecies(filtered.filter(c => !isPredatorCatch(c)))
+  const filteredSpeciesGroups = groupCatchesBySpecies(filtered.filter(c => !isRecordedOnlyCatch(c)))
 
   // Whole-scope DQ notice — if every catch in the current filter is
   // disqualified (the common case: an angler DQ'd for a whole day), show
@@ -184,7 +184,7 @@ export default function CompetitionAdminScoring({
   // would blur together unrelated crews — nesting by day keeps that
   // distinction visible while still not forcing a day to be picked first.
   const boatSummaryData = (() => {
-    const activeCatches = catches.filter(c => c.data_quality !== 'rejected' && !isPredatorCatch(c))
+    const activeCatches = catches.filter(c => c.data_quality !== 'rejected' && !isRecordedOnlyCatch(c))
 
     if (dayFilter !== 'all') {
       const dayCatches = activeCatches.filter(c => c.competition_days?.day_number === parseInt(dayFilter))
@@ -385,7 +385,7 @@ export default function CompetitionAdminScoring({
             {filteredSpeciesGroups.map(g => {
           const groupKey = g.speciesName
           const isExpanded = !!expandedGroups[groupKey]
-          const hasClaim = g.rows.some(r => r.notes && !isPredatorCatch(r) && r.data_quality !== 'rejected' && r.data_quality !== 'disqualified')
+          const hasClaim = g.rows.some(r => r.notes && !isRecordedOnlyCatch(r) && r.data_quality !== 'rejected' && r.data_quality !== 'disqualified')
           const groupIsDQd = !allFilteredDQd && g.rows.length > 0 && g.rows.every(r => r.data_quality === 'disqualified')
           return (
             <div key={groupKey} style={S.card}>
@@ -481,7 +481,8 @@ export default function CompetitionAdminScoring({
                   {c.video_status === 'verified'     && <span style={S.badge(GREEN)}>🎥 Release: Verified</span>}
                   {c.video_status === 'not_verified' && <span style={S.badge(RED)}>🎥 Release: Not Verified</span>}
                   {isPredatorCatch(c) && <span style={S.badge('#6b7280')} title={c.notes}>🦈 Predator-damaged · no points</span>}
-                  {c.notes && !isPredatorCatch(c) && c.data_quality !== 'rejected' && c.data_quality !== 'disqualified' && (
+                  {isUndersizeCatch(c) && <span style={S.badge('#6b7280')} title={c.notes}>📏 Undersize · no points</span>}
+                  {c.notes && !isRecordedOnlyCatch(c) && c.data_quality !== 'rejected' && c.data_quality !== 'disqualified' && (
                     <span style={S.badge(GOLD)} title={c.notes}>🏆 Claim</span>
                   )}
                   {c.species_name}
@@ -766,6 +767,9 @@ function CatchEditModal({ catch_, config, participants, days, onSave, onClose, i
       // zeroing it on Disqualified; everything else preserves whatever the
       // catch logger originally calculated with full context.
       points = form.data_quality === 'disqualified' ? 0 : parseFloat(catch_.points ?? 0)
+    } else if (isRecordedOnlyCatch(catch_)) {
+      // Predator-damaged or undersize: on record, never scored.
+      points = 0
     } else if (catch_.video_status || catch_.retained === false) {
       // A release (e.g. a video-verified Invitational release, or a Gamefish
       // Kingfish release) is scored by flat release points, set when it was

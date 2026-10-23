@@ -59,6 +59,10 @@ import {
   computeSpeciesMultiplier,
   isPredatorCatch,
   PREDATOR_NOTE,
+  isUndersizeCatch,
+  isRecordedOnlyCatch,
+  isBelowMinWeight,
+  UNDERSIZE_NOTE,
 } from './utils/catchLoggerScoring'
 
 // ─── STYLES ───────────────────────────────────────────────────────────────────
@@ -121,10 +125,13 @@ function rowToMeasuredDraft(row, speciesConfig) {
     if (predatorEntry) species = predatorEntry.name
   }
 
+  const isUndersize = isUndersizeCatch(row)
   return {
     _id: row.id,
     _predatorOnly: isPredator,
     _wasPredator: isPredator,
+    _undersize: isUndersize,
+    _wasUndersize: isUndersize,
     species,
     weight_kg: row.weight_kg != null ? String(row.weight_kg) : '',
     length_cm: row.length_cm != null ? String(row.length_cm) : '',
@@ -400,7 +407,8 @@ export default function UniversalCatchLogger({ competitionId }) {
   // list has no predator_damaged entries never see any of this.
   const isPredatorRow = (f) => !!f._predatorOnly || !!findSpeciesConfig(config?.species, f.species)?.predator_damaged
   const hasPredatorEntries = measuredSpecies.some(s => s.predator_damaged)
-  const normalFishCount = measuredDraft.filter(f => !isPredatorRow(f)).length
+  // Undersize fish (recorded, no points) don't count towards the limit either.
+  const normalFishCount = measuredDraft.filter(f => !isPredatorRow(f) && !(f._undersize && isBelowMinWeight(f, findSpeciesConfig(config?.species, f.species)))).length
   const addPredatorFish = () => {
     setNoCatch(false)
     setMeasuredDraft(prev => [...prev, {
@@ -538,16 +546,23 @@ export default function UniversalCatchLogger({ competitionId }) {
       const cfg = findSpeciesConfig(config?.species, fish.species)
       const isFirstOfSpecies = fish.species && !seenSpecies.has(fish.species)
       if (fish.species) seenSpecies.add(fish.species)
+      // Under the minimum weight: blocked as before, unless the scorer ticks
+      // Undersize - then it is recorded for statistics with 0 points.
+      const belowMin = isBelowMinWeight(fish, cfg)
+      if (belowMin && fish._undersize) {
+        return { ...fish, _cfg: cfg, _belowMin: true, _isUndersize: true, _warning: null,
+          _scored: { points: 0, method: 'undersize', detail: 'Undersize — recorded for statistics, no points' } }
+      }
       const scored = scoreDraftFish({ ...fish, isFirstOfSpecies }, cfg, config?.scoring)
       const warning = validateDraftFish(fish, cfg)
-      return { ...fish, _cfg: cfg, _scored: scored, _warning: warning }
+      return { ...fish, _cfg: cfg, _scored: scored, _warning: warning, _belowMin: belowMin }
     })
     // CBSC Invitational rule (heaviestTunaRule.js): of this angler's weighed
     // Yellowfin / Bigeye / Southern Bluefin today, only the heaviest scores;
     // the others keep their weight but score 0. Off unless the competition's
     // scoring config sets heaviest_tuna_only.
     if (!heaviestTunaRuleOn(config?.scoring)) return rows
-    const weighed = rows.filter(f => f.species && !f._warning && f._cfg
+    const weighed = rows.filter(f => f.species && !f._warning && !f._isUndersize && f._cfg
       && !f._cfg.predator_damaged && !f._cfg.kingfish_release && !f._cfg.billfish
       && (parseFloat(f.weight_kg) || 0) > 0)
     const speciesOf = (f) => f._cfg?.species_name || f.species
@@ -596,7 +611,9 @@ export default function UniversalCatchLogger({ competitionId }) {
     ? parseFloat((rawPoints * multiplier).toFixed(2))
     : parseFloat(rawPoints.toFixed(2))
 
-  const validMeasuredCount = scoredMeasured.filter(f => f.species && !f._warning && !f._cfg?.predator_damaged).length
+  const validMeasuredCount = scoredMeasured.filter(f => f.species && !f._warning && !f._cfg?.predator_damaged && !f._isUndersize).length
+  // Undersize fish: saved for statistics, never counted as catches.
+  const validUndersizeCount = scoredMeasured.filter(f => f.species && f._isUndersize).length
   // Predator-damaged fish are valid records (so Save works for an angler whose
   // only fish was mutilated) but are never counted as catches.
   const validPredatorCount = scoredMeasured.filter(f => f.species && !f._warning && f._cfg?.predator_damaged).length
@@ -657,10 +674,13 @@ export default function UniversalCatchLogger({ competitionId }) {
         // fish). A fish corrected FROM predator-damaged to a normal species
         // drops the old marker note.
         const isPredator = !!fish._cfg?.predator_damaged
+        const isUndersize = !!fish._isUndersize
         const noteForThisRow = isPredator
           ? PREDATOR_NOTE
-          : (!recordNoteAttached && recordNote ? recordNote : (fish._wasPredator ? null : (fish.notes || null)))
-        if (!isPredator && !recordNoteAttached && recordNote) recordNoteAttached = true
+          : isUndersize
+            ? UNDERSIZE_NOTE
+            : (!recordNoteAttached && recordNote ? recordNote : ((fish._wasPredator || fish._wasUndersize) ? null : (fish.notes || null)))
+        if (!isPredator && !isUndersize && !recordNoteAttached && recordNote) recordNoteAttached = true
         // A release already decided by the verifier (video_status
         // 'verified' or 'not_verified') keeps its locked points and
         // status untouched by this save, no matter what else on the card
@@ -708,7 +728,7 @@ export default function UniversalCatchLogger({ competitionId }) {
           // scoring is only written for a predator row (false) or a row being
           // corrected away from predator (true). Every other save leaves the
           // column exactly as it was, so disqualified rows are never disturbed.
-          ...(isPredator ? { scoring: false } : (fish._wasPredator ? { scoring: true } : {})),
+          ...((isPredator || isUndersize) ? { scoring: false } : ((fish._wasPredator || fish._wasUndersize) ? { scoring: true } : {})),
           measured_min_size: !!fish.measured_min_size,
           ...reviewFields,
           notes: noteForThisRow,
@@ -1102,7 +1122,7 @@ export default function UniversalCatchLogger({ competitionId }) {
                 </div>
               )}
 
-              {totalValidFish + validPredatorCount === 0 && scoredMeasured.every(f => !f.species) && (
+              {totalValidFish + validPredatorCount + validUndersizeCount === 0 && scoredMeasured.every(f => !f.species) && (
                 <div style={{ ...S.card, background: noCatch ? '#f3f4f6' : 'white', border: noCatch ? '2px solid #9ca3af' : undefined }} data-testid="no-catch-card">
                   {noCatch ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -1147,7 +1167,7 @@ export default function UniversalCatchLogger({ competitionId }) {
                   longer represented, so blocking the button here was the
                   only thing actually preventing that from working. */}
               {(() => {
-                const totalRecordable = totalValidFish + validPredatorCount
+                const totalRecordable = totalValidFish + validPredatorCount + validUndersizeCount
                 const isBlankNew = totalRecordable === 0 && originalRows.length === 0 && !noCatch
                 return (
                   <>
@@ -1177,7 +1197,7 @@ export default function UniversalCatchLogger({ competitionId }) {
               boat={boat}
               selectedDay={selectedDay}
               anglers={availableAnglers}
-              summaryRows={summaryRows.filter(r => !isPredatorCatch(r) && !isNoCatchRow(r))}
+              summaryRows={summaryRows.filter(r => !isRecordedOnlyCatch(r) && !isNoCatchRow(r))}
               usesMultiplier={usesMultiplier}
             />
           )}
@@ -1241,6 +1261,8 @@ function MeasuredFishRow({ fish, index, speciesPicker, allowNoCatch = false, aut
         <div style={{ textAlign: 'center' }}>
           {fish._cfg?.predator_damaged ? (
             <span style={S.badge('#6b7280')}>🦈 No points</span>
+          ) : fish._isUndersize ? (
+            <span style={S.badge('#6b7280')}>📏 No points</span>
           ) : fish._cfg?.billfish ? (
             <span style={S.badge(GOLD)}>Multiplier</span>
           ) : fish._cfg?.kingfish_release ? (
@@ -1326,6 +1348,13 @@ function MeasuredFishRow({ fish, index, speciesPicker, allowNoCatch = false, aut
 
       {fish._warning && (
         <div style={{ fontSize: '0.72rem', color: RED, marginTop: '0.3rem' }}>⚠ {fish._warning}</div>
+      )}
+      {fish._belowMin && (
+        <label data-testid="undersize-tick" style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: '0.35rem', fontSize: '0.8rem', fontWeight: 600, color: fish._isUndersize ? '#374151' : RED, cursor: 'pointer' }}>
+          <input type='checkbox' checked={!!fish._undersize}
+            onChange={e => onChange(index, { ...fish, _undersize: e.target.checked })} />
+          📏 Undersize — record this fish for statistics, no points
+        </label>
       )}
     </div>
   )
