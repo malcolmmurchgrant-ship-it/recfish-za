@@ -77,16 +77,16 @@ export function downloadCSV(standings, competition, config) {
 // ── XLSX-compatible HTML download ─────────────────────────────────────────────
 export function downloadXLSX(standings, catches, competition, config, mode = 'multi_sheet', extra = {}) {
   const name = sanitiseName(competition.name)
-  const { participants = [], dailyRecords = [], teamStandings = [], ladiesTeamStandings = [], cpueData = null, openStandings = [], ladiesStandings = [], juniorStandings = [], skipperRanking = [] } = extra
+  const { participants = [], dailyRecords = [], teamStandings = [], ladiesTeamStandings = [], cpueData = null, openStandings = [], ladiesStandings = [], juniorStandings = [], skipperRanking = [], divisions = null } = extra
 
   if (mode === 'single_sheet') {
-    const html = buildSingleSheetHTML(standings, catches, competition, config, participants, dailyRecords, teamStandings, cpueData, ladiesTeamStandings, openStandings, ladiesStandings, skipperRanking, juniorStandings)
+    const html = buildSingleSheetHTML(standings, catches, competition, config, participants, dailyRecords, teamStandings, cpueData, ladiesTeamStandings, openStandings, ladiesStandings, skipperRanking, juniorStandings, divisions)
     triggerDownload(
       new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' }),
       `${name}_Results.xls`
     )
   } else {
-    const html = buildMultiSheetHTML(standings, catches, competition, config, participants, dailyRecords, teamStandings, cpueData, ladiesTeamStandings, openStandings, ladiesStandings, skipperRanking, juniorStandings)
+    const html = buildMultiSheetHTML(standings, catches, competition, config, participants, dailyRecords, teamStandings, cpueData, ladiesTeamStandings, openStandings, ladiesStandings, skipperRanking, juniorStandings, divisions)
     triggerDownload(
       new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' }),
       `${name}_Full.xls`
@@ -104,7 +104,7 @@ export function downloadXLSX(standings, catches, competition, config, mode = 'mu
 // re-importing data, so it stays to a readable length instead of matching
 // the XLSX section-for-section.
 export function downloadPDFReport(standings, catches, competition, config, extra = {}) {
-  const { teamStandings = [], ladiesTeamStandings = [], openStandings = [], ladiesStandings = [], juniorStandings = [], skipperRanking = [], sponsorLogos = [], sponsorName = '' } = extra
+  const { teamStandings = [], ladiesTeamStandings = [], openStandings = [], ladiesStandings = [], juniorStandings = [], skipperRanking = [], sponsorLogos = [], sponsorName = '', divisions = null } = extra
   const name = sanitiseName(competition.name)
   const showWeight = config?.scoring?.method !== 'points'
   // Angler % only means anything for competitions actually scored on a
@@ -168,6 +168,17 @@ export function downloadPDFReport(standings, catches, competition, config, extra
   if (hasJuniors) {
     sectionHeading("Juniors' Standings")
     table(standingsHeaders, standingsRows(juniorStandings))
+  }
+
+  // CBSC Invitational: Weighed and Release divisions (TD's request, 24 Oct
+  // 2026). Weighed + Release points = each angler's overall points.
+  if (divisions?.weighed?.length) {
+    sectionHeading('Weighed Division')
+    table(['Rank', 'Name', 'Team', 'Fish', 'Weight (kg)', 'Points'], weighedDivisionRows(divisions.weighed))
+  }
+  if (divisions?.release?.length) {
+    sectionHeading('Release Division')
+    table(['Rank', 'Name', 'Team', 'Verified Releases', 'Points'], releaseDivisionRows(divisions.release))
   }
 
   // Team Standings (Open/Ladies split)
@@ -280,7 +291,7 @@ export function downloadPDFReport(standings, catches, competition, config, extra
   doc.save(`${name}_Results.pdf`)
 }
 
-function buildSingleSheetHTML(standings, catches, competition, config, participants = [], dailyRecords = [], teamStandings = [], cpueData = null, ladiesTeamStandings = [], openStandings = [], ladiesStandings = [], skipperRanking = [], juniorStandings = []) {
+function buildSingleSheetHTML(standings, catches, competition, config, participants = [], dailyRecords = [], teamStandings = [], cpueData = null, ladiesTeamStandings = [], openStandings = [], ladiesStandings = [], skipperRanking = [], juniorStandings = [], divisions = null) {
   const prizeRows = buildPrizeRows(standings, catches, config, teamStandings)
   const showWeight = config?.scoring?.method !== 'points'
   const usesBoatPercentage = config?.scoring?.boat_percentage_scoring === true
@@ -312,6 +323,8 @@ ${juniorStandings.length ? `<div class="section"><h3>Juniors' Standings</h3>${st
 <h2>${competition.name || 'Results'}</h2>
 <p>${competition.venue || ''} · ${competition.start_date || ''}</p>
 ${standingsSection}
+${divisions?.weighed?.length ? `<div class="section"><h3>Weighed Division</h3>${weighedDivisionTable(divisions.weighed)}</div>` : ''}
+${divisions?.release?.length ? `<div class="section"><h3>Release Division</h3>${releaseDivisionTable(divisions.release)}</div>` : ''}
 ${teamStandings.length ? `<div class="section"><h3>Team Standings</h3>${teamStandingsTable(teamStandings, usesBoatPercentage)}</div>` : ''}
 ${ladiesTeamStandings.length ? `<div class="section"><h3>Ladies' Team Standings</h3>${teamStandingsTable(ladiesTeamStandings, usesBoatPercentage)}</div>` : ''}
 ${skipperRanking.length ? `<div class="section"><h3>Skipper Standings</h3>${skipperStandingsTable(skipperRanking)}</div>` : ''}
@@ -323,7 +336,7 @@ ${prizeRows.length ? `<div class="section"><h3>Prize Categories</h3>${prizeTable
 </body></html>`
 }
 
-function buildMultiSheetHTML(standings, catches, competition, config, participants = [], dailyRecords = [], teamStandings = [], cpueData = null, ladiesTeamStandings = [], openStandings = [], ladiesStandings = [], skipperRanking = [], juniorStandings = []) {
+function buildMultiSheetHTML(standings, catches, competition, config, participants = [], dailyRecords = [], teamStandings = [], cpueData = null, ladiesTeamStandings = [], openStandings = [], ladiesStandings = [], skipperRanking = [], juniorStandings = [], divisions = null) {
   const prizeRows = buildPrizeRows(standings, catches, config, teamStandings)
   const showWeight = config?.scoring?.method !== 'points'
   const usesBoatPercentage = config?.scoring?.boat_percentage_scoring === true
@@ -335,6 +348,8 @@ function buildMultiSheetHTML(standings, catches, competition, config, participan
           ...(juniorStandings.length ? [{ name: 'Juniors Standings', content: standingsTable(juniorStandings, showWeight, usesBoatPercentage) }] : []),
         ]
       : [{ name: 'Standings', content: standingsTable(standings, showWeight, usesBoatPercentage) }]),
+    ...(divisions?.weighed?.length ? [{ name: 'Weighed Division', content: weighedDivisionTable(divisions.weighed) }] : []),
+    ...(divisions?.release?.length ? [{ name: 'Release Division', content: releaseDivisionTable(divisions.release) }] : []),
     ...(teamStandings.length ? [{ name: 'Team Standings', content: teamStandingsTable(teamStandings, usesBoatPercentage) }] : []),
     ...(ladiesTeamStandings.length ? [{ name: 'Ladies Team Standings', content: teamStandingsTable(ladiesTeamStandings, usesBoatPercentage) }] : []),
     ...(skipperRanking.length ? [{ name: 'Skipper Standings', content: skipperStandingsTable(skipperRanking) }] : []),
@@ -496,6 +511,22 @@ function skipperStandingsTable(skipperRanking) {
     s.totalPoints.toFixed(2), s.totalPosition,
   ])
   return htmlTable(headers, rows)
+}
+
+// CBSC Invitational divisions (see utils/invitationalDivisions.js). The
+// Daily Biggest Tuna fish keeps its weight but scores 0, marked "(Daily
+// Biggest Tuna)" so the 0 is explained.
+function weighedDivisionRows(list) {
+  return list.map(r => [r.rank, r.name + (r.dailyBiggest ? ' (Daily Biggest Tuna)' : ''), r.team || '', r.fish, (r.kg || 0).toFixed(2), (r.points || 0).toFixed(2)])
+}
+function releaseDivisionRows(list) {
+  return list.map(r => [r.rank, r.name, r.team || '', r.releases, (r.points || 0).toFixed(2)])
+}
+function weighedDivisionTable(list) {
+  return htmlTable(['Rank', 'Name', 'Team', 'Fish', 'Weight (kg)', 'Points'], weighedDivisionRows(list))
+}
+function releaseDivisionTable(list) {
+  return htmlTable(['Rank', 'Name', 'Team', 'Verified Releases', 'Points'], releaseDivisionRows(list))
 }
 
 function prizeTable(prizeRows) {

@@ -260,6 +260,8 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
   const TABS = [
     hasTeams          && { id: 'team',    label: '🏆 Teams'     },
                          { id: 'angler',  label: '🎣 Anglers'   },
+    divisions         && { id: 'weighed', label: '⚖️ Weighed'   },
+    divisions         && { id: 'release', label: '🎥 Released'  },
     hasSkipper        && { id: 'skipper', label: '⚓ Skippers'  },
                          { id: 'top10',   label: '🐟 Top Catches'},
                          { id: 'daily',   label: '📅 Daily'     },
@@ -534,6 +536,49 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
           })}
         </div>
       )}
+
+      {/* ── WEIGHED / RELEASE DIVISIONS (CBSC Invitational) ─────────────────── */}
+      {(activeTab === 'weighed' || activeTab === 'release') && divisions && (() => {
+        const isW = activeTab === 'weighed'
+        const list = isW ? divisions.weighed : divisions.release
+        return (
+          <div>
+            <div style={{ fontSize: '0.8rem', color: GREY, marginBottom: '0.5rem' }}>
+              {isW
+                ? 'Weighed fish only, 1 point per kg. Each day\'s Daily Biggest Tuna is left out of the points (🏆).'
+                : 'Video-verified releases only: 20 points for Yellowfin, Bigeye or Southern Bluefin, 5 for Longfin.'}
+              {' '}Weighed + Released = each angler's overall points.
+            </div>
+            {list.length === 0 && (
+              <div style={{ ...S.card, color: GREY, fontStyle: 'italic', textAlign: 'center' }}>
+                {isW ? 'No weighed fish yet.' : 'No verified releases yet.'}
+              </div>
+            )}
+            {list.map(r => (
+              <div key={r.id} style={{ ...S.medal(r.rank), borderRadius: 8, padding: '0.75rem 1rem', marginBottom: '0.4rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                  <span style={{ fontWeight: 700, minWidth: 28 }}>{S.icon(r.rank)}</span>
+                  <div style={{ flex: 1, minWidth: 160 }}>
+                    <div style={{ fontWeight: 700 }}>{r.name}{r.dailyBiggest ? ' 🏆' : ''}</div>
+                    <div style={{ fontSize: '0.78rem', color: GREY }}>{r.teamDisplay || r.team}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                    {isW ? (
+                      <>
+                        <StatPill label="Fish" val={r.fish} col={GREEN} />
+                        <StatPill label="Kg" val={r.kg.toFixed(2)} col={GOLD} />
+                      </>
+                    ) : (
+                      <StatPill label="Releases" val={r.releases} col={GREEN} />
+                    )}
+                    <StatPill label="Points" val={r.points.toLocaleString('en-ZA', { minimumFractionDigits: 2 })} col={NAVY} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      })()}
 
       {/* ── SKIPPER STANDINGS ─────────────────────────────────────────────── */}
       {activeTab === 'skipper' && (
