@@ -10,6 +10,8 @@ import { isPredatorCatch, isUndersizeCatch, isRecordedOnlyCatch } from './utils/
 import { heaviestTunaRuleOn, pickScoringTuna, isRuleTunaName } from '../../utils/heaviestTunaRule'
 import { dayLabel } from '../../utils/dayLabels'
 import { teamBoatLabel } from '../../utils/teamLabels'
+import { isNoCatchRow } from '../../utils/noCatch'
+import { usesDailyBiggestTuna } from '../../utils/dailyBiggestTunaExclusion'
 
 const NAVY  = '#1e3a8a'
 const GREY  = '#6b7280'
@@ -121,6 +123,22 @@ export default function CompetitionAdminScoring({
     if (anglerFilter !== 'all' && c.participant_id !== anglerFilter && c.angler_id !== anglerFilter) return false
     return true
   })
+
+  // CBSC Invitational order (Malcolm, 24 Oct 2026): weighed fish heaviest
+  // first, then releases (no weight) by angler name, then No Catch reports
+  // alphabetically at the bottom. Other competitions keep their own order.
+  const invitationalOrder = usesDailyBiggestTuna(config?.species)
+  const nameOfCatch = (c) => (participants.find(p => p.id === c.participant_id || (c.angler_id && p.user_id === c.angler_id))?.full_name || '')
+  const listedCatches = !invitationalOrder ? filtered : (() => {
+    const fish = filtered.filter(c => !isNoCatchRow(c))
+    const weighed = fish.filter(c => (parseFloat(c.weight_kg) || 0) > 0)
+      .sort((a, b) => (parseFloat(b.weight_kg) || 0) - (parseFloat(a.weight_kg) || 0) || nameOfCatch(a).localeCompare(nameOfCatch(b)))
+    const others = fish.filter(c => !((parseFloat(c.weight_kg) || 0) > 0))
+      .sort((a, b) => nameOfCatch(a).localeCompare(nameOfCatch(b)) || String(a.created_at || '').localeCompare(String(b.created_at || '')))
+    return [...weighed, ...others]
+  })()
+  const noCatchRows = !invitationalOrder ? [] : filtered.filter(isNoCatchRow)
+    .sort((a, b) => nameOfCatch(a).localeCompare(nameOfCatch(b)) || (a.competition_days?.day_number || 0) - (b.competition_days?.day_number || 0))
 
   // ── Bulk DQ: the angler + day currently selected in the filters above ────
   // dayFilter is a day_number (matches the <select> options), but
@@ -455,7 +473,7 @@ export default function CompetitionAdminScoring({
           <div style={{ ...S.card, color: GREY, textAlign: 'center', fontStyle: 'italic' }}>
             No catches found for selected filters.
           </div>
-        ) : filtered.map(c => {
+        ) : <>{listedCatches.map(c => {
         const qColor = DQ_COLORS[c.data_quality] || GREY
         const participant = resolveParticipant(c)
         const team = c.competition_teams
@@ -517,7 +535,37 @@ export default function CompetitionAdminScoring({
             </div>
           </div>
         )
-        })
+        })}
+        {noCatchRows.length > 0 && (
+          <div style={{ ...S.card, borderLeft: '4px solid #9ca3af' }} data-testid="no-catch-list">
+            <div style={{ fontWeight: 700, color: '#374151', marginBottom: '0.5rem' }}>
+              🚫 No Catch — {noCatchRows.length} {noCatchRows.length === 1 ? 'entry' : 'entries'}
+            </div>
+            <div style={{ display: 'grid', gap: '0.3rem' }}>
+              {noCatchRows.map(c => {
+                const participant = resolveParticipant(c)
+                const team = c.competition_teams
+                return (
+                  <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', background: '#f8fafc', borderRadius: 6, padding: '0.35rem 0.65rem' }}>
+                    <div style={{ fontSize: '0.85rem' }}>
+                      <span style={{ fontWeight: 600, color: NAVY }}>{participant?.full_name || 'Unknown angler'}</span>
+                      <span style={{ color: GREY, fontSize: '0.78rem' }}>
+                        {team && ` · ${team.team_name || team.province}`}{` · Day ${c.competition_days?.day_number || '?'}`}
+                      </span>
+                    </div>
+                    {(isAdmin || isScorer) && !isLocked && (
+                      <button onClick={() => setEditing(c)}
+                        style={{ ...S.btn(GREY), fontSize: '0.75rem', padding: '0.25rem 0.6rem' }}>
+                        ✏️ Edit
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+        </>
       )}
 
       {/* ── Boat Summary (per boat, per day) ──────────────────────────────── */}
