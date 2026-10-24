@@ -257,6 +257,10 @@ export function computeInvitationalPrizes({
         releasesVerified: verified.length,
         releasesPending: rel.filter(c => c.video_status === 'pending').length,
         total: r2(weighedPts - excludedPts + releasePts),
+        // Weighed fish only, after the Daily Biggest Tuna rule - the Most
+        // Weighed Fish prize (Greg, 24 Oct 2026: release points must not
+        // count towards it).
+        weighedNet: r2(weighedPts - excludedPts),
         scoreboardTotal: r2(weighedPts + releasePts),
         fishWeighed: w.length,
       }
@@ -266,7 +270,8 @@ export function computeInvitationalPrizes({
     ...a,
     result: `${a[key].toFixed(2)} ${unit}`,
     detail: [
-      key === 'total' && a.excludedPoints > 0 ? `${a.excludedPoints.toFixed(2)} pts of a Daily Biggest Tuna left out` : '',
+      (key === 'total' || key === 'weighedNet') && a.excludedPoints > 0 ? `${a.excludedPoints.toFixed(2)} pts of a Daily Biggest Tuna left out` : '',
+      key === 'weighedNet' ? `${a.fishWeighed} fish weighed` : '',
       key === 'releasePoints' ? `${a.releasesVerified} verified release${a.releasesVerified === 1 ? '' : 's'}` : '',
       a.releasesPending ? `${a.releasesPending} release${a.releasesPending === 1 ? '' : 's'} awaiting review` : '',
     ].filter(Boolean).join(' · '),
@@ -277,6 +282,7 @@ export function computeInvitationalPrizes({
   const ladiesRanked  = rankBy(scored.filter(a => isLady(a)), a => a.total, v => r2(v))
   const juniorRanked  = rankBy(scored.filter(a => isJunior(a)), a => a.total, v => r2(v))
   const releaseRanked = rankBy(anglers.filter(a => a.releasePoints > 0), a => a.releasePoints, v => r2(v))
+  const weighedRanked = rankBy(anglers.filter(a => a.weighedNet > 0), a => a.weighedNet, v => r2(v))
 
   // ── Boat average (for the TD's Top Team / auction decision) ─────────────
   const boatRanking = rankBy(
@@ -316,6 +322,14 @@ export function computeInvitationalPrizes({
     longfin,
     yellowfin,
     overall: slots(overallRanked, 10, personDesc('total', 'pts')),
+    // Replaces Overall Most Points on the Run of Show (weighed fish only).
+    weighed: slots(weighedRanked, 10, personDesc('weighedNet', 'pts')),
+    // Every angler with verified releases, best first - the summary at the
+    // end of the Run of Show.
+    releaseSummary: [...new Set(releaseRanked.map(a => a.place))].map(place => {
+      const at = releaseRanked.filter(a => a.place === place)
+      return { place, entries: at.map(personDesc('releasePoints', 'release pts')), tied: at.length > 1 }
+    }),
     bigeyeBluefin,
     topFish,
   }
@@ -324,7 +338,7 @@ export function computeInvitationalPrizes({
   tieWarn('Ladies', prizes.ladies)
   tieWarn('Longfin', prizes.longfin)
   tieWarn('Yellowfin', prizes.yellowfin)
-  tieWarn('Overall Most Points', prizes.overall)
+  tieWarn('Most Weighed Fish', prizes.weighed)
   tieWarn('Biggest Bigeye or Southern Bluefin Tuna', [prizes.bigeyeBluefin])
   tieWarn('Overall Biggest Fish', [prizes.topFish])
 
@@ -347,6 +361,8 @@ export function computeInvitationalPrizes({
     excludedCatchIds: [...excludedCatchIds],
     prizes,
     overallRanked,
+    weighedRanked,
+    releaseRanked,
     boatRanking,
     warnings,
   }
@@ -371,7 +387,9 @@ export function buildRunOfShow(result) {
   desc(result.prizes.ladies).forEach(s => add('Ladies', `${ordinal(s.place)} Lady`, 'App', s))
   desc(result.prizes.longfin).forEach(s => add('Longfin', `${ordinal(s.place)} Longfin`, 'App', s))
   desc(result.prizes.yellowfin).forEach(s => add('Yellowfin', `${ordinal(s.place)} Yellowfin`, 'App', s))
-  desc(result.prizes.overall).forEach(s => add('Overall Most Points (All Anglers)', ordinal(s.place), 'App', s))
+  // Most Weighed Fish replaces Overall Most Points (Greg, 24 Oct 2026):
+  // weighed fish only, release points not included.
+  desc(result.prizes.weighed).forEach(s => add('Most Weighed Fish (All Anglers)', ordinal(s.place), 'App', s))
   result.dailyTuna.forEach(t => add('Daily Biggest Tuna', `Fishing Day ${t.fishingDay}`, 'App', {
     place: 1, entries: t.entries, tied: t.tied,
     note: t.status === 'not_fished' ? `No Fishing Day ${t.fishingDay} recorded. If it is not fished, the club retains this prize money`
@@ -388,6 +406,13 @@ export function buildRunOfShow(result) {
     })
   }
   td('Non Winners Draw', '')
+
+  // Summary of the Most Released list, best first, closing the Run of Show.
+  if (result.prizes.releaseSummary.length) {
+    result.prizes.releaseSummary.forEach(s => add('Most Released - Summary', ordinal(s.place), 'App', s))
+  } else {
+    add('Most Released - Summary', '', 'App', { place: 1, entries: [], note: 'No verified releases yet' })
+  }
 
   return rows.map((r, i) => ({ order: i + 1, ...r }))
 }

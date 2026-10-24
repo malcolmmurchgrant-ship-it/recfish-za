@@ -89,15 +89,16 @@ export function buildPrizegivingPdf({ competitionName, result, upToLabel }) {
   // ── Supporting lists ─────────────────────────────────────────────────────
   doc.addPage()
   doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(...NAVY)
-  doc.text('Overall Most Points - full list', 14, 14)
+  doc.text('Most Weighed Fish - full list', 14, 14)
   doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(90)
-  doc.text('Points = weighed fish + verified releases, less the points of any Daily Biggest Tuna winning fish.', 14, 19)
+  doc.text('Most Weighed pts = weighed fish only, less the points of any Daily Biggest Tuna winning fish. Release points are shown for reference and are not included.', 14, 19)
   autoTable(doc, {
     startY: 22,
-    head: [['Place', 'Angler', 'Cat.', 'Boat', 'Weighed pts', 'Daily tuna left out', 'Release pts', 'Total', 'Pending videos']],
-    body: result.overallRanked.map(a => [
-      a.place + (a.tied ? '=' : ''), a.name, divisionLabel(a),
+    head: [['Place', 'Angler', 'Cat.', 'Boat', 'Weighed pts', 'Daily tuna left out', 'Most Weighed pts', 'Release pts', 'Combined', 'Pending videos']],
+    body: [...result.weighedRanked, ...result.overallRanked.filter(a => !(a.weighedNet > 0))].map(a => [
+      a.weighedNet > 0 ? a.place + (a.tied ? '=' : '') : '-', a.name, divisionLabel(a),
       a.boat, a.weighedPoints.toFixed(2), a.excludedPoints ? '-' + a.excludedPoints.toFixed(2) : '',
+      { content: a.weighedNet.toFixed(2), styles: { fontStyle: 'bold' } },
       a.releasePoints.toFixed(2), a.total.toFixed(2), a.releasesPending || '',
     ]),
     styles: { fontSize: 8, cellPadding: 1.3 },
