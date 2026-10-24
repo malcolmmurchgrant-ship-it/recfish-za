@@ -189,26 +189,30 @@ export default function CompetitionAdminPrizegiving({ competition, config, catch
       {/* ── Supporting lists ──────────────────────────────────────────── */}
       <div style={S.card}>
         <button onClick={() => setShowFull(v => !v)} style={{ background: 'none', border: 'none', color: NAVY, fontWeight: 700, cursor: 'pointer', padding: 0, fontSize: '0.95rem' }}>
-          {showFull ? '▾' : '▸'} Full Overall list and boat averages
+          {showFull ? '▾' : '▸'} Full Most Weighed Fish list and boat averages
         </button>
         {showFull && (
           <div style={{ overflowX: 'auto', marginTop: '0.6rem' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '1rem' }}>
               <thead><tr>
                 <th style={S.th}>Place</th><th style={S.th}>Angler</th><th style={S.th}>Cat.</th><th style={S.th}>Boat</th>
-                <th style={S.th}>Weighed</th><th style={S.th}>Daily tuna left out</th><th style={S.th}>Releases</th><th style={S.th}>Total</th>
+                <th style={S.th}>Weighed</th><th style={S.th}>Daily tuna left out</th><th style={S.th}>Most Weighed pts</th>
+                <th style={S.th}>Release pts</th><th style={S.th}>Combined</th>
               </tr></thead>
               <tbody>
-                {result.overallRanked.map(a => (
+                {/* Ranked by Most Weighed Fish (weighed only); anglers with
+                    releases but no weighed fish follow, unplaced. */}
+                {[...result.weighedRanked, ...result.overallRanked.filter(a => !(a.weighedNet > 0))].map(a => (
                   <tr key={a.participantId}>
-                    <td style={S.td}>{a.place}{a.tied ? '=' : ''}</td>
+                    <td style={S.td}>{a.weighedNet > 0 ? `${a.place}${a.tied ? '=' : ''}` : '-'}</td>
                     <td style={S.td}>{a.name}</td>
                     <td style={S.td}>{divisionLabel(a)}</td>
                     <td style={S.td}>{a.boat}</td>
                     <td style={S.td}>{a.weighedPoints.toFixed(2)}</td>
                     <td style={S.td}>{a.excludedPoints ? '−' + a.excludedPoints.toFixed(2) : ''}</td>
+                    <td style={{ ...S.td, fontWeight: 700 }}>{a.weighedNet.toFixed(2)}</td>
                     <td style={S.td}>{a.releasePoints.toFixed(2)}{a.releasesPending ? <span style={{ color: AMBER }}> ({a.releasesPending} pending)</span> : ''}</td>
-                    <td style={{ ...S.td, fontWeight: 700 }}>{a.total.toFixed(2)}</td>
+                    <td style={S.td}>{a.total.toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>
