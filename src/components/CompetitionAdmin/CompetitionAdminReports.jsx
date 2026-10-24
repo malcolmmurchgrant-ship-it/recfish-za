@@ -11,6 +11,8 @@ import { readLogoFile, MAX_LOGOS } from '../../utils/sponsorLogos'
 import { buildIndividualStandings, buildDailyAnglerPercentages, buildBoatPercentageTeamStandings, buildCpueData, buildSkipperRanking } from './utils/scoringEngine'
 import { isLady, isJunior } from '../../utils/anglerDivisions'
 import { dayLabel } from '../../utils/dayLabels'
+import { usesDailyBiggestTuna } from '../../utils/dailyBiggestTunaExclusion'
+import { buildDivisionsFromCatches } from '../../utils/invitationalDivisions'
 
 // Flip to true once generate-competition-pdf is actually built and deployed
 // as a Supabase Edge Function (confirmed none exist on this project yet).
@@ -72,6 +74,11 @@ export default function CompetitionAdminReports({
   }, [config?.species])
 
   const isLocked   = !!competition?.results_published_at || published
+  // CBSC Invitational: Weighed and Release divisions for the PDF / Excel
+  // downloads. null for every other competition (no extra sections).
+  const divisions = useMemo(() => usesDailyBiggestTuna(config?.species)
+    ? buildDivisionsFromCatches({ catches, participants, teams })
+    : null, [catches, participants, teams, config])
   const standings  = useMemo(() => buildIndividualStandings(catches, participants, days, boats, config?.scoring, teams), [catches, participants, days, boats, config?.scoring, teams])
 
   // Boat draws, needed for crew-size-aware skipper averaging (same as the
@@ -274,9 +281,9 @@ export default function CompetitionAdminReports({
       if (type === 'csv') {
         downloadCSV(standingsWithCpue, competition, config)
       } else if (type === 'xlsx') {
-        downloadXLSX(standingsWithCpue, catches, competition, config, xlsxMode, { participants, dailyRecords, teamStandings: generalTeamStandings, ladiesTeamStandings, cpueData, openStandings, ladiesStandings, juniorStandings, skipperRanking })
+        downloadXLSX(standingsWithCpue, catches, competition, config, xlsxMode, { participants, dailyRecords, teamStandings: generalTeamStandings, ladiesTeamStandings, cpueData, openStandings, ladiesStandings, juniorStandings, skipperRanking, divisions })
       } else if (type === 'pdf') {
-        downloadPDFReport(standingsWithCpue, catches, competition, config, { teamStandings: generalTeamStandings, ladiesTeamStandings, openStandings, ladiesStandings, juniorStandings, skipperRanking, sponsorLogos, sponsorName })
+        downloadPDFReport(standingsWithCpue, catches, competition, config, { teamStandings: generalTeamStandings, ladiesTeamStandings, openStandings, ladiesStandings, juniorStandings, skipperRanking, sponsorLogos, sponsorName, divisions })
       } else if (type === 'pdf_prize' || type === 'pdf_scorer') {
         throw new Error('This PDF type isn\'t built yet — only Full Results PDF is available so far.')
       }
