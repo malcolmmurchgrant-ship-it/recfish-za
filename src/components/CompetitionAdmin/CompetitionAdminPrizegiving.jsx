@@ -133,6 +133,7 @@ export default function CompetitionAdminPrizegiving({ competition, config, catch
         <div style={{ fontSize: '0.8rem', color: GREY, marginBottom: '0.6rem' }}>
           In announcement order. "TD" awards are decided by the Tournament Director and are left blank.
           A Daily Biggest Tuna fish wins its prize, and its points are then left out of that angler's totals.
+          Most Weighed Fish, Ladies and Top Junior count weighed fish only; release points count only for Catch and Release.
         </div>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }} data-testid="pg-table">
