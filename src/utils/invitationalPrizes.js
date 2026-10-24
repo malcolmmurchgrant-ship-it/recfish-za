@@ -279,8 +279,11 @@ export function computeInvitationalPrizes({
 
   const scored = anglers.filter(a => a.total > 0)
   const overallRanked = rankBy(scored, a => a.total, v => r2(v))
-  const ladiesRanked  = rankBy(scored.filter(a => isLady(a)), a => a.total, v => r2(v))
-  const juniorRanked  = rankBy(scored.filter(a => isJunior(a)), a => a.total, v => r2(v))
+  // Ladies and Top Junior: weighed fish only, like Most Weighed Fish (Greg,
+  // 24 Oct 2026: release points do not count towards these prizes).
+  const weighedScored = anglers.filter(a => a.weighedNet > 0)
+  const ladiesRanked  = rankBy(weighedScored.filter(a => isLady(a)), a => a.weighedNet, v => r2(v))
+  const juniorRanked  = rankBy(weighedScored.filter(a => isJunior(a)), a => a.weighedNet, v => r2(v))
   const releaseRanked = rankBy(anglers.filter(a => a.releasePoints > 0), a => a.releasePoints, v => r2(v))
   const weighedRanked = rankBy(anglers.filter(a => a.weighedNet > 0), a => a.weighedNet, v => r2(v))
 
@@ -317,8 +320,8 @@ export function computeInvitationalPrizes({
   }
   const prizes = {
     release: slots(releaseRanked, 3, personDesc('releasePoints', 'release pts')),
-    junior:  slots(juniorRanked, 1, personDesc('total', 'pts')),
-    ladies:  slots(ladiesRanked, 3, personDesc('total', 'pts')),
+    junior:  slots(juniorRanked, 1, personDesc('weighedNet', 'pts')),
+    ladies:  slots(ladiesRanked, 3, personDesc('weighedNet', 'pts')),
     longfin,
     yellowfin,
     overall: slots(overallRanked, 10, personDesc('total', 'pts')),
