@@ -12,7 +12,9 @@
 //
 // Opened from the "📺 TV display" button on the Scoreboard, or directly with
 //   /scoreboard/<competition id>?tv=1
-// Optional:  &view=angler | team | boat | rotate     (default: angler)
+// Optional:  &view=angler | team | boat | weighed | release | rotate  (default: angler)
+// weighed / release: the CBSC Invitational's Weighed and Release divisions,
+// shown only when the Scoreboard passes them in.
 //
 // The control bar (view, day, rotate, full screen, exit) hides itself after
 // a few seconds without mouse movement so the TV shows only the standings,
@@ -72,6 +74,8 @@ export default function ScoreboardTV({
   isSplitBoat,
   catchReleaseFormat,
   initialView = 'angler',
+  weighedAnglers = null,
+  releaseAnglers = null,
   onExit,
   sponsorLogos = [],
 }) {
@@ -79,6 +83,8 @@ export default function ScoreboardTV({
     { id: 'angler', label: '🎣 Anglers' },
     hasTeams && { id: 'team', label: '🏆 Teams' },
     hasBoats && { id: 'boat', label: '⚓ Boats' },
+    weighedAnglers && { id: 'weighed', label: '⚖️ Weighed' },
+    releaseAnglers && { id: 'release', label: '🎥 Released' },
   ].filter(Boolean)
 
   const startRotate = initialView === 'rotate'
@@ -173,13 +179,32 @@ export default function ScoreboardTV({
     title = 'Angler Standings'
     rows = anglers
     cols = [
-      { key: 'name', label: 'Angler', flex: 3.4, get: r => r.name || '—', strong: true },
+      { key: 'name', label: 'Angler', flex: 3.4, get: r => `${r.name || '—'}${r.dailyBiggest ? ' 🏆' : ''}`, strong: true },
       { key: 'team', label: 'Team', flex: 2.6, get: r => r.teamDisplay || r.team || '', muted: true },
       { key: 'fish', label: 'Fish', flex: 0.7, get: r => r.fish, align: 'right', num: true, color: GREEN },
       showKg && { key: 'kg', label: 'Kg', flex: 1.3, get: r => fmt2(r.kg), align: 'right', num: true, color: GOLD },
       isSplitBoat && { key: 'pct', label: '%', flex: 1.3, get: r => fmt2(r.percentage), align: 'right', num: true, color: NAVY, strong: true },
       { key: 'pts', label: 'Points', flex: 1.6, get: r => fmt2(r.points), align: 'right', num: true, color: isSplitBoat ? GREY : NAVY, strong: !isSplitBoat },
     ].filter(Boolean)
+  } else if (view === 'weighed' && weighedAnglers) {
+    title = 'Weighed Fish Division'
+    rows = weighedAnglers
+    cols = [
+      { key: 'name', label: 'Angler', flex: 3.4, get: r => `${r.name || '—'}${r.dailyBiggest ? ' 🏆' : ''}`, strong: true },
+      { key: 'team', label: 'Team', flex: 2.6, get: r => r.teamDisplay || r.team || '', muted: true },
+      { key: 'fish', label: 'Fish', flex: 0.7, get: r => r.fish, align: 'right', num: true, color: GREEN },
+      { key: 'kg', label: 'Kg', flex: 1.3, get: r => fmt2(r.kg), align: 'right', num: true, color: GOLD },
+      { key: 'pts', label: 'Points', flex: 1.6, get: r => fmt2(r.points), align: 'right', num: true, color: NAVY, strong: true },
+    ]
+  } else if (view === 'release' && releaseAnglers) {
+    title = 'Release Division'
+    rows = releaseAnglers
+    cols = [
+      { key: 'name', label: 'Angler', flex: 3.4, get: r => r.name || '—', strong: true },
+      { key: 'team', label: 'Team', flex: 2.6, get: r => r.teamDisplay || r.team || '', muted: true },
+      { key: 'rel', label: 'Releases', flex: 1, get: r => r.releases, align: 'right', num: true, color: GREEN },
+      { key: 'pts', label: 'Points', flex: 1.6, get: r => fmt2(r.points), align: 'right', num: true, color: NAVY, strong: true },
+    ]
   } else if (view === 'team') {
     title = 'Team Standings'
     rows = teams
@@ -254,6 +279,7 @@ export default function ScoreboardTV({
           <div style={{ fontWeight: 800, fontSize: 'clamp(16px, 3.2vh, 40px)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{competitionName}</div>
           <div style={{ fontSize: 'clamp(11px, 1.8vh, 22px)', opacity: 0.85, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {title} · {dayLabel}{venue ? ` · ${venue}` : ''}
+            {rows.some(r => r.dailyBiggest) ? ' · 🏆 Daily Biggest Tuna (points left out)' : ''}
           </div>
         </div>
         {/* Sponsor logos (Reports tab → Sponsor / Branding), each on a white

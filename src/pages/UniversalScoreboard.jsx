@@ -13,7 +13,8 @@ import ScoreboardTV from '../components/ScoreboardTV'
 import { getSponsorLogos } from '../utils/sponsorLogos'
 import PublishedResultsDownload from '../components/PublishedResultsDownload'
 import { divisionLabel } from '../utils/anglerDivisions'
-import { applyDailyBiggestTunaExclusion } from '../utils/dailyBiggestTunaExclusion'
+import { applyDailyBiggestTunaExclusion, usesDailyBiggestTuna } from '../utils/dailyBiggestTunaExclusion'
+import { buildDivisionStandings } from '../utils/invitationalDivisions'
 import WeighInReports from '../components/WeighInReports'
 import { tracksWeighInReports, buildReportStatus, localToday } from '../utils/noCatch'
 
@@ -146,6 +147,12 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
 
   const { scoringConfig, teamConfig, discipline, isPublished, isSplitBoat, teamMap, anglerMap, boatMap, dayMap, dateToDay, fishingDays, totalHours, cancelledDays, scoringCatches, filteredCatches, useMultiplier, teamPercentageMap, teamParticipantIds, userIdToParticipantId, teamStandings, anglerPercentageMap, anglerStandings } =
     computeStandings({ competition, template, catches: standingCatches, participants, teams, boats, days, dayFilter })
+
+  // CBSC Invitational: Weighed and Release divisions for the TV display
+  // (Greg's request, 24 Oct 2026), alongside the combined standings.
+  const invitationalFormat = usesDailyBiggestTuna(template?.species_config)
+  const divisions = invitationalFormat ? buildDivisionStandings(anglerStandings, filteredCatches, scoringConfig) : null
+  const dailyBiggestIds = new Set(filteredCatches.filter(c => c.daily_biggest_excluded).map(c => c.participant_id).filter(Boolean))
 
   // ── Skipper standings ─────────────────────────────────────────────────────
   // Match catches directly by their own boat_id — every catch always
@@ -291,7 +298,9 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
         dayFilter={dayFilter}
         onDayFilter={setDayFilter}
         lastRefresh={lastRefresh}
-        anglers={anglerStandings}
+        anglers={invitationalFormat ? anglerStandings.map(a => dailyBiggestIds.has(a.id) ? { ...a, dailyBiggest: true } : a) : anglerStandings}
+        weighedAnglers={divisions?.weighed || null}
+        releaseAnglers={divisions?.release || null}
         teams={teamStandings}
         boats={skipperStandings}
         hasTeams={!!hasTeams && teamStandings.length > 0}
