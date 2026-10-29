@@ -1,8 +1,10 @@
 // ─── dayLabels.js ────────────────────────────────────────────────────────────
 // One way of naming a competition day in every day list, so a day the TD
-// marked cancelled in Setup is plainly shown as such wherever it appears:
-//   "Day 3 — Thu, 22 Oct"
-//   "Day 1 — Tue, 20 Oct — CANCELLED (Bad weather. Called off.)"
+// marked cancelled in Setup is plainly shown as such wherever it appears.
+// SADSAA numbers fishing days only: Day 1 is the first day actually fished,
+// so a cancelled day is never given a day number of its own:
+//   "Day 1 — Thu, 22 Oct"
+//   "CANCELLED — Tue, 20 Oct (Bad weather. Called off.)"
 
 export function dayDate(d, { long = false } = {}) {
   if (!d?.date) return ''
@@ -15,10 +17,10 @@ export function dayDate(d, { long = false } = {}) {
 export function dayLabel(d, opts = {}) {
   if (!d) return ''
   const date = dayDate(d, opts)
-  const cancelled = d.cancelled
-    ? ` — CANCELLED${d.cancellation_reason ? ` (${d.cancellation_reason})` : ''}`
-    : ''
-  return `Day ${d.day_number}${date ? ` — ${date}` : ''}${cancelled}`
+  if (d.cancelled) {
+    return `CANCELLED${date ? ` — ${date}` : ''}${d.cancellation_reason ? ` (${d.cancellation_reason})` : ''}`
+  }
+  return `Day ${d.day_number}${date ? ` — ${date}` : ''}`
 }
 
 // Today's competition day if it is a fishing day, else the first day that

@@ -133,6 +133,12 @@ async function syncCompetitionDays(competitionId, startDate, numDays) {
     d.setDate(d.getDate() + i)
     return { day_number: i + 1, date: toLocalDateStr(d) }
   })
+  // Once a day has been cancelled, the days are numbered by fishing day
+  // (renumber_competition_days), not by calendar slot from the start date,
+  // so re-syncing from the start date here would put wrong dates on them.
+  // The Setup tab manages the days from then on.
+  if ((existing || []).some(d => d.cancelled)) return { error: null }
+
   const byDayNumber = Object.fromEntries((existing || []).map(d => [d.day_number, d]))
 
   for (const t of targetDays) {

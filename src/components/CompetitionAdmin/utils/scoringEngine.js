@@ -671,7 +671,8 @@ export function buildSkipperRanking(catches, boats, days, boatDraws = [], teams 
     return 1 // no roster and no catches to infer from — avoid divide-by-zero
   }
 
-  const dayNumbers = [...new Set((days || []).map(d => d.day_number))].sort((a, b) => a - b)
+  // Cancelled days are never fished, so they get no column or position.
+  const dayNumbers = [...new Set((days || []).filter(d => !d.cancelled).map(d => d.day_number))].sort((a, b) => a - b)
   const boatIds = [...new Set((boats || []).map(b => b.id))]
 
   // Rank boats within each day by that day's AVERAGE points per angler
