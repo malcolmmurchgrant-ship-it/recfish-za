@@ -203,8 +203,8 @@ export function downloadPDFReport(standings, catches, competition, config, extra
   // Skipper Standings
   if (skipperRanking.length) {
     sectionHeading('Skipper Standings')
-    table(['Rank', 'Boat', 'Skipper', 'Days Fished', 'Total Fish', 'Total Points', 'Total Position (Grand Prix)'],
-      skipperRanking.map(s => [s.rank, s.boatName, s.skipperName, s.daysFished, s.totalFishCount, s.totalPoints.toFixed(2), s.totalPosition]))
+    const { headers, rows } = skipperTableData(skipperRanking)
+    table(headers, rows)
   }
 
   // Prize Categories — this function's own comment already promised
@@ -504,12 +504,21 @@ function teamStandingsTable(teamStandings, usesBoatPercentage = true) {
 // Grand-prix style: lower totalPosition is better (sum of daily 1st/2nd/3rd...
 // positions, ranked by each day's average points per angler on the boat).
 // See buildSkipperRanking in scoringEngine.js for the full methodology.
+// Tuna events ('total_points' ranking) are ranked on Total Points alone,
+// so the Grand Prix position column is left out for them.
+function skipperTableData(skipperRanking) {
+  const byPoints = skipperRanking[0]?.rankingMethod === 'total_points'
+  const headers = byPoints
+    ? ['Rank', 'Boat', 'Skipper', 'Days Fished', 'Total Fish', 'Total Points']
+    : ['Rank', 'Boat', 'Skipper', 'Days Fished', 'Total Fish', 'Total Points', 'Total Position (Grand Prix)']
+  const rows = skipperRanking.map(s => {
+    const row = [s.rank, s.boatName, s.skipperName, s.daysFished, s.totalFishCount, s.totalPoints.toFixed(2)]
+    return byPoints ? row : [...row, s.totalPosition]
+  })
+  return { headers, rows }
+}
 function skipperStandingsTable(skipperRanking) {
-  const headers = ['Rank', 'Boat', 'Skipper', 'Days Fished', 'Total Fish', 'Total Points', 'Total Position (Grand Prix)']
-  const rows = skipperRanking.map(s => [
-    s.rank, s.boatName, s.skipperName, s.daysFished, s.totalFishCount,
-    s.totalPoints.toFixed(2), s.totalPosition,
-  ])
+  const { headers, rows } = skipperTableData(skipperRanking)
   return htmlTable(headers, rows)
 }
 
