@@ -232,6 +232,15 @@ export default function CompetitionAdminSetup({ competition, config, days, boats
   // rescheduling moves a day's calendar date without touching its
   // day_number, so a "Day 3" that gets rained out and fished a day later
   // is still Day 3, just on the correct date.
+  // SADSAA numbers fishing days only (Day 1 = first day actually fished).
+  // After a day is cancelled, restored or moved, the days are renumbered in
+  // the database (renumber_competition_days) so fishing days stay 1, 2, 3...
+  // in date order, together with boat times and day-specific prizes.
+  async function renumberDays() {
+    const { error: err } = await supabase.rpc('renumber_competition_days', { p_competition_id: competition.id })
+    if (err) setError(`Days saved, but they could not be renumbered: ${err.message}`)
+  }
+
   async function handleCancelDay(dayId, reason) {
     setDayLoading(p => ({ ...p, [dayId]: true }))
     const { error: err } = await supabase
@@ -240,6 +249,7 @@ export default function CompetitionAdminSetup({ competition, config, days, boats
       .eq('id', dayId)
     setDayLoading(p => ({ ...p, [dayId]: false }))
     if (err) { setError(err.message); return }
+    await renumberDays()
     onReload()
   }
 
@@ -251,6 +261,7 @@ export default function CompetitionAdminSetup({ competition, config, days, boats
       .eq('id', dayId)
     setDayLoading(p => ({ ...p, [dayId]: false }))
     if (err) { setError(err.message); return }
+    await renumberDays()
     onReload()
   }
 
@@ -263,6 +274,7 @@ export default function CompetitionAdminSetup({ competition, config, days, boats
       .eq('id', dayId)
     setDayLoading(p => ({ ...p, [dayId]: false }))
     if (err) { setError(err.message); return }
+    await renumberDays()
     onReload()
   }
 
@@ -452,7 +464,7 @@ export default function CompetitionAdminSetup({ competition, config, days, boats
               <div key={day.id} style={{ border: '1px solid #e5e7eb', borderRadius: 6, marginBottom: '0.4rem', overflow: 'hidden' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.6rem 0.75rem', flexWrap: 'wrap' }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, color: NAVY }}>Day {day.day_number}</div>
+                    <div style={{ fontWeight: 600, color: day.cancelled ? RED : NAVY }}>{day.cancelled ? 'Cancelled' : `Day ${day.day_number}`}</div>
                     <div style={{ fontSize: '0.8rem', color: GREY }}>
                       {day.date} · {day.fishing_start_time} – {day.fishing_end_time}
                       {day.cancelled && <span style={{ color: RED, marginLeft: 6 }}>CANCELLED — {day.cancellation_reason}</span>}
@@ -577,8 +589,9 @@ export default function CompetitionAdminSetup({ competition, config, days, boats
                       </button>
                     </div>
                     <div style={{ fontSize: '0.75rem', color: GREY, marginBottom: '0.5rem' }}>
-                      Moves this day's calendar date without changing its "Day {day.day_number}" label —
-                      use this when a day gets rained out and fished later instead.
+                      Moves this day's calendar date — use this when a day gets rained out and is
+                      fished later instead. Days are numbered by fishing day in date order (Day 1 is
+                      the first day fished); a cancelled day gets no day number.
                     </div>
 
                     {day.cancelled ? (

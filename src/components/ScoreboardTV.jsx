@@ -350,7 +350,7 @@ export default function ScoreboardTV({
             style={{ padding: '0.35rem 0.5rem', borderRadius: 6, fontSize: '0.9rem', fontWeight: 600 }}>
             <option value="all">All days</option>
             {days.map(d => (
-              <option key={d.id} value={d.day_number}>Day {d.day_number}{d.cancelled ? ' (cancelled)' : ''}</option>
+              <option key={d.id} value={d.day_number}>{d.cancelled ? `Cancelled${d.date ? ` — ${d.date}` : ''}` : `Day ${d.day_number}`}</option>
             ))}
           </select>
         )}

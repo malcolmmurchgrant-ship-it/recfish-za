@@ -162,7 +162,7 @@ export default function CompetitionAdminScoreboard({
     buildSkipperRanking(activeCatches, boats, days, boatDraws, teams, { method: skipperMethod }),
     [activeCatches, boats, days, boatDraws, teams, skipperMethod]
   )
-  const dayNumbersForSkipper = [...new Set((days || []).map(d => d.day_number))].sort((a, b) => a - b)
+  const dayNumbersForSkipper = [...new Set((days || []).filter(d => !d.cancelled).map(d => d.day_number))].sort((a, b) => a - b)
 
   const categories = ['all', ...new Set(participants.map(p => p.category).filter(Boolean))]
   const isLocked   = !!competition?.results_published_at
