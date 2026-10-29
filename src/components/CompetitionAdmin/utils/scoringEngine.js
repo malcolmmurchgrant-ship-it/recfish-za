@@ -590,7 +590,15 @@ export function buildCpueData(catches, participants, days, boats, fishingSession
 // indistinguishable from a true no-show with catch data alone. Worth
 // flagging to Malcolm/John if a specific day's ranking looks wrong for this
 // reason.
-export function buildSkipperRanking(catches, boats, days, boatDraws = [], teams = []) {
+// Ranking method (options.method):
+//   'position_sum' (default) — Bottomfish/Grand Prix style described above:
+//     boats are placed each day and the lowest total of daily places wins.
+//   'total_points' — SADSAA tuna events (Tuna Interprovincial / Nationals):
+//     the boat whose anglers on board score the most total points wins
+//     (Gold, Silver, Bronze, then 4th, 5th...). Ties broken by most fish.
+//     Daily places are still worked out and shown for reference only.
+export function buildSkipperRanking(catches, boats, days, boatDraws = [], teams = [], options = {}) {
+  const method = options.method === 'total_points' ? 'total_points' : 'position_sum'
   // 'rejected' catches never count anywhere — they represent a data-entry
   // mistake, not a real catch. 'disqualified' is different: the fish was
   // genuinely caught, the angler incurred a rules penalty for something
@@ -612,8 +620,25 @@ export function buildSkipperRanking(catches, boats, days, boatDraws = [], teams 
   // populate boat_id on the catch itself. Every catch does carry its own
   // team_id directly, so the team's fixed boat is resolved from there —
   // no participants lookup needed.
+  //
+  // Second gap (SADSAA Tuna Interprovincial 2026): a full-boat competition
+  // whose anglers are still drawn to different boats each day. The teams
+  // have no fixed boat and the Catch Logger did not save a boat on the
+  // catches, so the boat comes from that angler's boat draw for that day.
+  // Order: the catch's own boat, then the angler's boat draw for the day,
+  // then the team's fixed boat.
+  const drawBoatByParticipantDay = {}
+  for (const draw of (boatDraws || [])) {
+    if (draw.participant_id && draw.competition_day_id && draw.boat_id) {
+      drawBoatByParticipantDay[`${draw.participant_id}|${draw.competition_day_id}`] = draw.boat_id
+    }
+  }
   const resolveBoatId = (c) => {
     if (c.boat_id) return c.boat_id
+    const drawn = c.participant_id && c.competition_day_id
+      ? drawBoatByParticipantDay[`${c.participant_id}|${c.competition_day_id}`]
+      : null
+    if (drawn) return drawn
     const team = teams.find(t => t.id === c.team_id)
     return team?.boat_id || null
   }
@@ -727,8 +752,36 @@ export function buildSkipperRanking(catches, boats, days, boatDraws = [], teams 
   // ranking at all — a boat that never fished the whole tournament isn't a
   // genuine competing entry, distinct from a boat that fished some days
   // and was absent on others (which IS ranked, with the penalty above).
-  return results
-    .filter(r => r.daysFished > 0)
+  const fishing = results.filter(r => r.daysFished > 0)
+  if (method === 'total_points') {
+    // Most total points wins; boats level on points AND fish share a rank.
+    const sorted = fishing.sort((a, b) => b.totalPoints - a.totalPoints || b.totalFishCount - a.totalFishCount)
+    let rank = 0
+    return sorted.map((r, i, arr) => {
+      const prev = arr[i - 1]
+      const tied = prev && Math.abs(prev.totalPoints - r.totalPoints) < 0.005 && prev.totalFishCount === r.totalFishCount
+      if (!tied) rank = i + 1
+      return { ...r, rank, rankingMethod: method }
+    })
+  }
+  return fishing
     .sort((a, b) => a.totalPosition - b.totalPosition || b.totalFishCount - a.totalFishCount || b.totalPoints - a.totalPoints)
-    .map((r, i) => ({ ...r, rank: i + 1 }))
+    .map((r, i) => ({ ...r, rank: i + 1, rankingMethod: method }))
+}
+
+// Which skipper ranking a competition uses. A template may say so outright
+// in scoring_config.skipper_ranking_method; otherwise SADSAA tuna events
+// (Interprovincial, Nationals, International) rank by total points and
+// everything else keeps the Grand Prix position sum. Club tuna events with
+// their own rules (CBSC Invitational / Bonanza) are left unchanged.
+export function skipperRankingMethod(competition, config) {
+  const explicit = config?.scoring?.skipper_ranking_method
+  if (explicit === 'total_points' || explicit === 'position_sum') return explicit
+  const discipline = String(
+    competition?.discipline || competition?.competition_templates?.discipline || ''
+  ).toLowerCase()
+  const name = String(competition?.name || '').toLowerCase()
+  const isTuna = discipline.includes('tuna') || name.includes('tuna')
+  const isClubEvent = /invitational|bonanza/.test(name)
+  return isTuna && !isClubEvent ? 'total_points' : 'position_sum'
 }

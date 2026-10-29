@@ -45,6 +45,7 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
   const [teams,        setTeams]        = useState([])
   const [boats,        setBoats]        = useState([])
   const [days,         setDays]         = useState([])
+  const [boatDraws,    setBoatDraws]    = useState([])
   const [loading,      setLoading]      = useState(true)
   const [lastRefresh,  setLastRefresh]  = useState(null)
   const [activeTab,    setActiveTab]    = useState('team')
@@ -84,6 +85,7 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
       { data: teamData },
       { data: boatData },
       { data: dayData },
+      { data: drawData },
     ] = await Promise.all([
       supabase.from('competitions')
         .select('*, competition_templates(discipline, level, category, scoring_config, team_config, session_structure, species_config)')
@@ -108,6 +110,11 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
         .select('*').eq('competition_id', competitionId),
       supabase.from('competition_days')
         .select('*').eq('competition_id', competitionId).order('day_number'),
+      // Daily boat draws: which boat each angler fished from each day. Used
+      // as a fallback for the skipper standings when a catch has no boat
+      // saved (see resolveBoatId below). Optional — empty if unreadable.
+      supabase.from('competition_boat_draws')
+        .select('participant_id, boat_id, competition_day_id').eq('competition_id', competitionId),
     ])
     setCompetition(compData)
     setTemplate(compData?.competition_templates)
@@ -116,6 +123,7 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
     setTeams(teamData || [])
     setBoats(boatData || [])
     setDays(dayData || [])
+    setBoatDraws(drawData || [])
     setLastRefresh(new Date())
     setLoading(false)
   }, [competitionId])
@@ -180,9 +188,18 @@ export default function UniversalScoreboard({ competitionId, embedded = false, i
   // fixed boat_id.
   const boatIdByTeamId = Object.fromEntries(teams.filter(t => t.boat_id).map(t => [t.id, t.boat_id]))
   const teamIdByParticipantId = Object.fromEntries(participants.map(p => [p.id, p.team_id]))
+  // SADSAA Tuna Interprovincial 2026: full-boat format, but anglers are
+  // drawn to a different boat each day and the teams have no fixed boat —
+  // so after the catch's own boat, use the angler's boat draw for that day.
+  const drawBoatByParticipantDay = Object.fromEntries(
+    boatDraws.filter(d => d.participant_id && d.competition_day_id && d.boat_id)
+      .map(d => [`${d.participant_id}|${d.competition_day_id}`, d.boat_id])
+  )
   function resolveBoatId(c) {
     if (c.boat_id) return c.boat_id
     const participantId = (c.angler_id && userIdToParticipantId[c.angler_id]) || c.participant_id
+    const drawn = participantId && c.competition_day_id && drawBoatByParticipantDay[`${participantId}|${c.competition_day_id}`]
+    if (drawn) return drawn
     const teamId = participantId && teamIdByParticipantId[participantId]
     return teamId ? boatIdByTeamId[teamId] : null
   }

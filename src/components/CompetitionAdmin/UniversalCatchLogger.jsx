@@ -646,7 +646,10 @@ export default function UniversalCatchLogger({ competitionId }) {
         angler_id: participant.user_id,
         participant_id: participant.id,
         team_id: teamId || participant.competition_teams?.id || null,
-        boat_id: splitBoatFormat ? (boatId || null) : null,
+        // Full-boat formats can still draw anglers to different boats each
+        // day (SADSAA Tuna Interprovincial) — save the angler's drawn boat
+        // so the Boat/Skipper ranking can credit the right boat.
+        boat_id: splitBoatFormat ? (boatId || null) : (getAnglerBoatForDay(participant.id, selectedDay.id)?.id || null),
         fishing_date: selectedDay.date || null,
         entered_by: user?.id,
       }
@@ -887,7 +890,7 @@ export default function UniversalCatchLogger({ competitionId }) {
           angler_id: a.user_id || null,
           participant_id: a.id,
           team_id: a.competition_teams?.id || teamId || null,
-          boat_id: splitBoatFormat ? (boatId || null) : null,
+          boat_id: splitBoatFormat ? (boatId || null) : (getAnglerBoatForDay(a.id, selectedDay.id)?.id || null),
           fishing_date: selectedDay.date || null,
           entered_by: user?.id,
         }),

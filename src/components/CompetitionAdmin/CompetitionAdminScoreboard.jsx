@@ -7,7 +7,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { buildIndividualStandings, aggregateTeamScores, buildBoatPercentageTeamStandings, buildDailyAnglerPercentages, buildCpueData, buildSkipperRanking } from './utils/scoringEngine'
+import { buildIndividualStandings, aggregateTeamScores, buildBoatPercentageTeamStandings, buildDailyAnglerPercentages, buildCpueData, buildSkipperRanking, skipperRankingMethod } from './utils/scoringEngine'
 import { inDivision } from '../../utils/anglerDivisions'
 import WeighInReports from '../WeighInReports'
 import { tracksWeighInReports } from '../../utils/noCatch'
@@ -157,9 +157,10 @@ export default function CompetitionAdminScoreboard({
       .then(({ data }) => setBoatDraws(data || []))
   }, [competition?.id])
 
+  const skipperMethod = skipperRankingMethod(competition, config)
   const skipperRanking = useMemo(() =>
-    buildSkipperRanking(activeCatches, boats, days, boatDraws, teams),
-    [activeCatches, boats, days, boatDraws, teams]
+    buildSkipperRanking(activeCatches, boats, days, boatDraws, teams, { method: skipperMethod }),
+    [activeCatches, boats, days, boatDraws, teams, skipperMethod]
   )
   const dayNumbersForSkipper = [...new Set((days || []).map(d => d.day_number))].sort((a, b) => a - b)
 
@@ -460,6 +461,14 @@ export default function CompetitionAdminScoreboard({
       {/* ── Skipper / Boat ranking ──────────────────────────────────────── */}
       {viewMode === 'skipper' && (
         <div style={S.card}>
+          {skipperMethod === 'total_points' ? (
+          <div style={{ fontSize: '0.78rem', color: GREY, marginBottom: '0.75rem' }}>
+            Boats are ranked by the <strong>total points</strong> scored by the anglers on
+            board across all days: the most points wins Gold, then Silver, Bronze, 4th and so
+            on. Each angler's catches count for the boat they were drawn to that day. Ties
+            are broken by most fish. The daily positions are shown for reference only.
+          </div>
+          ) : (
           <div style={{ fontSize: '0.78rem', color: GREY, marginBottom: '0.75rem' }}>
             Each day, boats are ranked 1st, 2nd, 3rd... by that day's <strong>average points
             per angler</strong> (total points on the boat, divided by the number of anglers
@@ -473,6 +482,7 @@ export default function CompetitionAdminScoreboard({
             broken first by most fish caught for the competition, then by total points scored
             if still tied.
           </div>
+          )}
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
               <thead>
@@ -512,13 +522,13 @@ export default function CompetitionAdminScoreboard({
                         ) : '—'}
                       </td>
                     ))}
-                    <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', fontWeight: 700, color: NAVY }}>{s.totalPoints.toFixed(2)}</td>
+                    <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', fontWeight: 700, color: skipperMethod === 'total_points' ? RED : NAVY }}>{s.totalPoints.toFixed(2)}</td>
                     {dayNumbersForSkipper.map(d => (
                       <td key={`pos-${d}`} style={{ padding: '0.5rem 0.5rem', textAlign: 'center', color: GREY }}>
                         {s.dailyPosition[d] ?? '—'}
                       </td>
                     ))}
-                    <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', fontWeight: 700, color: RED }}>{s.totalPosition}</td>
+                    <td style={{ padding: '0.5rem 0.5rem', textAlign: 'center', fontWeight: skipperMethod === 'total_points' ? 400 : 700, color: skipperMethod === 'total_points' ? GREY : RED }}>{s.totalPosition}</td>
                   </tr>
                 ))}
                 {skipperRanking.length === 0 && (

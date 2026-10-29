@@ -8,7 +8,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { downloadCSV, downloadXLSX, downloadPDFReport } from './utils/reportGenerator'
 import { readLogoFile, MAX_LOGOS } from '../../utils/sponsorLogos'
-import { buildIndividualStandings, buildDailyAnglerPercentages, buildBoatPercentageTeamStandings, buildCpueData, buildSkipperRanking } from './utils/scoringEngine'
+import { buildIndividualStandings, buildDailyAnglerPercentages, buildBoatPercentageTeamStandings, buildCpueData, buildSkipperRanking, skipperRankingMethod } from './utils/scoringEngine'
 import { isLady, isJunior } from '../../utils/anglerDivisions'
 import { dayLabel } from '../../utils/dayLabels'
 import { usesDailyBiggestTuna } from '../../utils/dailyBiggestTunaExclusion'
@@ -93,8 +93,8 @@ export default function CompetitionAdminReports({
       .then(({ data }) => setBoatDraws(data || []))
   }, [competition?.id])
   const skipperRanking = useMemo(() =>
-    buildSkipperRanking(catches.filter(c => c.data_quality !== 'rejected'), boats, days, boatDraws, teams),
-    [catches, boats, days, boatDraws, teams]
+    buildSkipperRanking(catches.filter(c => c.data_quality !== 'rejected'), boats, days, boatDraws, teams, { method: skipperRankingMethod(competition, config) }),
+    [catches, boats, days, boatDraws, teams, competition, config]
   )
   // Weight isn't tracked at all for 'points'-method (unit-count) competitions
   // like this one — species are tallied, not weighed — so a "Total Weight"
