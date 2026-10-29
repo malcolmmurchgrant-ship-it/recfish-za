@@ -752,8 +752,11 @@ export function buildSkipperRanking(catches, boats, days, boatDraws = [], teams 
   // ranking at all — a boat that never fished the whole tournament isn't a
   // genuine competing entry, distinct from a boat that fished some days
   // and was absent on others (which IS ranked, with the penalty above).
-  const fishing = results.filter(r => r.daysFished > 0)
   if (method === 'total_points') {
+    // Tuna: every boat that was drawn (or caught anything) is listed, even
+    // on 0.00 points, the same as the official Skipper Ranking sheet.
+    const drawnBoatIds = new Set((boatDraws || []).map(d => d.boat_id).filter(Boolean))
+    const fishing = results.filter(r => r.daysFished > 0 || drawnBoatIds.has(r.boatId))
     // Most total points wins; boats level on points AND fish share a rank.
     const sorted = fishing.sort((a, b) => b.totalPoints - a.totalPoints || b.totalFishCount - a.totalFishCount)
     let rank = 0
@@ -764,7 +767,7 @@ export function buildSkipperRanking(catches, boats, days, boatDraws = [], teams 
       return { ...r, rank, rankingMethod: method }
     })
   }
-  return fishing
+  return results.filter(r => r.daysFished > 0)
     .sort((a, b) => a.totalPosition - b.totalPosition || b.totalFishCount - a.totalFishCount || b.totalPoints - a.totalPoints)
     .map((r, i) => ({ ...r, rank: i + 1, rankingMethod: method }))
 }
